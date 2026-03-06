@@ -9,6 +9,18 @@ export interface Employee {
   customRateHour: number | null;
 }
 
+export type LogType = "IN" | "OUT";
+export type LogSource = "Time1" | "Time2" | "OT";
+
+export interface AttendanceRecord {
+  date: string;
+  employee: string;
+  logTime: string;
+  type: LogType;
+  site: string;
+  source: LogSource;
+}
+
 export interface EmployeeCalculated extends Employee {
   rateDay: number;
   rateHour: number;
@@ -32,4 +44,4 @@ export interface PayrollSummary {
   totalGross: number;
 }
 
-export type Step = 1 | 2 | 3;
+export type Step = 1 | 2 | 3 | 4;

@@ -9,6 +9,7 @@ interface StepIndicatorProps {
 
 const STEPS: { label: string; sub: string }[] = [
   { label: "Upload Report", sub: "Attendance file" },
+  { label: "File Parsing Engine", sub: "Clean raw logs" },
   { label: "Configure Rates", sub: "Pay settings" },
   { label: "Review & Export", sub: "Final payroll" },
 ];

@@ -1,0 +1,59 @@
+
+> prodisenyo-payroll@1.0.0 dev
+> next dev
+
+  ▲ Next.js 14.2.5
+  - Local:        http://localhost:3000
+
+ ✓ Starting...
+ ✓ Ready in 3s
+ ○ Compiling / ...
+ ✓ Compiled / in 16.2s (549 modules)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET / 200 in 17212ms
+ ✓ Compiled in 1254ms (535 modules)
+ GET / 200 in 77ms
+ ✓ Compiled in 2s (546 modules)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⨯ app\page.tsx (198:7) @ resolvedRecords
+ ⨯ ReferenceError: resolvedRecords is not defined
+    at HomePage (./app/page.tsx:156:9)
+digest: "3126100375"
+[0m [90m 196 |[39m[0m
+[0m [90m 197 |[39m     [36mreturn[39m rows[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m 198 |[39m   }[33m,[39m [resolvedRecords])[33m;[39m[0m
+[0m [90m     |[39m       [31m[1m^[22m[39m[0m
+[0m [90m 199 |[39m[0m
+[0m [90m 200 |[39m   [36mconst[39m availableSites [33m=[39m useMemo(() [33m=>[39m {[0m
+[0m [90m 201 |[39m     [36mreturn[39m [33mArray[39m[33m.[39m[36mfrom[39m([0m
+ GET / 500 in 627ms
+ ✓ Compiled in 1476ms (546 modules)
+ ⨯ app\page.tsx (318:7) @ aliasLookup
+ ⨯ ReferenceError: aliasLookup is not defined
+    at HomePage (./app/page.tsx:277:9)
+digest: "866525335"
+[0m [90m 316 |[39m       })[33m;[39m[0m
+[0m [90m 317 |[39m     })[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m 318 |[39m   }[33m,[39m [aliasLookup[33m,[39m sourceEmployees])[33m;[39m[0m
+[0m [90m     |[39m       [31m[1m^[22m[39m[0m
+[0m [90m 319 |[39m[0m
+[0m [90m 320 |[39m   useEffect(() [33m=>[39m {[0m
+[0m [90m 321 |[39m     [36mif[39m ([33m![39mtimelineEmployees[33m.[39mincludes(timelineEmployee)) {[0m
+ ⨯ app\page.tsx (318:7) @ aliasLookup
+ ⨯ ReferenceError: aliasLookup is not defined
+    at HomePage (./app/page.tsx:277:9)
+digest: "866525335"
+[0m [90m 316 |[39m       })[33m;[39m[0m
+[0m [90m 317 |[39m     })[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m 318 |[39m   }[33m,[39m [aliasLookup[33m,[39m sourceEmployees])[33m;[39m[0m
+[0m [90m     |[39m       [31m[1m^[22m[39m[0m
+[0m [90m 319 |[39m[0m
+[0m [90m 320 |[39m   useEffect(() [33m=>[39m {[0m
+[0m [90m 321 |[39m     [36mif[39m ([33m![39mtimelineEmployees[33m.[39mincludes(timelineEmployee)) {[0m
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET / 500 in 127ms
+ ✓ Compiled in 1364ms (546 modules)
+ GET / 200 in 235ms
+ GET / 200 in 67ms
+ ✓ Compiled in 1574ms (546 modules)
+ ✓ Compiled in 980ms (546 modules)
