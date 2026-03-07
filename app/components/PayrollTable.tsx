@@ -32,10 +32,14 @@ export default function PayrollTable({
     useState<EmployeeCalculated | null>(null);
 
   const filtered = useMemo(() => {
+    // query
     const q = query.toLowerCase();
+
     return calculated.filter((e) => {
       const matchesQuery = e.name.toLowerCase().includes(q);
+
       const hasDuration = e.days > 0 || e.regularHours > 0 || e.otHours > 0;
+
       return matchesQuery && (!showWithDurationOnly || hasDuration);
     });
   }, [calculated, query, showWithDurationOnly]);
@@ -171,6 +175,7 @@ export default function PayrollTable({
             <tr className="border-b border-apple-mist">
               {[
                 "#",
+                "Branch",
                 "Employee",
                 "Days",
                 "Reg. Hours",
@@ -201,12 +206,15 @@ export default function PayrollTable({
                   {(safePage - 1) * PER_PAGE + idx + 1}
                 </td>
 
-                {/* Name + dept */}
+                <td className="px-4 py-3 text-xs text-apple-steel">
+                  {emp.branch}
+                </td>
+
+                {/* Name*/}
                 <td className="px-4 py-3.5">
                   <p className="font-semibold text-apple-charcoal text-[13px] tracking-tight">
                     {capitalize(emp.name)}
                   </p>
-                  {/* <p className="text-2xs text-apple-steel mt-0.5">{emp.dept}</p> */}
                 </td>
 
                 {/* Days editable */}

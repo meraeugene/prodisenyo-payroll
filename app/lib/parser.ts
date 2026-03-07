@@ -1,4 +1,8 @@
-import type { Employee, EmployeeCalcDetails, EmployeeDailyLog } from "@/app/types";
+import type {
+  Employee,
+  EmployeeCalcDetails,
+  EmployeeDailyLog,
+} from "@/app/types";
 
 export interface ParseResult {
   employees: Employee[];
@@ -11,6 +15,11 @@ export interface ParseResult {
  * Falls back to demo data extraction if structure is unrecognised.
  */
 export async function parseAttendanceFile(file: File): Promise<ParseResult> {
+  const branch = file.name
+    .replace(/\.[^/.]+$/, "") // remove extension
+    .replace(/\s*\d{4}T[O0]?\d{4}.*/i, "") // remove weekly date
+    .trim();
+
   const ext = file.name.split(".").pop()?.toLowerCase();
 
   if (ext === "pdf") {
@@ -18,13 +27,16 @@ export async function parseAttendanceFile(file: File): Promise<ParseResult> {
   }
 
   if (ext === "xls" || ext === "xlsx" || ext === "csv") {
-    return parseSpreadsheet(file);
+    return parseSpreadsheet(file, branch);
   }
 
   throw new Error(`Unsupported file type: .${ext}`);
 }
 
-async function parseSpreadsheet(file: File): Promise<ParseResult> {
+async function parseSpreadsheet(
+  file: File,
+  branch: string,
+): Promise<ParseResult> {
   // Dynamically import SheetJS only on client
   const XLSX = await import("xlsx");
   const buffer = await file.arrayBuffer();
@@ -62,9 +74,13 @@ async function parseSpreadsheet(file: File): Promise<ParseResult> {
       period = detectPeriod(rows) ?? period;
     }
 
-    allEmployees.push(
-      ...extractEmployeesFromBlockLayout(rows, sheetName),
-    );
+    const extracted = extractEmployeesFromBlockLayout(rows, sheetName);
+
+    extracted.forEach((e) => {
+      e.branch = branch;
+    });
+
+    allEmployees.push(...extracted);
   });
 
   const sortedEmployees = [...allEmployees].sort((a, b) => a.id - b.id);
@@ -203,9 +219,7 @@ function extractEmployeesFallback(rows: unknown[][]): Employee[] {
 
   for (let r = 0; r < Math.min(20, rows.length); r++) {
     const row = rows[r] as unknown[];
-    const nameIdx = row.findIndex((c) =>
-      normaliseCell(c).includes("name"),
-    );
+    const nameIdx = row.findIndex((c) => normaliseCell(c).includes("name"));
     if (nameIdx >= 0) {
       headerRowIdx = r;
       nameColIdx = nameIdx;

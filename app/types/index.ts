@@ -24,7 +24,7 @@ export interface EmployeeCalcDetails {
 export interface Employee {
   id: number;
   name: string;
-  // dept: string;
+  branch?: string;
   days: number;
   regularHours: number;
   otHours: number;
