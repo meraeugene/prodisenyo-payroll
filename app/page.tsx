@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { Download, ChevronRight } from "lucide-react";
@@ -8,12 +8,28 @@ import UploadZone from "@/app/components/UploadZone";
 import RateConfig from "@/app/components/RateConfig";
 import SummaryCards from "@/app/components/SummaryCards";
 import PayrollTable from "@/app/components/PayrollTable";
+import ChartCard from "@/app/components/ChartCard";
 
 import type { AttendanceRecord, Employee, PayrollConfig, Step } from "@/app/types";
 import { calculateAll, getSummary, exportToCSV, exportLogsToCSV } from "@/app/lib/payroll";
 import type { ParseResult } from "@/app/lib/parser";
 import Footer from "./components/Footer";
 import Nav from "./components/Nav";
+
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
+  CartesianGrid,
+} from "recharts";
 
 const DEFAULT_CONFIG: PayrollConfig = {
   defaultRateDay: 500,
@@ -123,6 +139,98 @@ export default function HomePage() {
     [employees, config],
   );
   const summary = useMemo(() => getSummary(calculated), [calculated]);
+
+// Payroll Cost by Branch
+const payrollByBranch = useMemo(() => {
+  const map = new Map<string, number>();
+
+  calculated.forEach((emp) => {
+    const rec = records.find(
+      (r) =>
+        r.employee.trim().toLowerCase() === emp.name.trim().toLowerCase()
+    );
+
+    const branch = rec?.site?.split(" ")[0] ?? "Unknown";
+
+    map.set(branch, (map.get(branch) ?? 0) + emp.grossPay);
+  });
+
+  return Array.from(map.entries())
+  .map(([branch, payroll]) => ({
+    branch,
+    payroll: Math.round(payroll),
+  }))
+  .sort((a, b) => b.payroll - a.payroll);
+}, [calculated, records]);
+
+// Overtime by Branch
+const overtimeByBranch = useMemo(() => {
+  const map = new Map<string, number>();
+
+  employees.forEach((emp) => {
+    const rec = records.find(
+      (r) =>
+        r.employee.trim().toLowerCase() === emp.name.trim().toLowerCase()
+    );
+
+    const branch = rec?.site?.split(" ")[0] ?? "Unknown";
+
+    map.set(branch, (map.get(branch) ?? 0) + emp.otHours);
+  });
+
+  return Array.from(map.entries())
+  .map(([branch, hours]) => ({
+    branch,
+    hours: Number(hours.toFixed(2)),  
+  }))
+  .sort((a, b) => b.hours - a.hours);
+}, [employees, records]);
+
+// Workforce by Branch
+const workforceByBranch = useMemo(() => {
+  const map = new Map<string, Set<string>>();
+
+  records.forEach((r) => {
+    const branch = r.site.split(" ")[0];
+    if (!map.has(branch)) map.set(branch, new Set());
+    map.get(branch)!.add(r.employee);
+  });
+
+  return Array.from(map.entries())
+  .map(([branch, set]) => ({
+    branch,
+    employees: set.size,
+  }))
+  .sort((a, b) => b.employees - a.employees);
+}, [records]);
+
+// Daily Labor Hours
+const dailyLaborHours = useMemo(() => {
+  const map = new Map<string, number>();
+
+  records.forEach((r) => {
+    map.set(r.date, (map.get(r.date) ?? 0) + 1);
+  });
+
+  return Array.from(map.entries())
+    .map(([date, logs]) => ({
+      date,
+      hours: logs / 2,
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}, [records]);
+
+// Top Overtime Employees
+const topOTEmployees = useMemo(() => {  
+  return [...employees]
+    .sort((a, b) => b.otHours - a.otHours)
+    .slice(0, 5)
+    .map((e) => ({
+      name: e.name,
+      hours: e.otHours,
+    }));
+}, [employees]);
+
 
   const dailyRows = useMemo<DailyLogRow[]>(() => {
     const grouped = new Map<string, DailyLogRow>();
@@ -805,67 +913,90 @@ export default function HomePage() {
         )}
 
         {step >= 4 && (
-          <section
-            className="animate-fade-up"
-            style={{ animationFillMode: "both", animationDelay: "140ms" }}
-          >
-            <div className="bg-white rounded-3xl border border-apple-mist shadow-apple-xs overflow-hidden">
-              <div className="px-5 sm:px-8 pt-6 sm:pt-8 pb-5 sm:pb-6 border-b border-apple-mist flex items-center justify-between flex-wrap gap-3 sm:gap-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-2xs font-mono font-semibold text-apple-steel uppercase tracking-widest">
-                      Step 4
-                    </span>
-                    <span className="text-2xs font-semibold text-apple-smoke bg-apple-snow px-2 py-0.5 rounded-full border border-apple-mist">
-                      {period}
-                    </span>
-                  </div>
-                  <h2 className="text-[22px] font-bold text-apple-charcoal tracking-tight">
-                    Review & Export Payroll
-                  </h2>
-                  <p className="text-sm text-apple-smoke mt-1">
-                    Final review before downloading the payroll report and detailed attendance logs.
-                  </p>
-                </div>
+  <section className="animate-fade-up">
+    <div className="bg-white rounded-3xl border border-apple-mist shadow-apple-xs p-6 sm:p-8 space-y-6">
 
-                <div className="flex items-center gap-2 no-print w-full sm:w-auto">
-                  <button
-                    onClick={() => exportLogsToCSV(records, site, period)}
-                    disabled={records.length === 0}
-                    className={`flex-1 sm:flex-none justify-center flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-semibold transition-all duration-150 active:scale-[0.98]
-                      ${records.length > 0
-                        ? "bg-white border border-apple-silver text-apple-charcoal hover:border-apple-charcoal"
-                        : "bg-apple-mist border border-apple-mist text-apple-steel cursor-not-allowed"
-                      }`}
-                  >
-                    <Download size={14} />
-                    Download Attendance Logs (CSV)
-                  </button>
+      <div>
+        <h2 className="text-[22px] font-bold text-apple-charcoal">
+          Payroll Insights
+        </h2>
+        <p className="text-sm text-apple-smoke">
+          Financial overview across branches.
+        </p>
+      </div>
 
-                  <button
-                    onClick={() => exportToCSV(calculated, period)}
-                    className="flex-1 sm:flex-none justify-center flex items-center gap-2 px-4 py-2.5 rounded-2xl
-                      bg-apple-charcoal text-white text-sm font-semibold
-                      hover:bg-apple-black transition-all duration-150 active:scale-[0.98]
-                      shadow-apple"
-                  >
-                    <Download size={14} />
-                    Download Payroll Excel
-                  </button>
-                </div>
-              </div>
+      <div className="grid md:grid-cols-2 gap-6">
 
-              <div className="px-5 sm:px-8 py-6 sm:py-8">
-                <PayrollTable
-                  employees={employees}
-                  calculated={calculated}
-                  config={config}
-                  onUpdateEmployee={handleUpdateEmployee}
-                />
-              </div>
-            </div>
-          </section>
-        )}
+        {/* Payroll by Branch */}
+        <ChartCard title="Payroll Cost by Branch">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={payrollByBranch}>
+              <XAxis dataKey="branch" />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="payroll" fill="#111827" radius={[6,6,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        {/* Overtime by Branch */}
+        <ChartCard title="Overtime Hours by Branch">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={overtimeByBranch}>
+              <XAxis dataKey="branch" />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="hours" fill="#4b5563" radius={[6,6,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        {/* Workforce */}
+        <ChartCard title="Employees per Branch">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={workforceByBranch}>
+              <XAxis dataKey="branch" />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="employees" fill="#1f2937" radius={[6,6,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        {/* Daily Labor */}
+        <ChartCard title="Daily Labor Hours">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={dailyLaborHours}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" />
+              <YAxis />
+              <Tooltip />
+              <Line
+                type="monotone"
+                dataKey="hours"
+                stroke="#111827"
+                strokeWidth={2}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        {/* Top OT Employees */}
+        <ChartCard title="Top Overtime Employees">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={topOTEmployees} layout="vertical">
+              <XAxis type="number" />
+              <YAxis dataKey="name" type="category" />
+              <Tooltip />
+              <Bar dataKey="hours" fill="#111827" radius={[0,6,6,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+      </div>
+    </div>
+  </section>
+)}
       </main>
 
       <Footer />
