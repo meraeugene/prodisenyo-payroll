@@ -129,7 +129,11 @@ export default function UploadZone({ onParsed }: UploadZoneProps) {
               </button>
             </div>
 
-            <div className="rounded-2xl border border-apple-mist bg-apple-snow px-3 py-2 max-h-28 overflow-auto">
+            <div className="space-y-1.5">
+              <p className="text-2xs font-semibold text-apple-steel uppercase tracking-widest">
+                Uploaded Reports
+              </p>
+              <div className="rounded-2xl border border-apple-mist bg-apple-snow px-3 py-2 max-h-28 overflow-auto">
               {files.slice(0, 8).map((current) => (
                 <p
                   key={`${current.name}-${current.size}`}
@@ -143,6 +147,7 @@ export default function UploadZone({ onParsed }: UploadZoneProps) {
                   +{files.length - 8} more files
                 </p>
               )}
+              </div>
             </div>
           </div>
         )}
@@ -177,9 +182,9 @@ export default function UploadZone({ onParsed }: UploadZoneProps) {
               <Loader2 size={15} className="animate-spin" /> Processing...
             </>
           ) : (
-            <>
-              <Upload size={15} /> Process {files.length > 1 ? "Files" : "File"}
-            </>
+              <>
+                <Upload size={15} /> Review Attendance Reports
+              </>
           )}
         </button>
       </div>

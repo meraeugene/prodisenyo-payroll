@@ -12,9 +12,9 @@ interface SummaryCardsProps {
 export default function SummaryCards({ summary, period }: SummaryCardsProps) {
   const cards = [
     {
-      label: "Employees",
+      label: "Employees Processed",
       value: summary.totalEmployees.toString(),
-      sub: "Active this period",
+      sub: "Included in this payroll",
       icon: Users,
     },
     {

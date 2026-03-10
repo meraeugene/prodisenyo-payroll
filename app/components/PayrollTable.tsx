@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   SlidersHorizontal,
+  AlertTriangle,
 } from "lucide-react";
 import type { Employee, EmployeeCalculated, PayrollConfig } from "@/app/types";
 import { capitalize, formatNumber } from "@/app/lib/payroll";
@@ -132,7 +133,7 @@ export default function PayrollTable({
 
       {/* Table */}
       <div className="overflow-x-auto rounded-3xl border border-apple-mist bg-white shadow-apple-xs [-webkit-overflow-scrolling:touch]">
-        <table className="w-full text-sm min-w-[860px]">
+        <table className="w-full text-sm min-w-[920px]">
           <thead>
             <tr className="border-b border-apple-mist">
               {[
@@ -148,7 +149,8 @@ export default function PayrollTable({
               ].map((h, i) => (
                 <th
                   key={i}
-                  className="px-4 py-3.5 text-left text-2xs font-semibold uppercase tracking-widest text-apple-steel whitespace-nowrap"
+                  className={`px-4 py-3.5 text-2xs font-semibold uppercase tracking-widest text-apple-steel whitespace-nowrap
+                    ${i === 1 ? "text-left" : "text-right"}`}
                 >
                   {h}
                 </th>
@@ -162,7 +164,7 @@ export default function PayrollTable({
                 className="border-b border-apple-mist/60 last:border-0 hover:bg-apple-snow/60 transition-colors group"
               >
                 {/* # */}
-                <td className="px-4 py-3.5 text-xs text-apple-silver font-mono">
+                <td className="px-4 py-3.5 text-xs text-apple-silver font-mono text-right">
                   {(safePage - 1) * PER_PAGE + idx + 1}
                 </td>
 
@@ -175,39 +177,45 @@ export default function PayrollTable({
                 </td>
 
                 {/* Days editable */}
-                <td className="px-4 py-3.5">
-                  <InlineInput
-                    value={emp.days}
-                    onChange={(v) => handleHoursChange(emp.id, "days", v)}
-                    suffix="d"
-                  />
+                <td className="px-4 py-3.5 text-right">
+                  <div className="inline-flex justify-end">
+                    <InlineInput
+                      value={emp.days}
+                      onChange={(v) => handleHoursChange(emp.id, "days", v)}
+                      suffix="d"
+                    />
+                  </div>
                 </td>
 
                 {/* Reg Hours */}
-                <td className="px-4 py-3.5">
-                  <InlineInput
-                    value={emp.regularHours}
-                    onChange={(v) =>
-                      handleHoursChange(emp.id, "regularHours", v)
-                    }
-                    suffix="h"
-                  />
+                <td className="px-4 py-3.5 text-right">
+                  <div className="inline-flex justify-end">
+                    <InlineInput
+                      value={emp.regularHours}
+                      onChange={(v) =>
+                        handleHoursChange(emp.id, "regularHours", v)
+                      }
+                      suffix="h"
+                    />
+                  </div>
                 </td>
 
                 {/* OT Hours */}
-                <td className="px-4 py-3.5">
-                  <InlineInput
-                    value={emp.otHours}
-                    onChange={(v) => handleHoursChange(emp.id, "otHours", v)}
-                    suffix="h"
-                    highlight={emp.otHours > 0}
-                  />
+                <td className="px-4 py-3.5 text-right">
+                  <div className="inline-flex justify-end">
+                    <InlineInput
+                      value={emp.otHours}
+                      onChange={(v) => handleHoursChange(emp.id, "otHours", v)}
+                      suffix="h"
+                      highlight={emp.otHours > 0}
+                    />
+                  </div>
                 </td>
 
                 {/* Per-emp rate fields */}
                 {perEmpRates && (
                   <>
-                    <td className="px-4 py-3.5">
+                    <td className="px-4 py-3.5 text-right">
                       <RateInput
                         value={emp.customRateDay ?? config.defaultRateDay}
                         isCustom={emp.customRateDay !== null}
@@ -219,7 +227,7 @@ export default function PayrollTable({
                         }
                       />
                     </td>
-                    <td className="px-4 py-3.5">
+                    <td className="px-4 py-3.5 text-right">
                       <RateInput
                         value={emp.customRateHour ?? config.defaultRateHour}
                         isCustom={emp.customRateHour !== null}
@@ -235,20 +243,31 @@ export default function PayrollTable({
                 )}
 
                 {/* Day Pay */}
-                <td className="px-4 py-3.5 text-[13px] font-mono text-apple-ash">
+                <td className="px-4 py-3.5 text-[13px] font-mono text-apple-ash text-right">
                   ₱{formatNumber(emp.dayPay)}
                 </td>
 
                 {/* OT Pay */}
-                <td className="px-4 py-3.5 text-[13px] font-mono text-apple-smoke">
+                <td className="px-4 py-3.5 text-[13px] font-mono text-apple-smoke text-right">
                   {emp.otPay > 0 ? `₱${formatNumber(emp.otPay)}` : "—"}
                 </td>
 
                 {/* Gross */}
-                <td className="px-4 py-3.5">
-                  <span className="text-[13px] font-bold font-mono text-apple-charcoal">
-                    ₱{formatNumber(emp.grossPay)}
-                  </span>
+                <td className="px-4 py-3.5 text-right">
+                  <div className="inline-flex flex-col items-end gap-0.5">
+                    <span className="text-[13px] font-bold font-mono text-apple-charcoal">
+                      ₱{formatNumber(emp.grossPay)}
+                    </span>
+                    {emp.days === 0 &&
+                      emp.regularHours === 0 &&
+                      emp.otHours === 0 &&
+                      emp.grossPay === 0 && (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-amber-50 border border-amber-100 text-[10px] font-medium text-amber-700">
+                          <AlertTriangle size={10} className="shrink-0" />
+                          No attendance
+                        </span>
+                      )}
+                  </div>
                 </td>
               </tr>
             ))}

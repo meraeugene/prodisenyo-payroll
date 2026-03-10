@@ -8,10 +8,10 @@ interface StepIndicatorProps {
 }
 
 const STEPS: { label: string; sub: string }[] = [
-  { label: "Upload Report", sub: "Attendance file" },
-  { label: "File Parsing Engine", sub: "Clean raw logs" },
-  { label: "Configure Rates", sub: "Pay settings" },
-  { label: "Review & Export", sub: "Final payroll" },
+  { label: "Upload Attendance", sub: "Biometric reports" },
+  { label: "Review Attendance", sub: "Clean time logs" },
+  { label: "Review Payroll Settings", sub: "Rates & overtime" },
+  { label: "Review & Download Payroll", sub: "Final checks" },
 ];
 
 export default function StepIndicator({ current }: StepIndicatorProps) {

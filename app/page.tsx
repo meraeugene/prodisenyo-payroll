@@ -276,6 +276,24 @@ export default function HomePage() {
     return filteredDailyRows.slice(previewStart, previewEnd);
   }, [filteredDailyRows, previewStart, previewEnd]);
 
+  const branchSummaries = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const record of records) {
+      const siteKey = record.site?.trim();
+      if (!siteKey) continue;
+      if (!map.has(siteKey)) {
+        map.set(siteKey, new Set<string>());
+      }
+      map.get(siteKey)!.add(record.employee.trim());
+    }
+    return Array.from(map.entries())
+      .map(([siteName, employeesSet]) => ({
+        siteName,
+        employeeCount: employeesSet.size,
+      }))
+      .sort((a, b) => a.siteName.localeCompare(b.siteName));
+  }, [records]);
+
   useEffect(() => {
     setRecordsPage((prev) => Math.min(prev, totalRecordPages));
   }, [totalRecordPages]);
@@ -357,10 +375,10 @@ export default function HomePage() {
                   )}
                 </div>
                 <h2 className="text-[22px] font-bold text-apple-charcoal tracking-tight">
-                  Upload Attendance Report
+                  Upload Attendance Reports
                 </h2>
                 <p className="text-sm text-apple-smoke mt-1">
-                  Upload one or more biometric exports as XLS, XLSX, or CSV.
+                  Upload one or more biometric attendance exports as XLS, XLSX, or CSV.
                 </p>
               </div>
             </div>
@@ -394,10 +412,10 @@ export default function HomePage() {
                   )}
                 </div>
                 <h2 className="text-[22px] font-bold text-apple-charcoal tracking-tight">
-                  File Parsing Engine
+                  Review Attendance Logs
                 </h2>
                 <p className="text-sm text-apple-smoke mt-1">
-                  Horizontal logs are cleaned and normalized into vertical records.
+                  Your biometric files are cleaned and converted into readable daily time logs.
                 </p>
               </div>
 
@@ -416,8 +434,12 @@ export default function HomePage() {
                     <p className="text-xl font-bold text-apple-charcoal mt-1">{removedEntries}</p>
                   </div>
                   <div className="rounded-2xl border border-apple-mist bg-apple-snow px-4 py-3">
-                    <p className="text-2xs text-apple-steel uppercase tracking-widest">Employees</p>
-                    <p className="text-xl font-bold text-apple-charcoal mt-1">{employees.length}</p>
+                    <p className="text-2xs text-apple-steel uppercase tracking-widest">
+                      Employees Processed
+                    </p>
+                    <p className="text-xl font-bold text-apple-charcoal mt-1">
+                      {employees.length}
+                    </p>
                   </div>
                   <div className="rounded-2xl border border-apple-mist bg-apple-snow px-4 py-3">
                     <p className="text-2xs text-apple-steel uppercase tracking-widest">Total Hrs</p>
@@ -425,9 +447,33 @@ export default function HomePage() {
                   </div>
                   <div className="rounded-2xl border border-apple-mist bg-apple-snow px-4 py-3">
                     <p className="text-2xs text-apple-steel uppercase tracking-widest">Avg Hrs/Day</p>
-                    <p className="text-xl font-bold text-apple-charcoal mt-1">{averageHoursPerWorkedDay.toFixed(2)}</p>
+                    <p className="text-xl font-bold text-apple-charcoal mt-1">
+                      {averageHoursPerWorkedDay.toFixed(2)}
+                    </p>
                   </div>
                 </div>
+
+                {branchSummaries.length > 0 && (
+                  <div className="rounded-2xl border border-apple-mist bg-white px-4 py-3">
+                    <p className="text-2xs font-semibold text-apple-steel uppercase tracking-widest mb-1.5">
+                      Branch Summary
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {branchSummaries.map((branch) => (
+                        <span
+                          key={branch.siteName}
+                          className="inline-flex items-center gap-1 rounded-full border border-apple-mist bg-apple-snow px-3 py-1 text-[11px] text-apple-charcoal"
+                        >
+                          <span className="font-semibold">{branch.siteName}</span>
+                          <span className="text-apple-steel">
+                            – {branch.employeeCount}{" "}
+                            {branch.employeeCount === 1 ? "employee" : "employees"}
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {records.length > 0 && (
                   <div className="flex items-center gap-2 flex-wrap">
@@ -703,10 +749,10 @@ export default function HomePage() {
                     </span>
                   </div>
                   <h2 className="text-[22px] font-bold text-apple-charcoal tracking-tight">
-                    Configure Pay Rates
+                    Review Payroll Settings
                   </h2>
                   <p className="text-sm text-apple-smoke mt-1">
-                    Set default rates. Override per employee in the review table.
+                    Set default daily and hourly rates. You can fine-tune per employee in the table.
                   </p>
                 </div>
                 <div className="px-5 sm:px-8 py-6 sm:py-8">
@@ -729,7 +775,7 @@ export default function HomePage() {
                   bg-white border border-apple-silver text-apple-charcoal text-sm font-semibold
                   hover:border-apple-charcoal transition-all duration-150 active:scale-[0.98]"
               >
-                Back to File Parsing Engine
+                Back to Attendance Review
               </button>
 
               {step === 3 ? (
@@ -740,7 +786,7 @@ export default function HomePage() {
                     hover:bg-apple-black transition-all duration-150 active:scale-[0.98]
                     shadow-apple-lg"
                 >
-                  Continue to Review and Export
+                  Continue to Review Payroll
                   <ChevronRight size={15} />
                 </button>
               ) : (
@@ -750,7 +796,7 @@ export default function HomePage() {
                     bg-white border border-apple-silver text-apple-charcoal text-sm font-semibold
                     hover:border-apple-charcoal transition-all duration-150 active:scale-[0.98]"
                 >
-                  Open Review and Export
+                  Open Review Payroll
                   <ChevronRight size={15} />
                 </button>
               )}
@@ -775,10 +821,10 @@ export default function HomePage() {
                     </span>
                   </div>
                   <h2 className="text-[22px] font-bold text-apple-charcoal tracking-tight">
-                    Review and Export
+                    Review & Export Payroll
                   </h2>
                   <p className="text-sm text-apple-smoke mt-1">
-                    Review payroll values, then export clean logs and payroll outputs.
+                    Final review before downloading the payroll report and detailed attendance logs.
                   </p>
                 </div>
 
@@ -793,7 +839,7 @@ export default function HomePage() {
                       }`}
                   >
                     <Download size={14} />
-                    Export Clean Logs CSV
+                    Download Attendance Logs (CSV)
                   </button>
 
                   <button
@@ -804,7 +850,7 @@ export default function HomePage() {
                       shadow-apple"
                   >
                     <Download size={14} />
-                    Export Payroll CSV
+                    Download Payroll Excel
                   </button>
                 </div>
               </div>
