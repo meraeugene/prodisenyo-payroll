@@ -1,38 +1,15 @@
 ﻿"use client";
 
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { Download, ChevronRight } from "lucide-react";
-
+import { X, Search, ArrowRight, ArrowLeft } from "lucide-react";
 import StepIndicator from "@/app/components/StepIndicator";
 import UploadZone from "@/app/components/UploadZone";
-import RateConfig from "@/app/components/RateConfig";
-import SummaryCards from "@/app/components/SummaryCards";
-import PayrollTable from "@/app/components/PayrollTable";
-
-import type {
-  AttendanceRecord,
-  Employee,
-  PayrollConfig,
-  Step,
-} from "@/app/types";
-import {
-  calculateAll,
-  getSummary,
-  exportToCSV,
-  exportLogsToCSV,
-} from "@/app/lib/payroll";
+import type { AttendanceRecord, Step } from "@/app/types";
 import type { ParseResult } from "@/app/lib/parser";
 import Footer from "./components/Footer";
 import Nav from "./components/Nav";
 
-const DEFAULT_CONFIG: PayrollConfig = {
-  defaultRateDay: 500,
-  defaultRateHour: 62.5,
-  otMultiplier: 1.25,
-  periodLabel: "Current Period",
-};
-
-const PREVIEW_LIMIT = 10;
+const PREVIEW_LIMIT = 8;
 
 type Step2View = "daily" | "detailed";
 type Step2Sort = "date-asc" | "date-desc" | "name-asc" | "name-desc";
@@ -112,6 +89,22 @@ function compareStep2Rows(
   return aDate.localeCompare(bDate);
 }
 
+function highlight(text: string, query: string) {
+  if (!query) return text;
+
+  const parts = text.split(new RegExp(`(${query})`, "gi"));
+
+  return parts.map((part, i) =>
+    part.toLowerCase() === query.toLowerCase() ? (
+      <span key={i} className="bg-amber-200/70  rounded px-0.5">
+        {part}
+      </span>
+    ) : (
+      part
+    ),
+  );
+}
+
 export default function HomePage() {
   const [step, setStep] = useState<Step>(1);
   const [step2View, setStep2View] = useState<Step2View>("daily");
@@ -120,17 +113,8 @@ export default function HomePage() {
   const [step2SiteFilter, setStep2SiteFilter] = useState("ALL");
   const [step2NameFilter, setStep2NameFilter] = useState("");
   const [step2DateFilter, setStep2DateFilter] = useState("");
-  const [employees, setEmployees] = useState<Employee[]>([]);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
-  const [config, setConfig] = useState<PayrollConfig>(DEFAULT_CONFIG);
-  const [period, setPeriod] = useState("Current Period");
   const [site, setSite] = useState("Unknown Site");
-
-  const calculated = useMemo(
-    () => calculateAll(employees, config),
-    [employees, config],
-  );
-  const summary = useMemo(() => getSummary(calculated), [calculated]);
 
   const dailyRows = useMemo<DailyLogRow[]>(() => {
     const grouped = new Map<string, DailyLogRow>();
@@ -257,21 +241,6 @@ export default function HomePage() {
     return filtered;
   }, [dailyRows, step2SiteFilter, step2DateFilter, step2NameFilter, step2Sort]);
 
-  const totalDailyHours = useMemo(
-    () => filteredDailyRows.reduce((sum, row) => sum + row.hours, 0),
-    [filteredDailyRows],
-  );
-
-  const workedDays = useMemo(
-    () => filteredDailyRows.filter((row) => row.hours > 0).length,
-    [filteredDailyRows],
-  );
-
-  const averageHoursPerWorkedDay = useMemo(
-    () => (workedDays > 0 ? totalDailyHours / workedDays : 0),
-    [totalDailyHours, workedDays],
-  );
-
   const activeRowsCount =
     step2View === "daily"
       ? filteredDailyRows.length
@@ -330,8 +299,39 @@ export default function HomePage() {
     }
   }, [availableSites, step2SiteFilter]);
 
+  useEffect(() => {
+    if (step === 2) {
+      window.scrollTo({ top: 500, behavior: "smooth" });
+    }
+  }, [step]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "/") {
+        e.preventDefault();
+        document.getElementById("searchEmployee")?.focus();
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") {
+        setRecordsPage((p) => Math.min(totalRecordPages, p + 1));
+      }
+      if (e.key === "ArrowLeft") {
+        setRecordsPage((p) => Math.max(1, p - 1));
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [totalRecordPages]);
+
   const handleParsed = useCallback((result: ParseResult) => {
-    setEmployees(result.employees);
     setRecords(result.records);
     setStep2View("daily");
     setStep2Sort("date-asc");
@@ -339,23 +339,11 @@ export default function HomePage() {
     setStep2NameFilter("");
     setStep2DateFilter("");
     setRecordsPage(1);
-    setPeriod(result.period);
     setSite(result.site);
-    setConfig((c) => ({ ...c, periodLabel: result.period }));
     setStep(2);
   }, []);
 
-  const handleUpdateEmployee = useCallback(
-    (id: number, patch: Partial<Employee>) => {
-      setEmployees((prev) =>
-        prev.map((e) => (e.id === id ? { ...e, ...patch } : e)),
-      );
-    },
-    [],
-  );
-
   function handleReset() {
-    setEmployees([]);
     setRecords([]);
     setStep2View("daily");
     setStep2Sort("date-asc");
@@ -363,11 +351,27 @@ export default function HomePage() {
     setStep2NameFilter("");
     setStep2DateFilter("");
     setRecordsPage(1);
-    setConfig(DEFAULT_CONFIG);
-    setPeriod("Current Period");
     setSite("Unknown Site");
     setStep(1);
   }
+
+  const pages = useMemo(() => {
+    const arr = [];
+    const maxVisible = 5;
+
+    let start = Math.max(1, recordsPage - 2);
+    let end = Math.min(totalRecordPages, start + maxVisible - 1);
+
+    if (end - start < maxVisible - 1) {
+      start = Math.max(1, end - maxVisible + 1);
+    }
+
+    for (let i = start; i <= end; i++) {
+      arr.push(i);
+    }
+
+    return arr;
+  }, [recordsPage, totalRecordPages]);
 
   return (
     <div className="min-h-screen bg-apple-snow">
@@ -396,7 +400,7 @@ export default function HomePage() {
                     </span>
                   )}
                 </div>
-                <h2 className="text-[22px] font-bold text-apple-charcoal tracking-tight">
+                <h2 className="text-xl sm:text-2xl font-bold text-apple-charcoal tracking-tight">
                   Upload Attendance Reports
                 </h2>
                 <p className="text-sm text-apple-smoke mt-1">
@@ -433,7 +437,7 @@ export default function HomePage() {
                     </span>
                   )}
                 </div>
-                <h2 className="text-[22px] font-bold text-apple-charcoal tracking-tight">
+                <h2 className="text-xl sm:text-2xl font-bold text-apple-charcoal tracking-tight">
                   Review Attendance Logs
                 </h2>
                 <p className="text-sm text-apple-smoke mt-1">
@@ -454,10 +458,8 @@ export default function HomePage() {
                           key={branch.siteName}
                           className="inline-flex items-center gap-1 rounded-full border border-apple-mist bg-apple-snow px-3 py-1 text-[11px] text-apple-charcoal"
                         >
+                          <span className="font-light">{branch.siteName}</span>
                           <span className="font-semibold">
-                            {branch.siteName}
-                          </span>
-                          <span className="text-apple-steel">
                             – {branch.employeeCount}{" "}
                             {branch.employeeCount === 1
                               ? "employee"
@@ -501,11 +503,11 @@ export default function HomePage() {
                 )}
 
                 {records.length > 0 && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                     <select
                       value={step2SiteFilter}
                       onChange={(e) => setStep2SiteFilter(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal
+                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal
                         focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
                     >
                       <option value="ALL">All files/sites</option>
@@ -516,21 +518,36 @@ export default function HomePage() {
                       ))}
                     </select>
 
-                    <input
-                      type="text"
-                      value={step2NameFilter}
-                      onChange={(e) => setStep2NameFilter(e.target.value)}
-                      placeholder="Search employee name"
-                      className="w-full px-3 py-2.5 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal
-                        placeholder:text-apple-silver focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15
-                        focus:border-apple-charcoal transition-all"
-                    />
+                    <div className="relative w-full">
+                      <Search
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-apple-silver"
+                        size={16}
+                      />
+
+                      <input
+                        type="text"
+                        value={step2NameFilter}
+                        onChange={(e) => setStep2NameFilter(e.target.value)}
+                        placeholder="Search employee… ( / )"
+                        id="searchEmployee"
+                        className="w-full pl-9 pr-9 py-2.5 rounded-2xl border border-apple-silver bg-white text-sm"
+                      />
+
+                      {step2NameFilter && (
+                        <button
+                          onClick={() => setStep2NameFilter("")}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-apple-steel"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
 
                     <input
                       type="date"
                       value={step2DateFilter}
                       onChange={(e) => setStep2DateFilter(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal
+                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal
                         focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
                     />
 
@@ -539,7 +556,7 @@ export default function HomePage() {
                       onChange={(e) =>
                         setStep2Sort(e.target.value as Step2Sort)
                       }
-                      className="w-full px-3 py-2.5 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal
+                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal
                         focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
                     >
                       <option value="date-asc">Date first (oldest)</option>
@@ -555,7 +572,7 @@ export default function HomePage() {
                         setStep2DateFilter("");
                         setStep2Sort("date-asc");
                       }}
-                      className="w-full px-3 py-2.5 rounded-2xl border border-apple-silver bg-white text-sm font-semibold text-apple-charcoal
+                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm font-semibold text-apple-charcoal
                         hover:border-apple-charcoal transition-all"
                     >
                       Clear Filters
@@ -593,24 +610,35 @@ export default function HomePage() {
                         <tbody>
                           {previewDailyRows.length === 0 ? (
                             <tr>
-                              <td
-                                colSpan={10}
-                                className="p-4 text-center text-sm text-apple-steel"
-                              >
-                                No matching records found
+                              <td colSpan={10} className="py-10">
+                                <div className="flex flex-col items-center justify-center text-center gap-3 text-apple-steel">
+                                  <Search
+                                    size={22}
+                                    className="text-apple-silver"
+                                  />
+
+                                  <p className="text-sm font-semibold text-apple-charcoal">
+                                    No employees found
+                                  </p>
+
+                                  <p className="text-xs text-apple-steel max-w-sm">
+                                    Try clearing filters, searching another
+                                    name, or changing the date.
+                                  </p>
+                                </div>
                               </td>
                             </tr>
                           ) : (
                             previewDailyRows.map((row) => (
                               <tr
                                 key={`${row.date}-${row.employee}`}
-                                className="border-b border-apple-mist/60 last:border-0"
+                                className="border-b border-apple-mist/60 last:border-0 odd:bg-apple-snow/40 hover:bg-apple-snow/70 transition"
                               >
                                 <td className="px-4 py-3 text-xs font-mono text-apple-ash">
                                   {row.date}
                                 </td>
                                 <td className="px-4 py-3 text-sm font-semibold text-apple-charcoal">
-                                  {row.employee}
+                                  {highlight(row.employee, step2NameFilter)}
                                 </td>
                                 <td className="px-4 py-3 text-xs font-mono text-apple-ash">
                                   {row.time1In || "--:--"}
@@ -669,7 +697,7 @@ export default function HomePage() {
                           {previewRecords.map((r, idx) => (
                             <tr
                               key={`${r.employee}-${r.date}-${r.logTime}-${r.type}-${idx}`}
-                              className="border-b border-apple-mist/60 last:border-0"
+                              className="border-b border-apple-mist/60 last:border-0 odd:bg-apple-snow/40 hover:bg-apple-snow/70 transition"
                             >
                               <td className="px-4 py-3 text-xs font-mono text-apple-ash">
                                 {r.date}
@@ -718,26 +746,54 @@ export default function HomePage() {
                     </p>
 
                     {activeRowsCount > PREVIEW_LIMIT && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {/* First */}
+                        <button
+                          onClick={() => setRecordsPage(1)}
+                          disabled={recordsPage === 1}
+                          className={`px-2.5 h-8 rounded-xl text-xs font-semibold border
+      ${
+        recordsPage === 1
+          ? "border-apple-mist text-apple-silver cursor-not-allowed"
+          : "border-apple-silver text-apple-charcoal hover:border-apple-charcoal"
+      }`}
+                        >
+                          First
+                        </button>
+
+                        {/* Previous */}
                         <button
                           onClick={() =>
                             setRecordsPage((p) => Math.max(1, p - 1))
                           }
                           disabled={recordsPage === 1}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all duration-150
-                            ${
-                              recordsPage === 1
-                                ? "border-apple-mist text-apple-silver cursor-not-allowed"
-                                : "border-apple-silver text-apple-charcoal hover:border-apple-charcoal"
-                            }`}
+                          className={`px-3 h-8 rounded-xl text-xs font-semibold border
+      ${
+        recordsPage === 1
+          ? "border-apple-mist text-apple-silver cursor-not-allowed"
+          : "border-apple-silver text-apple-charcoal hover:border-apple-charcoal"
+      }`}
                         >
-                          Previous
+                          <ArrowLeft size={16} />
                         </button>
 
-                        <span className="text-xs font-semibold text-apple-ash min-w-[72px] text-center">
-                          Page {recordsPage} / {totalRecordPages}
-                        </span>
+                        {/* Page numbers */}
+                        {pages.map((p) => (
+                          <button
+                            key={p}
+                            onClick={() => setRecordsPage(p)}
+                            className={`w-8 h-8 rounded-lg text-xs font-semibold border transition
+        ${
+          recordsPage === p
+            ? "bg-apple-charcoal text-white border-apple-charcoal"
+            : "border-apple-silver text-apple-charcoal hover:border-apple-charcoal"
+        }`}
+                          >
+                            {p}
+                          </button>
+                        ))}
 
+                        {/* Next */}
                         <button
                           onClick={() =>
                             setRecordsPage((p) =>
@@ -745,155 +801,33 @@ export default function HomePage() {
                             )
                           }
                           disabled={recordsPage === totalRecordPages}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all duration-150
-                            ${
-                              recordsPage === totalRecordPages
-                                ? "border-apple-mist text-apple-silver cursor-not-allowed"
-                                : "border-apple-silver text-apple-charcoal hover:border-apple-charcoal"
-                            }`}
+                          className={`px-3 h-8 rounded-xl text-xs font-semibold border
+      ${
+        recordsPage === totalRecordPages
+          ? "border-apple-mist text-apple-silver cursor-not-allowed"
+          : "border-apple-silver text-apple-charcoal hover:border-apple-charcoal"
+      }`}
                         >
-                          Next
+                          <ArrowRight size={16} />
+                        </button>
+
+                        {/* Last */}
+                        <button
+                          onClick={() => setRecordsPage(totalRecordPages)}
+                          disabled={recordsPage === totalRecordPages}
+                          className={`px-2.5 h-8 rounded-xl text-xs font-semibold border
+      ${
+        recordsPage === totalRecordPages
+          ? "border-apple-mist text-apple-silver cursor-not-allowed"
+          : "border-apple-silver text-apple-charcoal hover:border-apple-charcoal"
+      }`}
+                        >
+                          Last
                         </button>
                       </div>
                     )}
                   </div>
                 )}
-              </div>
-            </div>
-          </section>
-        )}
-        {step >= 3 && (
-          <>
-            <section
-              className="animate-fade-up"
-              style={{ animationFillMode: "both", animationDelay: "80ms" }}
-            >
-              <div className="bg-white rounded-3xl border border-apple-mist shadow-apple-xs overflow-hidden">
-                <div className="px-5 sm:px-8 pt-6 sm:pt-8 pb-5 sm:pb-6 border-b border-apple-mist">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-2xs font-mono font-semibold text-apple-steel uppercase tracking-widest">
-                      Step 3
-                    </span>
-                    <span className="text-2xs font-semibold text-apple-smoke bg-apple-snow px-2 py-0.5 rounded-full border border-apple-mist">
-                      {period}
-                    </span>
-                  </div>
-                  <h2 className="text-[22px] font-bold text-apple-charcoal tracking-tight">
-                    Review Payroll Settings
-                  </h2>
-                  <p className="text-sm text-apple-smoke mt-1">
-                    Set default daily and hourly rates. You can fine-tune per
-                    employee in the table.
-                  </p>
-                </div>
-                <div className="px-5 sm:px-8 py-6 sm:py-8">
-                  <RateConfig config={config} onChange={setConfig} />
-                </div>
-              </div>
-            </section>
-
-            <section
-              className="animate-fade-up"
-              style={{ animationFillMode: "both", animationDelay: "120ms" }}
-            >
-              <SummaryCards summary={summary} period={period} />
-            </section>
-
-            <div className="flex justify-between items-center gap-2 pb-2 no-print flex-wrap">
-              <button
-                onClick={() => setStep(2)}
-                className="flex items-center gap-2 px-6 py-3 rounded-2xl
-                  bg-white border border-apple-silver text-apple-charcoal text-sm font-semibold
-                  hover:border-apple-charcoal transition-all duration-150 active:scale-[0.98]"
-              >
-                Back to Attendance Review
-              </button>
-
-              {step === 3 ? (
-                <button
-                  onClick={() => setStep(4)}
-                  className="flex items-center gap-2 px-6 py-3 rounded-2xl
-                    bg-apple-charcoal text-white text-sm font-semibold
-                    hover:bg-apple-black transition-all duration-150 active:scale-[0.98]
-                    shadow-apple-lg"
-                >
-                  Continue to Review Payroll
-                  <ChevronRight size={15} />
-                </button>
-              ) : (
-                <button
-                  onClick={() => setStep(4)}
-                  className="flex items-center gap-2 px-6 py-3 rounded-2xl
-                    bg-white border border-apple-silver text-apple-charcoal text-sm font-semibold
-                    hover:border-apple-charcoal transition-all duration-150 active:scale-[0.98]"
-                >
-                  Open Review Payroll
-                  <ChevronRight size={15} />
-                </button>
-              )}
-            </div>
-          </>
-        )}
-        {step >= 4 && (
-          <section
-            className="animate-fade-up"
-            style={{ animationFillMode: "both", animationDelay: "140ms" }}
-          >
-            <div className="bg-white rounded-3xl border border-apple-mist shadow-apple-xs overflow-hidden">
-              <div className="px-5 sm:px-8 pt-6 sm:pt-8 pb-5 sm:pb-6 border-b border-apple-mist flex items-center justify-between flex-wrap gap-3 sm:gap-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-2xs font-mono font-semibold text-apple-steel uppercase tracking-widest">
-                      Step 4
-                    </span>
-                    <span className="text-2xs font-semibold text-apple-smoke bg-apple-snow px-2 py-0.5 rounded-full border border-apple-mist">
-                      {period}
-                    </span>
-                  </div>
-                  <h2 className="text-[22px] font-bold text-apple-charcoal tracking-tight">
-                    Review & Export Payroll
-                  </h2>
-                  <p className="text-sm text-apple-smoke mt-1">
-                    Final review before downloading the payroll report and
-                    detailed attendance logs.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2 no-print w-full sm:w-auto">
-                  <button
-                    onClick={() => exportLogsToCSV(records, site, period)}
-                    disabled={records.length === 0}
-                    className={`flex-1 sm:flex-none justify-center flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-semibold transition-all duration-150 active:scale-[0.98]
-                      ${
-                        records.length > 0
-                          ? "bg-white border border-apple-silver text-apple-charcoal hover:border-apple-charcoal"
-                          : "bg-apple-mist border border-apple-mist text-apple-steel cursor-not-allowed"
-                      }`}
-                  >
-                    <Download size={14} />
-                    Download Attendance Logs (CSV)
-                  </button>
-
-                  <button
-                    onClick={() => exportToCSV(calculated, period)}
-                    className="flex-1 sm:flex-none justify-center flex items-center gap-2 px-4 py-2.5 rounded-2xl
-                      bg-apple-charcoal text-white text-sm font-semibold
-                      hover:bg-apple-black transition-all duration-150 active:scale-[0.98]
-                      shadow-apple"
-                  >
-                    <Download size={14} />
-                    Download Payroll Excel
-                  </button>
-                </div>
-              </div>
-
-              <div className="px-5 sm:px-8 py-6 sm:py-8">
-                <PayrollTable
-                  employees={employees}
-                  calculated={calculated}
-                  config={config}
-                  onUpdateEmployee={handleUpdateEmployee}
-                />
               </div>
             </div>
           </section>
