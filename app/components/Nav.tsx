@@ -16,7 +16,7 @@ const Nav = ({ step, handleReset }: NavProps) => {
           <div className="flex items-center gap-2.5">
             <div className="px-3 h-7 rounded-lg bg-apple-charcoal flex items-center justify-center">
               <span className="text-white uppercase text-xs font-bold tracking-widest">
-                Prodisenyo Attendance System
+                Prodisenyo Payroll System
               </span>
             </div>
           </div>
