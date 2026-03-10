@@ -1,81 +1,393 @@
-"use client";
+﻿"use client";
 
-import { useState, useCallback, useMemo } from "react";
-import { Download, Printer, RotateCcw, ChevronRight } from "lucide-react";
-
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { X, Search, ArrowRight, ArrowLeft } from "lucide-react";
 import StepIndicator from "@/app/components/StepIndicator";
 import UploadZone from "@/app/components/UploadZone";
-import RateConfig from "@/app/components/RateConfig";
-import SummaryCards from "@/app/components/SummaryCards";
-import PayrollTable from "@/app/components/PayrollTable";
-
-import type { Employee, PayrollConfig, Step } from "@/app/types";
-import { calculateAll, getSummary, exportToCSV } from "@/app/lib/payroll";
+import type { AttendanceRecord, Step } from "@/app/types";
+import type { ParseResult } from "@/app/lib/parser";
 import Footer from "./components/Footer";
 import Nav from "./components/Nav";
 
-const DEFAULT_CONFIG: PayrollConfig = {
-  defaultRateDay: 500,
-  defaultRateHour: 62.5,
-  otMultiplier: 1.25,
-  periodLabel: "Current Period",
-};
+const PREVIEW_LIMIT = 8;
+
+type Step2View = "daily" | "detailed";
+type Step2Sort = "date-asc" | "date-desc" | "name-asc" | "name-desc";
+
+interface DailyLogRow {
+  date: string;
+  employee: string;
+  time1In: string;
+  time1Out: string;
+  time2In: string;
+  time2Out: string;
+  otIn: string;
+  otOut: string;
+  hours: number;
+  site: string;
+}
+
+function timeToMinutes(time: string): number {
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function earlierTime(current: string, incoming: string): string {
+  if (!current) return incoming;
+  return timeToMinutes(incoming) < timeToMinutes(current) ? incoming : current;
+}
+
+function laterTime(current: string, incoming: string): string {
+  if (!current) return incoming;
+  return timeToMinutes(incoming) > timeToMinutes(current) ? incoming : current;
+}
+
+function pairMinutes(inTime: string, outTime: string): number {
+  if (!inTime || !outTime) return 0;
+  const inMinutes = timeToMinutes(inTime);
+  const outMinutes = timeToMinutes(outTime);
+  if (outMinutes >= inMinutes) return outMinutes - inMinutes;
+  return outMinutes + 24 * 60 - inMinutes;
+}
+
+function earliestNonEmptyTime(...times: string[]): string {
+  const valid = times.filter(Boolean);
+  if (valid.length === 0) return "";
+  return valid.reduce((earliest, current) =>
+    timeToMinutes(current) < timeToMinutes(earliest) ? current : earliest,
+  );
+}
+
+function latestNonEmptyTime(...times: string[]): string {
+  const valid = times.filter(Boolean);
+  if (valid.length === 0) return "";
+  return valid.reduce((latest, current) =>
+    timeToMinutes(current) > timeToMinutes(latest) ? current : latest,
+  );
+}
+
+function compareStep2Rows(
+  aDate: string,
+  aName: string,
+  bDate: string,
+  bName: string,
+  sortMode: Step2Sort,
+): number {
+  if (sortMode === "date-asc") {
+    if (aDate !== bDate) return aDate.localeCompare(bDate);
+    return aName.localeCompare(bName);
+  }
+  if (sortMode === "date-desc") {
+    if (aDate !== bDate) return bDate.localeCompare(aDate);
+    return aName.localeCompare(bName);
+  }
+  if (sortMode === "name-asc") {
+    if (aName !== bName) return aName.localeCompare(bName);
+    return aDate.localeCompare(bDate);
+  }
+  if (aName !== bName) return bName.localeCompare(aName);
+  return aDate.localeCompare(bDate);
+}
+
+function highlight(text: string, query: string) {
+  if (!query) return text;
+
+  const parts = text.split(new RegExp(`(${query})`, "gi"));
+
+  return parts.map((part, i) =>
+    part.toLowerCase() === query.toLowerCase() ? (
+      <span key={i} className="bg-amber-200/70  rounded px-0.5">
+        {part}
+      </span>
+    ) : (
+      part
+    ),
+  );
+}
 
 export default function HomePage() {
   const [step, setStep] = useState<Step>(1);
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [config, setConfig] = useState<PayrollConfig>(DEFAULT_CONFIG);
-  const [period, setPeriod] = useState("Current Period");
+  const [step2View, setStep2View] = useState<Step2View>("daily");
+  const [step2Sort, setStep2Sort] = useState<Step2Sort>("date-asc");
+  const [recordsPage, setRecordsPage] = useState(1);
+  const [step2SiteFilter, setStep2SiteFilter] = useState("ALL");
+  const [step2NameFilter, setStep2NameFilter] = useState("");
+  const [step2DateFilter, setStep2DateFilter] = useState("");
+  const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [site, setSite] = useState("Unknown Site");
 
-  // Calculate payroll whenever employees or config changes
-  const calculated = useMemo(
-    () => calculateAll(employees, config),
-    [employees, config],
+  const dailyRows = useMemo<DailyLogRow[]>(() => {
+    const grouped = new Map<string, DailyLogRow>();
+
+    for (const record of records) {
+      const key = `${record.date}|||${record.employee.trim().toLowerCase()}`;
+      const current = grouped.get(key) ?? {
+        date: record.date,
+        employee: record.employee,
+        time1In: "",
+        time1Out: "",
+        time2In: "",
+        time2Out: "",
+        otIn: "",
+        otOut: "",
+        hours: 0,
+        site: record.site,
+      };
+
+      if (!current.site && record.site) current.site = record.site;
+
+      if (record.source === "Time1" && record.type === "IN") {
+        current.time1In = earlierTime(current.time1In, record.logTime);
+      } else if (record.source === "Time1" && record.type === "OUT") {
+        current.time1Out = laterTime(current.time1Out, record.logTime);
+      } else if (record.source === "Time2" && record.type === "IN") {
+        current.time2In = earlierTime(current.time2In, record.logTime);
+      } else if (record.source === "Time2" && record.type === "OUT") {
+        current.time2Out = laterTime(current.time2Out, record.logTime);
+      } else if (record.source === "OT" && record.type === "IN") {
+        current.otIn = earlierTime(current.otIn, record.logTime);
+      } else if (record.source === "OT" && record.type === "OUT") {
+        current.otOut = laterTime(current.otOut, record.logTime);
+      }
+
+      grouped.set(key, current);
+    }
+
+    const rows = Array.from(grouped.values()).map((row) => {
+      const regularIn = earliestNonEmptyTime(row.time1In, row.time2In);
+      const regularOut = latestNonEmptyTime(row.time1Out, row.time2Out);
+
+      // Some exports place late end-of-day punches in OT In/Out instead of regular Out.
+      const otAsRegularOut = !regularOut
+        ? latestNonEmptyTime(row.otOut, row.otIn)
+        : "";
+      const effectiveRegularOut = regularOut || otAsRegularOut;
+      const regularMinutes = pairMinutes(regularIn, effectiveRegularOut);
+
+      const usedOtAsRegularBoundary =
+        !regularOut && Boolean(otAsRegularOut) && Boolean(regularIn);
+      const otMinutes =
+        row.otIn && row.otOut && !usedOtAsRegularBoundary
+          ? pairMinutes(row.otIn, row.otOut)
+          : 0;
+
+      const minutes = regularMinutes + otMinutes;
+      return {
+        ...row,
+        hours: Math.round((minutes / 60) * 100) / 100,
+      };
+    });
+
+    return rows;
+  }, [records]);
+
+  const availableSites = useMemo(() => {
+    return Array.from(
+      new Set(
+        records
+          .map((record) => record.site.trim())
+          .filter((value) => value.length > 0),
+      ),
+    ).sort((a, b) => a.localeCompare(b));
+  }, [records]);
+
+  const filteredDetailedRecords = useMemo(() => {
+    const nameFilter = step2NameFilter.trim().toLowerCase();
+    const dateFilter = step2DateFilter.trim();
+
+    const filtered = records.filter((record) => {
+      if (step2SiteFilter !== "ALL" && record.site !== step2SiteFilter)
+        return false;
+      if (dateFilter && record.date !== dateFilter) return false;
+      if (nameFilter && !record.employee.toLowerCase().includes(nameFilter))
+        return false;
+      return true;
+    });
+
+    filtered.sort((a, b) => {
+      const byPrimary = compareStep2Rows(
+        a.date,
+        a.employee,
+        b.date,
+        b.employee,
+        step2Sort,
+      );
+      if (byPrimary !== 0) return byPrimary;
+      if (a.logTime !== b.logTime) return a.logTime.localeCompare(b.logTime);
+      if (a.type !== b.type) return a.type.localeCompare(b.type);
+      return a.source.localeCompare(b.source);
+    });
+
+    return filtered;
+  }, [records, step2SiteFilter, step2DateFilter, step2NameFilter, step2Sort]);
+
+  const filteredDailyRows = useMemo(() => {
+    const nameFilter = step2NameFilter.trim().toLowerCase();
+    const dateFilter = step2DateFilter.trim();
+
+    const filtered = dailyRows.filter((row) => {
+      if (step2SiteFilter !== "ALL" && row.site !== step2SiteFilter)
+        return false;
+      if (dateFilter && row.date !== dateFilter) return false;
+      if (nameFilter && !row.employee.toLowerCase().includes(nameFilter))
+        return false;
+      return true;
+    });
+
+    filtered.sort((a, b) =>
+      compareStep2Rows(a.date, a.employee, b.date, b.employee, step2Sort),
+    );
+
+    return filtered;
+  }, [dailyRows, step2SiteFilter, step2DateFilter, step2NameFilter, step2Sort]);
+
+  const activeRowsCount =
+    step2View === "daily"
+      ? filteredDailyRows.length
+      : filteredDetailedRecords.length;
+  const totalRowsForCurrentView =
+    step2View === "daily" ? dailyRows.length : records.length;
+
+  const totalRecordPages = useMemo(
+    () => Math.max(1, Math.ceil(activeRowsCount / PREVIEW_LIMIT)),
+    [activeRowsCount],
   );
-  const summary = useMemo(() => getSummary(calculated), [calculated]);
 
-  const handleParsed = useCallback((emps: Employee[], per: string) => {
-    setEmployees(emps);
-    setPeriod(per);
-    setConfig((c) => ({ ...c, periodLabel: per }));
+  const previewStart = (recordsPage - 1) * PREVIEW_LIMIT;
+  const previewEnd = previewStart + PREVIEW_LIMIT;
+
+  const previewRecords = useMemo(() => {
+    return filteredDetailedRecords.slice(previewStart, previewEnd);
+  }, [filteredDetailedRecords, previewStart, previewEnd]);
+
+  const previewDailyRows = useMemo(() => {
+    return filteredDailyRows.slice(previewStart, previewEnd);
+  }, [filteredDailyRows, previewStart, previewEnd]);
+
+  const branchSummaries = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const record of records) {
+      const siteKey = record.site?.trim();
+      if (!siteKey) continue;
+      if (!map.has(siteKey)) {
+        map.set(siteKey, new Set<string>());
+      }
+      map.get(siteKey)!.add(record.employee.trim());
+    }
+    return Array.from(map.entries())
+      .map(([siteName, employeesSet]) => ({
+        siteName,
+        employeeCount: employeesSet.size,
+      }))
+      .sort((a, b) => a.siteName.localeCompare(b.siteName));
+  }, [records]);
+
+  useEffect(() => {
+    setRecordsPage((prev) => Math.min(prev, totalRecordPages));
+  }, [totalRecordPages]);
+
+  useEffect(() => {
+    setRecordsPage(1);
+  }, [step2View, step2Sort, step2SiteFilter, step2NameFilter, step2DateFilter]);
+
+  useEffect(() => {
+    if (
+      step2SiteFilter !== "ALL" &&
+      !availableSites.includes(step2SiteFilter)
+    ) {
+      setStep2SiteFilter("ALL");
+    }
+  }, [availableSites, step2SiteFilter]);
+
+  useEffect(() => {
+    if (step === 2) {
+      window.scrollTo({ top: 500, behavior: "smooth" });
+    }
+  }, [step]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "/") {
+        e.preventDefault();
+        document.getElementById("searchEmployee")?.focus();
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") {
+        setRecordsPage((p) => Math.min(totalRecordPages, p + 1));
+      }
+      if (e.key === "ArrowLeft") {
+        setRecordsPage((p) => Math.max(1, p - 1));
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [totalRecordPages]);
+
+  const handleParsed = useCallback((result: ParseResult) => {
+    setRecords(result.records);
+    setStep2View("daily");
+    setStep2Sort("date-asc");
+    setStep2SiteFilter("ALL");
+    setStep2NameFilter("");
+    setStep2DateFilter("");
+    setRecordsPage(1);
+    setSite(result.site);
     setStep(2);
   }, []);
 
-  const handleUpdateEmployee = useCallback(
-    (id: number, patch: Partial<Employee>) => {
-      setEmployees((prev) =>
-        prev.map((e) => (e.id === id ? { ...e, ...patch } : e)),
-      );
-    },
-    [],
-  );
-
   function handleReset() {
-    setEmployees([]);
-    setConfig(DEFAULT_CONFIG);
-    setPeriod("Current Period");
+    setRecords([]);
+    setStep2View("daily");
+    setStep2Sort("date-asc");
+    setStep2SiteFilter("ALL");
+    setStep2NameFilter("");
+    setStep2DateFilter("");
+    setRecordsPage(1);
+    setSite("Unknown Site");
     setStep(1);
   }
 
+  const pages = useMemo(() => {
+    const arr = [];
+    const maxVisible = 5;
+
+    let start = Math.max(1, recordsPage - 2);
+    let end = Math.min(totalRecordPages, start + maxVisible - 1);
+
+    if (end - start < maxVisible - 1) {
+      start = Math.max(1, end - maxVisible + 1);
+    }
+
+    for (let i = start; i <= end; i++) {
+      arr.push(i);
+    }
+
+    return arr;
+  }, [recordsPage, totalRecordPages]);
+
   return (
     <div className="min-h-screen bg-apple-snow">
-      {/* ── Nav ─────────────────────────────────────── */}
       <Nav step={step} handleReset={handleReset} />
 
-      {/* ── Steps mobile ─────────────────────────── */}
       <div className="md:hidden border-b border-apple-mist bg-white px-5 py-3">
         <StepIndicator current={step} />
       </div>
 
-      {/* ── Main ─────────────────────────────────── */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-8 py-6 sm:py-10 space-y-6 sm:space-y-8">
-        {/* ── STEP 1: Upload ───────────────────── */}
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-8 py-6 sm:py-10 space-y-6 sm:space-y-8">
+        {" "}
         <section
           className="animate-fade-up"
           style={{ animationFillMode: "both" }}
         >
           <div className="bg-white rounded-3xl border border-apple-mist shadow-apple-xs overflow-hidden">
-            {/* Header */}
             <div className="px-5 sm:px-8 pt-6 sm:pt-8 pb-5 sm:pb-6 border-b border-apple-mist flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2 mb-1">
@@ -88,11 +400,12 @@ export default function HomePage() {
                     </span>
                   )}
                 </div>
-                <h2 className="text-[22px] font-bold text-apple-charcoal tracking-tight">
-                  Upload Attendance Report
+                <h2 className="text-xl sm:text-2xl font-bold text-apple-charcoal tracking-tight">
+                  Upload Attendance Reports
                 </h2>
                 <p className="text-sm text-apple-smoke mt-1">
-                  Export from your biometric system as XLS, XLSX, or CSV.
+                  Upload one or more biometric attendance exports as XLS, XLSX,
+                  or CSV.
                 </p>
               </div>
             </div>
@@ -104,113 +417,423 @@ export default function HomePage() {
             </div>
           </div>
         </section>
-
-        {/* ── STEP 2: Rates + Table ────────────── */}
         {step >= 2 && (
-          <>
-            <section
-              className="animate-fade-up"
-              style={{ animationFillMode: "both", animationDelay: "40ms" }}
-            >
-              <div className="bg-white rounded-3xl border border-apple-mist shadow-apple-xs overflow-hidden">
-                <div className="px-5 sm:px-8 pt-6 sm:pt-8 pb-5 sm:pb-6 border-b border-apple-mist">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-2xs font-mono font-semibold text-apple-steel uppercase tracking-widest">
-                      Step 2
+          <section
+            className="animate-fade-up"
+            style={{ animationFillMode: "both", animationDelay: "40ms" }}
+          >
+            <div className="bg-white rounded-3xl border border-apple-mist shadow-apple-xs overflow-hidden">
+              <div className="px-5 sm:px-8 pt-6 sm:pt-8 pb-5 sm:pb-6 border-b border-apple-mist">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <span className="text-2xs font-mono font-semibold text-apple-steel uppercase tracking-widest">
+                    Step 2
+                  </span>
+                  <span className="text-2xs font-semibold text-apple-smoke bg-apple-snow px-2 py-0.5 rounded-full border border-apple-mist">
+                    {site}
+                  </span>
+                  {step > 2 && (
+                    <span className="text-2xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">
+                      Complete
                     </span>
-                    <span className="text-2xs font-semibold text-apple-smoke bg-apple-snow px-2 py-0.5 rounded-full border border-apple-mist">
-                      {period}
-                    </span>
-                  </div>
-                  <h2 className="text-[22px] font-bold text-apple-charcoal tracking-tight">
-                    Configure Pay Rates
-                  </h2>
-                  <p className="text-sm text-apple-smoke mt-1">
-                    Set default rates. Override per employee in the table.
-                  </p>
+                  )}
                 </div>
-                <div className="px-5 sm:px-8 py-6 sm:py-8">
-                  <RateConfig config={config} onChange={setConfig} />
-                </div>
+                <h2 className="text-xl sm:text-2xl font-bold text-apple-charcoal tracking-tight">
+                  Review Attendance Logs
+                </h2>
+                <p className="text-sm text-apple-smoke mt-1">
+                  Your biometric files are cleaned and converted into readable
+                  daily time logs.
+                </p>
               </div>
-            </section>
 
-            {/* Summary */}
-            <section
-              className="animate-fade-up"
-              style={{ animationFillMode: "both", animationDelay: "80ms" }}
-            >
-              <SummaryCards summary={summary} period={period} />
-            </section>
-
-            {/* Table */}
-            <section
-              className="animate-fade-up"
-              style={{ animationFillMode: "both", animationDelay: "120ms" }}
-            >
-              <div className="bg-white rounded-3xl border border-apple-mist shadow-apple-xs overflow-hidden">
-                <div className="px-5 sm:px-8 pt-6 sm:pt-8 pb-5 sm:pb-6 border-b border-apple-mist flex items-center justify-between flex-wrap gap-3 sm:gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-2xs font-mono font-semibold text-apple-steel uppercase tracking-widest">
-                        Step 3
-                      </span>
-                      <span className="text-2xs font-semibold text-apple-smoke bg-apple-snow px-2 py-0.5 rounded-full border border-apple-mist">
-                        {period}
-                      </span>
-                    </div>
-                    <h2 className="text-[22px] font-bold text-apple-charcoal tracking-tight">
-                      Employee Payroll Details
-                    </h2>
-                    <p className="text-sm text-apple-smoke mt-1">
-                      Edit hours inline. All totals update in real time.
+              <div className="px-5 sm:px-8 py-6 sm:py-8 space-y-5">
+                {branchSummaries.length > 0 && (
+                  <div className="rounded-2xl border border-apple-mist bg-white px-4 py-3">
+                    <p className="text-2xs font-semibold text-apple-steel uppercase tracking-widest mb-1.5">
+                      Branch Summary
                     </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {branchSummaries.map((branch) => (
+                        <span
+                          key={branch.siteName}
+                          className="inline-flex items-center gap-1 rounded-full border border-apple-mist bg-apple-snow px-3 py-1 text-[11px] text-apple-charcoal"
+                        >
+                          <span className="font-light">{branch.siteName}</span>
+                          <span className="font-semibold">
+                            – {branch.employeeCount}{" "}
+                            {branch.employeeCount === 1
+                              ? "employee"
+                              : "employees"}
+                          </span>
+                        </span>
+                      ))}
+                    </div>
                   </div>
+                )}
 
-                  {/* Export actions */}
-                  <div className="flex items-center gap-2 no-print w-full sm:w-auto">
+                {records.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap">
                     <button
-                      onClick={() => exportToCSV(calculated, period)}
-                      className="flex-1 sm:flex-none justify-center flex items-center gap-2 px-4 py-2.5 rounded-2xl
-                        bg-apple-charcoal text-white text-sm font-semibold
-                        hover:bg-apple-black transition-all duration-150 active:scale-[0.98]
-                        shadow-apple"
+                      onClick={() => {
+                        setStep2View("daily");
+                      }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all duration-150
+                        ${
+                          step2View === "daily"
+                            ? "bg-apple-charcoal text-white border-apple-charcoal"
+                            : "bg-white text-apple-charcoal border-apple-silver hover:border-apple-charcoal"
+                        }`}
                     >
-                      <Download size={14} />
-                      Export CSV
+                      Daily View
+                    </button>
+                    <button
+                      onClick={() => {
+                        setStep2View("detailed");
+                      }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all duration-150
+                        ${
+                          step2View === "detailed"
+                            ? "bg-apple-charcoal text-white border-apple-charcoal"
+                            : "bg-white text-apple-charcoal border-apple-silver hover:border-apple-charcoal"
+                        }`}
+                    >
+                      Detailed Logs
                     </button>
                   </div>
-                </div>
+                )}
 
-                <div className="px-5 sm:px-8 py-6 sm:py-8">
-                  <PayrollTable
-                    employees={employees}
-                    calculated={calculated}
-                    config={config}
-                    onUpdateEmployee={handleUpdateEmployee}
-                  />
-                </div>
+                {records.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                    <select
+                      value={step2SiteFilter}
+                      onChange={(e) => setStep2SiteFilter(e.target.value)}
+                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal
+                        focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
+                    >
+                      <option value="ALL">All files/sites</option>
+                      {availableSites.map((siteOption) => (
+                        <option key={siteOption} value={siteOption}>
+                          {siteOption}
+                        </option>
+                      ))}
+                    </select>
+
+                    <div className="relative w-full">
+                      <Search
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-apple-silver"
+                        size={16}
+                      />
+
+                      <input
+                        type="text"
+                        value={step2NameFilter}
+                        onChange={(e) => setStep2NameFilter(e.target.value)}
+                        placeholder="Search employee… ( / )"
+                        id="searchEmployee"
+                        className="w-full pl-9 pr-9 py-2.5 rounded-2xl border border-apple-silver bg-white text-sm"
+                      />
+
+                      {step2NameFilter && (
+                        <button
+                          onClick={() => setStep2NameFilter("")}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-apple-steel"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+
+                    <input
+                      type="date"
+                      value={step2DateFilter}
+                      onChange={(e) => setStep2DateFilter(e.target.value)}
+                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal
+                        focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
+                    />
+
+                    <select
+                      value={step2Sort}
+                      onChange={(e) =>
+                        setStep2Sort(e.target.value as Step2Sort)
+                      }
+                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal
+                        focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
+                    >
+                      <option value="date-asc">Date first (oldest)</option>
+                      <option value="date-desc">Date first (newest)</option>
+                      <option value="name-asc">Name first (A-Z)</option>
+                      <option value="name-desc">Name first (Z-A)</option>
+                    </select>
+
+                    <button
+                      onClick={() => {
+                        setStep2SiteFilter("ALL");
+                        setStep2NameFilter("");
+                        setStep2DateFilter("");
+                        setStep2Sort("date-asc");
+                      }}
+                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm font-semibold text-apple-charcoal
+                        hover:border-apple-charcoal transition-all"
+                    >
+                      Clear Filters
+                    </button>
+                  </div>
+                )}
+
+                {records.length > 0 ? (
+                  step2View === "daily" ? (
+                    <div className="rounded-3xl border border-apple-mist bg-white shadow-apple-xs w-full">
+                      <table className="w-full text-sm table-auto">
+                        <thead>
+                          <tr className="border-b border-apple-mist">
+                            {[
+                              "Date",
+                              "Employee",
+                              "Time1 In",
+                              "Time1 Out",
+                              "Time2 In",
+                              "Time2 Out",
+                              "OT In",
+                              "OT Out",
+                              "Hrs",
+                              "Site",
+                            ].map((h) => (
+                              <th
+                                key={h}
+                                className="px-4 py-3.5 text-left text-2xs font-semibold uppercase tracking-widest text-apple-steel"
+                              >
+                                {h}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {previewDailyRows.length === 0 ? (
+                            <tr>
+                              <td colSpan={10} className="py-10">
+                                <div className="flex flex-col items-center justify-center text-center gap-3 text-apple-steel">
+                                  <Search
+                                    size={22}
+                                    className="text-apple-silver"
+                                  />
+
+                                  <p className="text-sm font-semibold text-apple-charcoal">
+                                    No employees found
+                                  </p>
+
+                                  <p className="text-xs text-apple-steel max-w-sm">
+                                    Try clearing filters, searching another
+                                    name, or changing the date.
+                                  </p>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : (
+                            previewDailyRows.map((row) => (
+                              <tr
+                                key={`${row.date}-${row.employee}`}
+                                className="border-b border-apple-mist/60 last:border-0 odd:bg-apple-snow/40 hover:bg-apple-snow/70 transition"
+                              >
+                                <td className="px-4 py-3 text-xs font-mono text-apple-ash">
+                                  {row.date}
+                                </td>
+                                <td className="px-4 py-3 text-sm font-semibold text-apple-charcoal">
+                                  {highlight(row.employee, step2NameFilter)}
+                                </td>
+                                <td className="px-4 py-3 text-xs font-mono text-apple-ash">
+                                  {row.time1In || "--:--"}
+                                </td>
+                                <td className="px-4 py-3 text-xs font-mono text-apple-ash">
+                                  {row.time1Out || "--:--"}
+                                </td>
+                                <td className="px-4 py-3 text-xs font-mono text-apple-ash">
+                                  {row.time2In || "--:--"}
+                                </td>
+                                <td className="px-4 py-3 text-xs font-mono text-apple-ash">
+                                  {row.time2Out || "--:--"}
+                                </td>
+                                <td className="px-4 py-3 text-xs font-mono text-apple-ash">
+                                  {row.otIn || "--:--"}
+                                </td>
+                                <td className="px-4 py-3 text-xs font-mono text-apple-ash">
+                                  {row.otOut || "--:--"}
+                                </td>
+                                <td className="px-4 py-3 text-xs font-semibold text-apple-charcoal">
+                                  {row.hours.toFixed(2)}
+                                </td>
+                                <td className="px-4 py-3 text-xs text-apple-smoke">
+                                  {row.site}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto rounded-3xl border border-apple-mist bg-white shadow-apple-xs [-webkit-overflow-scrolling:touch]">
+                      <table className="w-full text-sm table-auto">
+                        {" "}
+                        <thead>
+                          <tr className="border-b border-apple-mist">
+                            {[
+                              "Date",
+                              "Employee",
+                              "Log Time",
+                              "Type",
+                              "Source",
+                              "Site",
+                            ].map((h) => (
+                              <th
+                                key={h}
+                                className="px-4 py-3.5 text-left text-2xs font-semibold uppercase tracking-widest text-apple-steel"
+                              >
+                                {h}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {previewRecords.map((r, idx) => (
+                            <tr
+                              key={`${r.employee}-${r.date}-${r.logTime}-${r.type}-${idx}`}
+                              className="border-b border-apple-mist/60 last:border-0 odd:bg-apple-snow/40 hover:bg-apple-snow/70 transition"
+                            >
+                              <td className="px-4 py-3 text-xs font-mono text-apple-ash">
+                                {r.date}
+                              </td>
+                              <td className="px-4 py-3 text-sm font-semibold text-apple-charcoal">
+                                {r.employee}
+                              </td>
+                              <td className="px-4 py-3 text-xs font-mono text-apple-ash">
+                                {r.logTime}
+                              </td>
+                              <td className="px-4 py-3 text-xs font-semibold text-apple-charcoal">
+                                {r.type}
+                              </td>
+                              <td className="px-4 py-3 text-xs font-semibold text-apple-steel">
+                                {r.source}
+                              </td>
+                              <td className="px-4 py-3 text-xs text-apple-smoke">
+                                {r.site}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
+                ) : (
+                  <p className="text-sm text-apple-smoke">
+                    No detailed time logs detected. Upload a raw biometric
+                    attendance sheet with Date/Week or Date/Weekday and IN/OUT
+                    time columns.
+                  </p>
+                )}
+
+                {activeRowsCount > 0 && (
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <p className="text-xs text-apple-steel">
+                      Showing {previewStart + 1}-
+                      {Math.min(previewEnd, activeRowsCount)} of{" "}
+                      {activeRowsCount}{" "}
+                      {step2View === "daily"
+                        ? "employee-day rows"
+                        : "cleaned logs"}
+                      {activeRowsCount !== totalRowsForCurrentView
+                        ? ` (filtered from ${totalRowsForCurrentView}).`
+                        : "."}
+                    </p>
+
+                    {activeRowsCount > PREVIEW_LIMIT && (
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {/* First */}
+                        <button
+                          onClick={() => setRecordsPage(1)}
+                          disabled={recordsPage === 1}
+                          className={`px-2.5 h-8 rounded-xl text-xs font-semibold border
+      ${
+        recordsPage === 1
+          ? "border-apple-mist text-apple-silver cursor-not-allowed"
+          : "border-apple-silver text-apple-charcoal hover:border-apple-charcoal"
+      }`}
+                        >
+                          First
+                        </button>
+
+                        {/* Previous */}
+                        <button
+                          onClick={() =>
+                            setRecordsPage((p) => Math.max(1, p - 1))
+                          }
+                          disabled={recordsPage === 1}
+                          className={`px-3 h-8 rounded-xl text-xs font-semibold border
+      ${
+        recordsPage === 1
+          ? "border-apple-mist text-apple-silver cursor-not-allowed"
+          : "border-apple-silver text-apple-charcoal hover:border-apple-charcoal"
+      }`}
+                        >
+                          <ArrowLeft size={16} />
+                        </button>
+
+                        {/* Page numbers */}
+                        {pages.map((p) => (
+                          <button
+                            key={p}
+                            onClick={() => setRecordsPage(p)}
+                            className={`w-8 h-8 rounded-lg text-xs font-semibold border transition
+        ${
+          recordsPage === p
+            ? "bg-apple-charcoal text-white border-apple-charcoal"
+            : "border-apple-silver text-apple-charcoal hover:border-apple-charcoal"
+        }`}
+                          >
+                            {p}
+                          </button>
+                        ))}
+
+                        {/* Next */}
+                        <button
+                          onClick={() =>
+                            setRecordsPage((p) =>
+                              Math.min(totalRecordPages, p + 1),
+                            )
+                          }
+                          disabled={recordsPage === totalRecordPages}
+                          className={`px-3 h-8 rounded-xl text-xs font-semibold border
+      ${
+        recordsPage === totalRecordPages
+          ? "border-apple-mist text-apple-silver cursor-not-allowed"
+          : "border-apple-silver text-apple-charcoal hover:border-apple-charcoal"
+      }`}
+                        >
+                          <ArrowRight size={16} />
+                        </button>
+
+                        {/* Last */}
+                        <button
+                          onClick={() => setRecordsPage(totalRecordPages)}
+                          disabled={recordsPage === totalRecordPages}
+                          className={`px-2.5 h-8 rounded-xl text-xs font-semibold border
+      ${
+        recordsPage === totalRecordPages
+          ? "border-apple-mist text-apple-silver cursor-not-allowed"
+          : "border-apple-silver text-apple-charcoal hover:border-apple-charcoal"
+      }`}
+                        >
+                          Last
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            </section>
-
-            {/* Proceed button */}
-            <div className="flex justify-end pb-4 no-print">
-              <button
-                onClick={() => setStep(3)}
-                className="flex items-center gap-2 px-6 py-3 rounded-2xl
-                  bg-apple-charcoal text-white text-sm font-semibold
-                  hover:bg-apple-black transition-all duration-150 active:scale-[0.98]
-                  shadow-apple-lg"
-              >
-                Finalise Payroll
-                <ChevronRight size={15} />
-              </button>
             </div>
-          </>
+          </section>
         )}
       </main>
 
-      {/* ── Footer ───────────────────────────────── */}
       <Footer />
     </div>
   );

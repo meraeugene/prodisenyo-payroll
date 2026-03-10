@@ -1,4 +1,5 @@
 import type {
+  AttendanceRecord,
   Employee,
   EmployeeCalculated,
   PayrollConfig,
@@ -113,6 +114,40 @@ export function exportToCSV(
   const a = document.createElement("a");
   a.href = url;
   a.download = `payroll_${period.replace(/\s/g, "_")}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export function exportLogsToCSV(
+  records: AttendanceRecord[],
+  site: string,
+  period: string,
+): void {
+  const headers = ["Date", "Employee", "Log Time", "Type", "Source", "Site"];
+  const rows = records.map((r) => [
+    r.date,
+    capitalize(r.employee),
+    r.logTime,
+    r.type,
+    r.source,
+    r.site || site,
+  ]);
+
+  const csv = [
+    [`Clean Attendance Logs - ${site}`],
+    [`Period: ${period}`],
+    [],
+    headers,
+    ...rows,
+  ]
+    .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `clean_logs_${site.replace(/\s+/g, "_")}_${period.replace(/\s+/g, "_")}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }

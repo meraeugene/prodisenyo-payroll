@@ -81,11 +81,26 @@ export default function RateConfig({ config, onChange }: RateConfigProps) {
       </div>
 
       <div className="p-4 rounded-2xl bg-apple-snow border border-apple-mist">
-        <p className="text-xs text-apple-smoke leading-relaxed">
-          <span className="font-semibold text-apple-charcoal">Formula: </span>
-          Gross Pay = (Rate/Day × Days Present) + (Rate/Hour × OT Multiplier × OT Hours)
-          &nbsp;— You can override rates per employee in the table below.
+        <p className="text-[11px] font-semibold text-apple-charcoal uppercase tracking-[0.16em] mb-2">
+          Payroll Formula
         </p>
+        <div className="space-y-1.5 text-xs text-apple-smoke leading-relaxed">
+          <p>
+            <span className="font-semibold text-apple-charcoal">Daily Pay</span>{" "}
+            = Rate/Day × Days Worked
+          </p>
+          <p>
+            <span className="font-semibold text-apple-charcoal">Overtime Pay</span>{" "}
+            = Rate/Hour × OT Multiplier × OT Hours
+          </p>
+          <p className="pt-1">
+            <span className="font-semibold text-apple-charcoal">Gross Pay</span>{" "}
+            = Daily Pay + Overtime Pay
+          </p>
+          <p className="text-[11px] text-apple-steel pt-1">
+            You can review and override individual employee rates in the payroll table below.
+          </p>
+        </div>
       </div>
     </div>
   );

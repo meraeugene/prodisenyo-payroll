@@ -1,0 +1,43 @@
+
+> prodisenyo-payroll@1.0.0 dev
+> next dev
+
+  ▲ Next.js 14.2.5
+  - Local:        http://localhost:3000
+
+ ✓ Starting...
+ ✓ Ready in 3.8s
+ ○ Compiling / ...
+ ✓ Compiled / in 5s (546 modules)
+ GET / 200 in 5745ms
+ ✓ Compiled in 753ms (281 modules)
+ GET / 200 in 58ms
+ GET / 200 in 52ms
+ ✓ Compiled in 1468ms (546 modules)
+ ✓ Compiled in 1213ms (546 modules)
+ ✓ Compiled in 1116ms (546 modules)
+ GET / 200 in 469ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 712ms (535 modules)
+ GET /_next/static/css/app/layout.css?v=1772776528802 404 in 1033ms
+ GET /_next/static/chunks/webpack.js?v=1772776528802 404 in 1057ms
+ GET /_next/static/chunks/main-app.js?v=1772776528802 404 in 1056ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 1056ms
+ GET /_next/static/chunks/app/page.js 404 in 1056ms
+ GET / 200 in 97ms
+ GET /_next/static/css/app/layout.css?v=1772776532020 404 in 61ms
+ GET /_next/static/chunks/main-app.js?v=1772776532020 404 in 73ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 73ms
+ GET /_next/static/chunks/app/page.js 404 in 71ms
+ GET / 200 in 67ms
+ GET /_next/static/css/app/layout.css?v=1772776549402 404 in 35ms
+ GET /_next/static/chunks/main-app.js?v=1772776549402 404 in 57ms
+ GET /_next/static/chunks/app/page.js 404 in 55ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 55ms
+ GET / 200 in 74ms
+ GET /_next/static/css/app/layout.css?v=1772776605032 404 in 36ms
+ GET /_next/static/css/app/layout.css 404 in 44ms
+ GET /_next/static/css/app/layout.css?v=test 404 in 28ms
+ GET /_next/static/chunks/main-app.js 404 in 28ms
+ GET /_next/static/chunks/app/page.js 404 in 57ms
+[?25h
