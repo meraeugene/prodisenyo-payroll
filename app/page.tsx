@@ -465,7 +465,7 @@ export default function HomePage() {
                             {branch.siteName.split(" ")[0]}
                           </p>
 
-                          <p className="text-xs text-apple-steel mt-1">
+                          <p className="text-sm text-apple-steel mt-1">
                             {branch.employeeCount}{" "}
                             {branch.employeeCount === 1
                               ? "employee"
@@ -1046,21 +1046,27 @@ export default function HomePage() {
                             type="monotone"
                             dataKey="hours"
                             stroke="#1D1D1F"
-                            strokeWidth={3}
+                            strokeWidth={1}
                             fillOpacity={1}
                             fill="url(#colorHours)"
-                            animationBegin={200}
-                            animationDuration={1200}
-                            activeDot={{
-                              r: 6,
+                            dot={{
+                              r: 3,
                               fill: "#1D1D1F",
                               stroke: "#fff",
-                              strokeWidth: 3,
+                              strokeWidth: 1,
+                            }}
+                            activeDot={{
+                              r: 5,
+                              fill: "#1D1D1F",
+                              stroke: "#fff",
+                              strokeWidth: 2,
                               style: {
                                 filter:
                                   "drop-shadow(0px 2px 4px rgba(0,0,0,0.2))",
                               },
                             }}
+                            animationBegin={200}
+                            animationDuration={1200}
                           />
                         </AreaChart>
                       </ResponsiveContainer>
