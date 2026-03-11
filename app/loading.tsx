@@ -3,7 +3,7 @@ export default function loading() {
     <div className="flex min-h-screen items-center justify-center bg-white">
       <div className="flex flex-col items-center gap-6">
         {/* Logo */}
-        <div className="flex flex-col items-center gap-1 leading-none">
+        <div className="flex flex-col items-center gap-1 leading-none animate-pulse">
           <span className="text-2xl font-black tracking-wide text-gray-900">
             PRODISENYO
           </span>
