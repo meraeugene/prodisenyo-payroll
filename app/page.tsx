@@ -640,31 +640,31 @@ export default function HomePage() {
                                 key={`${row.date}-${row.employee}`}
                                 className="border-b border-apple-mist/60 last:border-0 odd:bg-apple-snow/40 hover:bg-apple-snow/70 transition"
                               >
-                                <td className="px-4 py-3 text-xs font-mono text-apple-ash">
+                                <td className="px-4 py-3 text-sm font-mono text-apple-ash">
                                   {row.date}
                                 </td>
                                 <td className="px-4 py-3 text-sm font-semibold text-apple-charcoal">
                                   {highlight(row.employee, step2NameFilter)}
                                 </td>
-                                <td className="px-4 py-3 text-xs font-mono text-apple-ash">
+                                <td className="px-4 py-3 text-sm font-mono text-apple-ash">
                                   {row.time1In || "--:--"}
                                 </td>
-                                <td className="px-4 py-3 text-xs font-mono text-apple-ash">
+                                <td className="px-4 py-3 text-sm font-mono text-apple-ash">
                                   {row.time1Out || "--:--"}
                                 </td>
-                                <td className="px-4 py-3 text-xs font-mono text-apple-ash">
+                                <td className="px-4 py-3 text-sm font-mono text-apple-ash">
                                   {row.time2In || "--:--"}
                                 </td>
-                                <td className="px-4 py-3 text-xs font-mono text-apple-ash">
+                                <td className="px-4 py-3 text-sm font-mono text-apple-ash">
                                   {row.time2Out || "--:--"}
                                 </td>
-                                <td className="px-4 py-3 text-xs font-mono text-apple-ash">
+                                <td className="px-4 py-3 text-sm font-mono text-apple-ash">
                                   {row.otIn || "--:--"}
                                 </td>
-                                <td className="px-4 py-3 text-xs font-mono text-apple-ash">
+                                <td className="px-4 py-3 text-sm font-mono text-apple-ash">
                                   {row.otOut || "--:--"}
                                 </td>
-                                <td className="px-4 py-3 text-xs font-semibold text-apple-charcoal">
+                                <td className="px-4 py-3 text-sm font-semibold text-apple-charcoal">
                                   {row.hours.toFixed(2)}
                                 </td>
                                 <td className="px-4 py-3 text-xs text-apple-smoke">
@@ -704,13 +704,13 @@ export default function HomePage() {
                               key={`${r.employee}-${r.date}-${r.logTime}-${r.type}-${idx}`}
                               className="border-b border-apple-mist/60 last:border-0 odd:bg-apple-snow/40 hover:bg-apple-snow/70 transition"
                             >
-                              <td className="px-4 py-3 text-xs font-mono text-apple-ash">
+                              <td className="px-4 py-3 text-sm font-mono text-apple-ash">
                                 {r.date}
                               </td>
                               <td className="px-4 py-3 text-sm font-semibold text-apple-charcoal">
                                 {r.employee}
                               </td>
-                              <td className="px-4 py-3 text-xs font-mono text-apple-ash">
+                              <td className="px-4 py-3 text-sm font-mono text-apple-ash">
                                 {r.logTime}
                               </td>
                               <td className="px-4 py-3 text-xs font-semibold text-apple-charcoal">
