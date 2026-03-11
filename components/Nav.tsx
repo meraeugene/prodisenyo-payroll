@@ -13,11 +13,21 @@ const Nav = ({ step, handleReset }: NavProps) => {
       <div className="max-w-[1400px] mx-auto px-5 sm:px-8">
         <div className="h-14 flex items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center gap-2.5">
-            <div className="px-3 h-7 rounded-lg bg-apple-charcoal flex items-center justify-center">
-              <span className="text-white uppercase text-xs font-bold tracking-widest">
-                Prodisenyo Payroll System
+          <div className="flex flex-col items-center gap-1 leading-none">
+            <span className="text-base font-black tracking-wide text-gray-900">
+              PRODISENYO
+            </span>
+
+            <div className="flex items-center gap-2 -mt-1">
+              {/* Left sharp line */}
+              <div className="h-[1px] w-6 bg-gradient-to-r from-transparent via-gray-400 to-gray-400"></div>
+
+              <span className="text-[8px] tracking-[0.10em] text-gray-500 whitespace-nowrap">
+                PAYROLL SYSTEM
               </span>
+
+              {/* Right sharp line */}
+              <div className="h-[1px] w-6 bg-gradient-to-l from-transparent via-gray-400 to-gray-400"></div>
             </div>
           </div>
 
