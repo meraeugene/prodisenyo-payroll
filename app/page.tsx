@@ -17,7 +17,6 @@ import {
   ResponsiveContainer,
   Tooltip,
   Area,
-  Cell,
   AreaChart,
 } from "recharts";
 import { DailyLogRow, Step2Sort, Step2View } from "@/types/index";
@@ -380,6 +379,7 @@ export default function HomePage() {
       </div>
 
       <main className="max-w-[1400px] mx-auto px-4 sm:px-8 py-6 sm:py-10 space-y-6 sm:space-y-8">
+        {/* Step 1: Upload Attendance Reports */}
         <section
           className="animate-fade-up"
           style={{ animationFillMode: "both" }}
@@ -414,6 +414,7 @@ export default function HomePage() {
             </div>
           </div>
         </section>
+        {/* Step 2: Review Attendance Logs */}
         {step >= 2 && (
           <section
             className="animate-fade-up"
@@ -445,24 +446,32 @@ export default function HomePage() {
 
               <div className="px-5 sm:px-8 py-6 sm:py-8 space-y-5">
                 {branchSummaries.length > 0 && (
-                  <div className="rounded-2xl border border-apple-mist bg-white px-4 py-3">
-                    <p className="text-2xs font-semibold text-apple-steel uppercase tracking-widest mb-1.5">
+                  <div className="rounded-2xl border border-apple-mist bg-white px-5 py-4">
+                    <p className="text-2xs font-semibold text-apple-steel uppercase tracking-widest mb-4">
                       Branch Summary
                     </p>
-                    <div className="flex flex-wrap gap-1.5">
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                       {branchSummaries.map((branch) => (
-                        <span
+                        <div
                           key={branch.siteName}
-                          className="inline-flex items-center gap-1 rounded-full border border-apple-mist bg-apple-snow px-3 py-1 text-[11px] text-apple-charcoal"
+                          className="rounded-xl border border-apple-mist bg-apple-snow px-4 py-3 hover:shadow-sm transition"
                         >
-                          <span className="font-light">{branch.siteName}</span>
-                          <span className="font-semibold">
-                            – {branch.employeeCount}{" "}
+                          <p className="text-[11px] text-apple-steel uppercase tracking-wider">
+                            Branch
+                          </p>
+
+                          <p className="text-sm font-semibold text-apple-charcoal mt-1">
+                            {branch.siteName.split(" ")[0]}
+                          </p>
+
+                          <p className="text-xs text-apple-steel mt-1">
+                            {branch.employeeCount}{" "}
                             {branch.employeeCount === 1
                               ? "employee"
                               : "employees"}
-                          </span>
-                        </span>
+                          </p>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -828,7 +837,6 @@ export default function HomePage() {
             </div>
           </section>
         )}
-
         {/* Charts */}
         {employees.length > 0 && records.length > 0 && (
           <section
