@@ -513,7 +513,7 @@ export default function HomePage() {
                     <select
                       value={step2SiteFilter}
                       onChange={(e) => setStep2SiteFilter(e.target.value)}
-                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal
+                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver  hover:border-apple-charcoal cursor-pointer bg-white text-sm text-apple-charcoal
                         focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
                     >
                       <option value="ALL">All files/sites</option>
@@ -536,7 +536,7 @@ export default function HomePage() {
                         onChange={(e) => setStep2NameFilter(e.target.value)}
                         placeholder="Search employee… ( / )"
                         id="searchEmployee"
-                        className="w-full pl-9 pr-9 py-2.5 rounded-2xl border border-apple-silver bg-white text-sm"
+                        className="w-full hover:border-apple-charcoal pl-9 pr-9 py-2.5 rounded-2xl border border-apple-silver bg-white text-sm"
                       />
 
                       {step2NameFilter && (
@@ -553,7 +553,7 @@ export default function HomePage() {
                       type="date"
                       value={step2DateFilter}
                       onChange={(e) => setStep2DateFilter(e.target.value)}
-                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal
+                      className="w-full hover:border-apple-charcoal px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal
                         focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
                     />
 
@@ -562,7 +562,7 @@ export default function HomePage() {
                       onChange={(e) =>
                         setStep2Sort(e.target.value as Step2Sort)
                       }
-                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal
+                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver hover:border-apple-charcoal cursor-pointer bg-white text-sm text-apple-charcoal
                         focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
                     >
                       <option value="date-asc">Date first (oldest)</option>
