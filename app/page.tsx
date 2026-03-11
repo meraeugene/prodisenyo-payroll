@@ -30,6 +30,7 @@ import {
   pairMinutes,
 } from "@/lib/utils";
 import { highlight } from "@/components/Highlight";
+import ChartTooltip from "@/components/charts/ChartTooltip";
 
 const PREVIEW_LIMIT = 8;
 
@@ -897,13 +898,9 @@ export default function HomePage() {
                           />
                           <Tooltip
                             cursor={{ fill: "#F5F5F7" }}
-                            contentStyle={{
-                              backgroundColor: "#fff",
-                              borderRadius: "12px",
-                              border: "1px solid #F5F5F7",
-                              fontSize: "12px",
-                              boxShadow: "0 4px 12px rgba(0,0,0,0.03)",
-                            }}
+                            content={(props) => (
+                              <ChartTooltip {...props} unit="OT hours" />
+                            )}
                           />
                           <Bar
                             dataKey="hours"
@@ -940,11 +937,9 @@ export default function HomePage() {
                           />
                           <Tooltip
                             cursor={{ fill: "#F5F5F7" }}
-                            contentStyle={{
-                              backgroundColor: "#fff",
-                              borderRadius: "12px",
-                              border: "1px solid #F5F5F7",
-                            }}
+                            content={(props) => (
+                              <ChartTooltip {...props} unit="employees" />
+                            )}
                           />
                           <Bar
                             dataKey="employees"
@@ -1031,26 +1026,9 @@ export default function HomePage() {
                               strokeWidth: 2,
                               strokeDasharray: "6 6",
                             }}
-                            content={({ active, payload, label }) => {
-                              if (active && payload && payload.length) {
-                                return (
-                                  <div className="bg-[#1D1D1F] text-white p-3 rounded-xl shadow-xl border border-white/10 backdrop-blur-md">
-                                    <p className="text-[10px] uppercase tracking-widest opacity-60 mb-1">
-                                      {label}
-                                    </p>
-                                    <div className="flex items-baseline gap-1">
-                                      <span className="text-lg font-bold">
-                                        {payload[0].value}
-                                      </span>
-                                      <span className="text-[10px] opacity-80">
-                                        hrs utilized
-                                      </span>
-                                    </div>
-                                  </div>
-                                );
-                              }
-                              return null;
-                            }}
+                            content={(props) => (
+                              <ChartTooltip {...props} unit="hrs utilized" />
+                            )}
                           />
                           <Area
                             type="monotone"
@@ -1110,11 +1088,9 @@ export default function HomePage() {
                           />
                           <Tooltip
                             cursor={{ fill: "#F5F5F7" }}
-                            contentStyle={{
-                              backgroundColor: "#fff",
-                              borderRadius: "12px",
-                              border: "1px solid #F5F5F7",
-                            }}
+                            content={(props) => (
+                              <ChartTooltip {...props} unit="overtime hrs" />
+                            )}
                           />
                           <Bar
                             dataKey="hours"
