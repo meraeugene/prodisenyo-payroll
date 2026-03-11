@@ -9,6 +9,9 @@ export const metadata: Metadata = {
   title: "Prodisenyo Payroll",
   description:
     "Upload your attendance report and auto-calculate payroll in seconds.",
+  // icons: {
+  //   icon: "/icon.ico",
+  // },
 };
 
 export default function RootLayout({
