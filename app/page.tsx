@@ -1,1115 +1,770 @@
-﻿"use client";
+"use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
-import { X, Search, ArrowRight, ArrowLeft } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
-import StepIndicator from "@/components/StepIndicator";
-import UploadZone from "@/components/UploadZone";
-import type { AttendanceRecord, Employee, Step } from "@/types";
-import type { ParseResult } from "@/app/lib/parser";
-import Footer from "@/components/Footer";
-import Nav from "@/components/Nav";
 import {
-  BarChart,
+  ArrowLeft,
+  ArrowRight,
+  Download,
+  Pencil,
+  Search,
+  X,
+} from "lucide-react";
+import {
+  Area,
+  AreaChart,
   Bar,
-  XAxis,
-  YAxis,
+  BarChart,
   CartesianGrid,
   ResponsiveContainer,
   Tooltip,
-  Area,
-  AreaChart,
+  XAxis,
+  YAxis,
 } from "recharts";
-import { DailyLogRow, Step2Sort, Step2View } from "@/types/index";
-import {
-  compareStep2Rows,
-  earlierTime,
-  earliestNonEmptyTime,
-  laterTime,
-  latestNonEmptyTime,
-  pairMinutes,
-} from "@/lib/utils";
-import { highlight } from "@/components/Highlight";
+import Footer from "@/components/Footer";
+import Nav from "@/components/Nav";
+import StepIndicator from "@/components/StepIndicator";
+import UploadZone from "@/components/UploadZone";
 import ChartTooltip from "@/components/charts/ChartTooltip";
+import { highlight } from "@/components/Highlight";
+import type {
+  AttendanceRecord,
+  AuditLogEntry,
+  PayrollEntry,
+  PayrollSettingsState,
+  Step,
+  Step2Sort,
+  Step2View,
+} from "@/types";
+import type { ParseResult } from "@/app/lib/parser";
+import {
+  buildDailyLogRows,
+  exportPayrollToXlsx,
+  formatNumber,
+  formatPHP,
+  generatePayrollEntries,
+  recalculatePayrollEntry,
+  summarizePayroll,
+} from "@/app/lib/payroll";
+import {
+  defaultPayrollSettings,
+  loadPayrollSettings,
+  saveAttendanceSnapshot,
+} from "@/app/lib/storage";
+import { compareStep2Rows } from "@/lib/utils";
 
-const PREVIEW_LIMIT = 8;
+const STEP2_PER_PAGE = 12;
+const STEP3_PER_PAGE = 10;
+
+const AUDIT_FIELDS: Array<{ key: keyof PayrollEntry; label: string }> = [
+  { key: "date", label: "Date" },
+  { key: "hoursWorked", label: "Hours Worked" },
+  { key: "overtimeHours", label: "Overtime Hours" },
+  { key: "rate", label: "Rate" },
+  { key: "bonuses", label: "Bonuses" },
+  { key: "deductions", label: "Deductions" },
+];
 
 export default function HomePage() {
   const [step, setStep] = useState<Step>(1);
+  const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [periodLabel, setPeriodLabel] = useState("Current Period");
+  const [siteLabel, setSiteLabel] = useState("Unknown Site");
+  const [removedEntries, setRemovedEntries] = useState(0);
   const [step2View, setStep2View] = useState<Step2View>("daily");
   const [step2Sort, setStep2Sort] = useState<Step2Sort>("date-asc");
-  const [recordsPage, setRecordsPage] = useState(1);
   const [step2SiteFilter, setStep2SiteFilter] = useState("ALL");
-  const [step2NameFilter, setStep2NameFilter] = useState("");
   const [step2DateFilter, setStep2DateFilter] = useState("");
-  const [records, setRecords] = useState<AttendanceRecord[]>([]);
-  const [site, setSite] = useState("Unknown Site");
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [step2NameFilter, setStep2NameFilter] = useState("");
+  const [step2Page, setStep2Page] = useState(1);
+  const [payrollSettings, setPayrollSettings] =
+    useState<PayrollSettingsState>(defaultPayrollSettings());
+  const [payrollEntries, setPayrollEntries] = useState<PayrollEntry[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [editingEntry, setEditingEntry] = useState<PayrollEntry | null>(null);
+  const [editDraft, setEditDraft] = useState<PayrollEntry | null>(null);
+  const [exporting, setExporting] = useState(false);
 
-  const dailyRows = useMemo<DailyLogRow[]>(() => {
-    const grouped = new Map<string, DailyLogRow>();
-
-    for (const record of records) {
-      const key = `${record.date}|||${record.employee.trim().toLowerCase()}`;
-      const current = grouped.get(key) ?? {
-        date: record.date,
-        employee: record.employee,
-        time1In: "",
-        time1Out: "",
-        time2In: "",
-        time2Out: "",
-        otIn: "",
-        otOut: "",
-        hours: 0,
-        site: record.site,
-      };
-
-      if (!current.site && record.site) current.site = record.site;
-
-      if (record.source === "Time1" && record.type === "IN") {
-        current.time1In = earlierTime(current.time1In, record.logTime);
-      } else if (record.source === "Time1" && record.type === "OUT") {
-        current.time1Out = laterTime(current.time1Out, record.logTime);
-      } else if (record.source === "Time2" && record.type === "IN") {
-        current.time2In = earlierTime(current.time2In, record.logTime);
-      } else if (record.source === "Time2" && record.type === "OUT") {
-        current.time2Out = laterTime(current.time2Out, record.logTime);
-      } else if (record.source === "OT" && record.type === "IN") {
-        current.otIn = earlierTime(current.otIn, record.logTime);
-      } else if (record.source === "OT" && record.type === "OUT") {
-        current.otOut = laterTime(current.otOut, record.logTime);
-      }
-
-      grouped.set(key, current);
-    }
-
-    const rows = Array.from(grouped.values()).map((row) => {
-      const regularIn = earliestNonEmptyTime(row.time1In, row.time2In);
-      const regularOut = latestNonEmptyTime(row.time1Out, row.time2Out);
-
-      // Some exports place late end-of-day punches in OT In/Out instead of regular Out.
-      const otAsRegularOut = !regularOut
-        ? latestNonEmptyTime(row.otOut, row.otIn)
-        : "";
-      const effectiveRegularOut = regularOut || otAsRegularOut;
-      const regularMinutes = pairMinutes(regularIn, effectiveRegularOut);
-
-      const usedOtAsRegularBoundary =
-        !regularOut && Boolean(otAsRegularOut) && Boolean(regularIn);
-      const otMinutes =
-        row.otIn && row.otOut && !usedOtAsRegularBoundary
-          ? pairMinutes(row.otIn, row.otOut)
-          : 0;
-
-      const minutes = regularMinutes + otMinutes;
-      return {
-        ...row,
-        hours: Math.round((minutes / 60) * 100) / 100,
-      };
-    });
-
-    return rows;
-  }, [records]);
-
-  const availableSites = useMemo(() => {
-    return Array.from(
-      new Set(
-        records
-          .map((record) => record.site.trim())
-          .filter((value) => value.length > 0),
-      ),
-    ).sort((a, b) => a.localeCompare(b));
-  }, [records]);
-
-  const filteredDetailedRecords = useMemo(() => {
-    const nameFilter = step2NameFilter.trim().toLowerCase();
-    const dateFilter = step2DateFilter.trim();
-
-    const filtered = records.filter((record) => {
-      if (step2SiteFilter !== "ALL" && record.site !== step2SiteFilter)
-        return false;
-      if (dateFilter && record.date !== dateFilter) return false;
-      if (nameFilter && !record.employee.toLowerCase().includes(nameFilter))
-        return false;
-      return true;
-    });
-
-    filtered.sort((a, b) => {
-      const byPrimary = compareStep2Rows(
-        a.date,
-        a.employee,
-        b.date,
-        b.employee,
-        step2Sort,
-      );
-      if (byPrimary !== 0) return byPrimary;
-      if (a.logTime !== b.logTime) return a.logTime.localeCompare(b.logTime);
-      if (a.type !== b.type) return a.type.localeCompare(b.type);
-      return a.source.localeCompare(b.source);
-    });
-
-    return filtered;
-  }, [records, step2SiteFilter, step2DateFilter, step2NameFilter, step2Sort]);
-
-  const filteredDailyRows = useMemo(() => {
-    const nameFilter = step2NameFilter.trim().toLowerCase();
-    const dateFilter = step2DateFilter.trim();
-
-    const filtered = dailyRows.filter((row) => {
-      if (step2SiteFilter !== "ALL" && row.site !== step2SiteFilter)
-        return false;
-      if (dateFilter && row.date !== dateFilter) return false;
-      if (nameFilter && !row.employee.toLowerCase().includes(nameFilter))
-        return false;
-      return true;
-    });
-
-    filtered.sort((a, b) =>
-      compareStep2Rows(a.date, a.employee, b.date, b.employee, step2Sort),
+  useEffect(() => setPayrollSettings(loadPayrollSettings()), []);
+  useEffect(() => {
+    const refresh = () => setPayrollSettings(loadPayrollSettings());
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, []);
+  useEffect(() => {
+    setPayrollEntries((prev) =>
+      prev.map((entry) => recalculatePayrollEntry(entry, payrollSettings)),
     );
+  }, [payrollSettings]);
 
-    return filtered;
-  }, [dailyRows, step2SiteFilter, step2DateFilter, step2NameFilter, step2Sort]);
-
-  const activeRowsCount =
-    step2View === "daily"
-      ? filteredDailyRows.length
-      : filteredDetailedRecords.length;
-  const totalRowsForCurrentView =
-    step2View === "daily" ? dailyRows.length : records.length;
-
-  const totalRecordPages = useMemo(
-    () => Math.max(1, Math.ceil(activeRowsCount / PREVIEW_LIMIT)),
-    [activeRowsCount],
+  const dailyRows = useMemo(() => buildDailyLogRows(records), [records]);
+  const availableSites = useMemo(
+    () =>
+      Array.from(new Set(records.map((record) => record.site).filter(Boolean))).sort(
+        (a, b) => a.localeCompare(b),
+      ),
+    [records],
   );
 
-  const previewStart = (recordsPage - 1) * PREVIEW_LIMIT;
-  const previewEnd = previewStart + PREVIEW_LIMIT;
+  const filteredDailyRows = useMemo(() => {
+    const nameQuery = step2NameFilter.trim().toLowerCase();
+    return dailyRows
+      .filter((row) => {
+        if (step2SiteFilter !== "ALL" && row.site !== step2SiteFilter) return false;
+        if (step2DateFilter && row.date !== step2DateFilter) return false;
+        if (nameQuery && !row.workerName.toLowerCase().includes(nameQuery)) return false;
+        return true;
+      })
+      .sort((a, b) =>
+        compareStep2Rows(a.date, a.workerName, b.date, b.workerName, step2Sort),
+      );
+  }, [dailyRows, step2DateFilter, step2NameFilter, step2SiteFilter, step2Sort]);
 
-  const previewRecords = useMemo(() => {
-    return filteredDetailedRecords.slice(previewStart, previewEnd);
-  }, [filteredDetailedRecords, previewStart, previewEnd]);
+  const filteredRecords = useMemo(() => {
+    const nameQuery = step2NameFilter.trim().toLowerCase();
+    return records
+      .filter((record) => {
+        if (step2SiteFilter !== "ALL" && record.site !== step2SiteFilter) return false;
+        if (step2DateFilter && record.date !== step2DateFilter) return false;
+        if (nameQuery && !record.workerName.toLowerCase().includes(nameQuery)) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const byPrimary = compareStep2Rows(
+          a.date,
+          a.workerName,
+          b.date,
+          b.workerName,
+          step2Sort,
+        );
+        if (byPrimary !== 0) return byPrimary;
+        if (a.logTime !== b.logTime) return a.logTime.localeCompare(b.logTime);
+        if (a.type !== b.type) return a.type.localeCompare(b.type);
+        return a.source.localeCompare(b.source);
+      });
+  }, [records, step2DateFilter, step2NameFilter, step2SiteFilter, step2Sort]);
 
-  const previewDailyRows = useMemo(() => {
-    return filteredDailyRows.slice(previewStart, previewEnd);
-  }, [filteredDailyRows, previewStart, previewEnd]);
+  const step2Count = step2View === "daily" ? filteredDailyRows.length : filteredRecords.length;
+  const step2Pages = Math.max(1, Math.ceil(step2Count / STEP2_PER_PAGE));
+  const step2Start = (step2Page - 1) * STEP2_PER_PAGE;
+  const step2Rows =
+    step2View === "daily"
+      ? filteredDailyRows.slice(step2Start, step2Start + STEP2_PER_PAGE)
+      : filteredRecords.slice(step2Start, step2Start + STEP2_PER_PAGE);
 
-  const branchSummaries = useMemo(() => {
+  useEffect(() => setStep2Page((prev) => Math.min(prev, step2Pages)), [step2Pages]);
+  useEffect(() => setStep2Page(1), [
+    step2View,
+    step2Sort,
+    step2SiteFilter,
+    step2DateFilter,
+    step2NameFilter,
+  ]);
+
+  const chartOT = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of dailyRows) map.set(row.site, (map.get(row.site) ?? 0) + row.overtimeHours);
+    return Array.from(map.entries()).map(([site, hours]) => ({ site, hours: Number(hours.toFixed(2)) }));
+  }, [dailyRows]);
+  const chartWorkers = useMemo(() => {
     const map = new Map<string, Set<string>>();
     for (const record of records) {
-      const siteKey = record.site?.trim();
-      if (!siteKey) continue;
-      if (!map.has(siteKey)) {
-        map.set(siteKey, new Set<string>());
-      }
-      map.get(siteKey)!.add(record.employee.trim());
+      if (!map.has(record.site)) map.set(record.site, new Set());
+      map.get(record.site)?.add(record.mergeKey);
     }
-    return Array.from(map.entries())
-      .map(([siteName, employeesSet]) => ({
-        siteName,
-        employeeCount: employeesSet.size,
-      }))
-      .sort((a, b) => a.siteName.localeCompare(b.siteName));
+    return Array.from(map.entries()).map(([site, workers]) => ({ site, workers: workers.size }));
   }, [records]);
-
-  const overtimeByBranch = useMemo(() => {
+  const chartDailyHours = useMemo(() => {
     const map = new Map<string, number>();
-
-    employees.forEach((emp) => {
-      const rec = records.find(
-        (r) =>
-          r.employee.trim().toLowerCase() === emp.name.trim().toLowerCase(),
-      );
-
-      const branch = rec?.site?.split(" ")[0] ?? "Unknown";
-
-      map.set(branch, (map.get(branch) ?? 0) + emp.otHours);
-    });
-
+    for (const row of dailyRows) map.set(row.date, (map.get(row.date) ?? 0) + row.totalHours);
     return Array.from(map.entries())
-      .map(([branch, hours]) => ({
-        branch,
-        hours: Number(hours.toFixed(2)),
-      }))
-      .sort((a, b) => b.hours - a.hours);
-  }, [employees, records]);
-
-  const workforceByBranch = useMemo(() => {
-    const map = new Map<string, Set<string>>();
-
-    records.forEach((r) => {
-      const branch = r.site.split(" ")[0];
-      if (!map.has(branch)) map.set(branch, new Set());
-      map.get(branch)!.add(r.employee);
-    });
-
-    return Array.from(map.entries())
-      .map(([branch, set]) => ({
-        branch,
-        employees: set.size,
-      }))
-      .sort((a, b) => b.employees - a.employees);
-  }, [records]);
-
-  const dailyLaborHours = useMemo(() => {
+      .map(([date, hours]) => ({ date: formatDateDisplay(date), hours: Number(hours.toFixed(2)) }))
+      .sort((a, b) => dateDisplayToIso(a.date).localeCompare(dateDisplayToIso(b.date)));
+  }, [dailyRows]);
+  const chartTopOT = useMemo(() => {
     const map = new Map<string, number>();
-
-    records.forEach((r) => {
-      map.set(r.date, (map.get(r.date) ?? 0) + 1);
-    });
-
+    for (const row of dailyRows) map.set(row.workerName, (map.get(row.workerName) ?? 0) + row.overtimeHours);
     return Array.from(map.entries())
-      .map(([date, logs]) => ({
-        date,
-        hours: logs / 2,
-      }))
-      .sort((a, b) => a.date.localeCompare(b.date));
-  }, [records]);
-
-  const topOTEmployees = useMemo(() => {
-    return [...employees]
-      .sort((a, b) => b.otHours - a.otHours)
-      .slice(0, 5)
-      .map((e) => ({
-        name: e.name,
-        hours: e.otHours,
-      }));
-  }, [employees]);
+      .map(([worker, hours]) => ({ worker, hours: Number(hours.toFixed(2)) }))
+      .sort((a, b) => b.hours - a.hours)
+      .slice(0, 5);
+  }, [dailyRows]);
 
   const handleParsed = useCallback((result: ParseResult) => {
-    setEmployees(result.employees);
     setRecords(result.records);
+    setPeriodLabel(result.period);
+    setSiteLabel(result.site);
+    setRemovedEntries(result.removedEntries);
     setStep2View("daily");
     setStep2Sort("date-asc");
     setStep2SiteFilter("ALL");
-    setStep2NameFilter("");
     setStep2DateFilter("");
-    setRecordsPage(1);
-    setSite(result.site);
+    setStep2NameFilter("");
+    setStep2Page(1);
+    setPayrollEntries([]);
+    setAuditLogs([]);
     setStep(2);
+    saveAttendanceSnapshot({
+      period: result.period,
+      site: result.site,
+      records: result.records,
+      savedAt: new Date().toISOString(),
+    });
   }, []);
 
-  function handleReset() {
-    setRecords([]);
-    setStep2View("daily");
+  const clearFilters = () => {
     setStep2Sort("date-asc");
     setStep2SiteFilter("ALL");
-    setStep2NameFilter("");
     setStep2DateFilter("");
-    setRecordsPage(1);
-    setSite("Unknown Site");
+    setStep2NameFilter("");
+    setStep2Page(1);
+  };
+  const handleReset = useCallback(() => {
     setStep(1);
-  }
-
-  const pages = useMemo(() => {
-    const arr = [];
-    const maxVisible = 5;
-
-    let start = Math.max(1, recordsPage - 2);
-    let end = Math.min(totalRecordPages, start + maxVisible - 1);
-
-    if (end - start < maxVisible - 1) {
-      start = Math.max(1, end - maxVisible + 1);
-    }
-
-    for (let i = start; i <= end; i++) {
-      arr.push(i);
-    }
-
-    return arr;
-  }, [recordsPage, totalRecordPages]);
-
-  useEffect(() => {
-    setRecordsPage((prev) => Math.min(prev, totalRecordPages));
-  }, [totalRecordPages]);
-
-  useEffect(() => {
-    setRecordsPage(1);
-  }, [step2View, step2Sort, step2SiteFilter, step2NameFilter, step2DateFilter]);
-
-  useEffect(() => {
-    if (
-      step2SiteFilter !== "ALL" &&
-      !availableSites.includes(step2SiteFilter)
-    ) {
-      setStep2SiteFilter("ALL");
-    }
-  }, [availableSites, step2SiteFilter]);
-
-  useEffect(() => {
-    if (step === 2) {
-      window.scrollTo({ top: 500, behavior: "smooth" });
-    }
-  }, [step]);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "/") {
-        e.preventDefault();
-        document.getElementById("searchEmployee")?.focus();
-      }
-    };
-
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    setRecords([]);
+    setPeriodLabel("Current Period");
+    setSiteLabel("Unknown Site");
+    setRemovedEntries(0);
+    clearFilters();
+    setStep2View("daily");
+    setPayrollEntries([]);
+    setAuditLogs([]);
+    setEditingEntry(null);
+    setEditDraft(null);
   }, []);
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight") {
-        setRecordsPage((p) => Math.min(totalRecordPages, p + 1));
-      }
-      if (e.key === "ArrowLeft") {
-        setRecordsPage((p) => Math.max(1, p - 1));
-      }
-    };
+  const handleGeneratePayroll = () =>
+    setPayrollEntries(generatePayrollEntries(dailyRows, payrollSettings));
 
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [totalRecordPages]);
+  const handleExportPayroll = async () => {
+    if (payrollEntries.length === 0 || exporting) return;
+    setExporting(true);
+    try {
+      await exportPayrollToXlsx(payrollEntries, summarizePayroll(payrollEntries).rows, periodLabel);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const saveEdit = () => {
+    if (!editingEntry || !editDraft) return;
+    const roleSetting = payrollSettings.roleRates.find((item) => item.role === editDraft.role) ?? payrollSettings.roleRates[0];
+    const nextEntry = recalculatePayrollEntry(
+      {
+        ...editDraft,
+        customRate: Math.abs(editDraft.rate - roleSetting.dailyRate) > 0.0001,
+        id: `${editDraft.date}|||${editDraft.site.toLowerCase()}|||${editDraft.mergeKey}`,
+      },
+      payrollSettings,
+    );
+    const logs: AuditLogEntry[] = [];
+    for (const field of AUDIT_FIELDS) {
+      const oldValue = normalizeAuditValue(editingEntry[field.key]);
+      const newValue = normalizeAuditValue(nextEntry[field.key]);
+      if (oldValue !== newValue) {
+        logs.push({
+          id: `${Date.now()}-${field.key}-${logs.length}`,
+          user: "Payroll Manager",
+          worker: `${editingEntry.workerName} (${editingEntry.role})`,
+          field: field.label,
+          oldValue,
+          newValue,
+          changedAt: new Date().toLocaleString("en-PH", {
+            month: "short",
+            day: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        });
+      }
+    }
+    setPayrollEntries((prev) => prev.map((entry) => (entry.id === editingEntry.id ? nextEntry : entry)));
+    if (logs.length > 0) setAuditLogs((prev) => [...logs.reverse(), ...prev].slice(0, 250));
+    setEditingEntry(null);
+    setEditDraft(null);
+  };
 
   return (
     <div className="min-h-screen bg-apple-snow">
       <Nav step={step} handleReset={handleReset} />
-
       <div className="md:hidden border-b border-apple-mist bg-white px-5 py-3">
         <StepIndicator current={step} />
       </div>
 
       <main className="max-w-[1400px] mx-auto px-4 sm:px-8 py-6 sm:py-10 space-y-6 sm:space-y-8">
-        {/* Step 1: Upload Attendance Reports */}
-        <section
-          className="animate-fade-up"
-          style={{ animationFillMode: "both" }}
-        >
-          <div className="bg-white rounded-3xl border border-apple-mist shadow-apple-xs overflow-hidden">
-            <div className="px-5 sm:px-8 pt-6 sm:pt-8 pb-5 sm:pb-6 border-b border-apple-mist flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-2xs font-mono font-semibold text-apple-steel uppercase tracking-widest">
-                    Step 1
-                  </span>
-                  {step > 1 && (
-                    <span className="text-2xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">
-                      Complete
-                    </span>
-                  )}
-                </div>
-                <h2 className="text-xl sm:text-2xl font-bold text-apple-charcoal tracking-tight">
-                  Upload Attendance Reports
-                </h2>
-                <p className="text-sm text-apple-smoke mt-1">
-                  Upload one or more biometric attendance exports as XLS, XLSX,
-                  or CSV.
-                </p>
-              </div>
-            </div>
-
-            <div
-              className={`px-5 sm:px-8 py-6 sm:py-8 transition-opacity duration-300 ${step > 1 ? "opacity-50 pointer-events-none" : ""}`}
-            >
-              <UploadZone onParsed={handleParsed} />
-            </div>
+        <section className="bg-white rounded-3xl border border-apple-mist shadow-apple-xs overflow-hidden">
+          <div className="px-5 sm:px-8 py-6 border-b border-apple-mist">
+            <p className="text-2xs uppercase font-semibold tracking-widest text-apple-steel">Step 1</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-apple-charcoal">Upload Attendance</h2>
+          </div>
+          <div className={`px-5 sm:px-8 py-6 ${step > 1 ? "opacity-50 pointer-events-none" : ""}`}>
+            <UploadZone onParsed={handleParsed} />
           </div>
         </section>
-        {/* Step 2: Review Attendance Logs */}
+
         {step >= 2 && (
-          <section
-            className="animate-fade-up"
-            style={{ animationFillMode: "both", animationDelay: "40ms" }}
-          >
-            <div className="bg-white rounded-3xl border border-apple-mist shadow-apple-xs overflow-hidden">
-              <div className="px-5 sm:px-8 pt-6 sm:pt-8 pb-5 sm:pb-6 border-b border-apple-mist">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className="text-2xs font-mono font-semibold text-apple-steel uppercase tracking-widest">
-                    Step 2
-                  </span>
-                  <span className="text-2xs font-semibold text-apple-smoke bg-apple-snow px-2 py-0.5 rounded-full border border-apple-mist">
-                    {site}
-                  </span>
-                  {step > 2 && (
-                    <span className="text-2xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">
-                      Complete
-                    </span>
-                  )}
+          <section className="bg-white rounded-3xl border border-apple-mist shadow-apple-xs overflow-hidden">
+            <div className="px-5 sm:px-8 py-6 border-b border-apple-mist">
+              <p className="text-2xs uppercase font-semibold tracking-widest text-apple-steel">Step 2</p>
+              <h2 className="text-xl sm:text-2xl font-bold text-apple-charcoal">Review Attendance</h2>
+              <p className="text-sm text-apple-smoke mt-1">
+                Site: {siteLabel} | Period: {periodLabel} | Removed entries: {removedEntries}
+              </p>
+            </div>
+            <div className="px-5 sm:px-8 py-6 space-y-4">
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => setStep2View("daily")} className={`px-3 py-1.5 rounded-xl text-xs font-semibold border ${step2View === "daily" ? "bg-apple-charcoal text-white border-apple-charcoal" : "bg-white border-apple-silver text-apple-charcoal"}`}>Attendance Viewer</button>
+                <button onClick={() => setStep2View("detailed")} className={`px-3 py-1.5 rounded-xl text-xs font-semibold border ${step2View === "detailed" ? "bg-apple-charcoal text-white border-apple-charcoal" : "bg-white border-apple-silver text-apple-charcoal"}`}>Raw Logs</button>
+                <button onClick={() => setStep(3)} className="ml-auto px-4 py-2 rounded-xl bg-apple-charcoal text-white text-sm font-semibold">Continue to Step 3</button>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
+                <select
+                  value={step2SiteFilter}
+                  onChange={(event) => setStep2SiteFilter(event.target.value)}
+                  className="h-10 px-3 rounded-2xl border border-apple-silver bg-white text-sm"
+                >
+                  <option value="ALL">All Sites</option>
+                  {availableSites.map((site) => (
+                    <option key={site} value={site}>
+                      {site}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="date"
+                  value={step2DateFilter}
+                  onChange={(event) => setStep2DateFilter(event.target.value)}
+                  className="h-10 px-3 rounded-2xl border border-apple-silver bg-white text-sm"
+                />
+                <div className="relative lg:col-span-2">
+                  <Search
+                    size={15}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-apple-silver"
+                  />
+                  <input
+                    value={step2NameFilter}
+                    onChange={(event) => setStep2NameFilter(event.target.value)}
+                    className="w-full h-10 pl-9 pr-3 rounded-2xl border border-apple-silver bg-white text-sm"
+                    placeholder="Search worker"
+                  />
                 </div>
-                <h2 className="text-xl sm:text-2xl font-bold text-apple-charcoal tracking-tight">
-                  Review Attendance Logs
-                </h2>
-                <p className="text-sm text-apple-smoke mt-1">
-                  Your biometric files are cleaned and converted into readable
-                  daily time logs.
+                <select
+                  value={step2Sort}
+                  onChange={(event) => setStep2Sort(event.target.value as Step2Sort)}
+                  className="h-10 px-3 rounded-2xl border border-apple-silver bg-white text-sm"
+                >
+                  <option value="date-asc">Date (oldest first)</option>
+                  <option value="date-desc">Date (newest first)</option>
+                  <option value="name-asc">Name (A-Z)</option>
+                  <option value="name-desc">Name (Z-A)</option>
+                </select>
+              </div>
+              <div className="flex justify-between items-center gap-3 flex-wrap">
+                <p className="text-xs text-apple-steel">
+                  Showing {step2Count === 0 ? 0 : step2Start + 1}-
+                  {Math.min(step2Start + STEP2_PER_PAGE, step2Count)} of {step2Count}.
                 </p>
+                <button
+                  onClick={clearFilters}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-apple-silver text-xs font-semibold text-apple-charcoal"
+                >
+                  <X size={12} />
+                  Clear Filters
+                </button>
               </div>
-
-              <div className="px-5 sm:px-8 py-6 sm:py-8 space-y-5">
-                {branchSummaries.length > 0 && (
-                  <div className="rounded-2xl border border-apple-mist bg-white px-5 py-4">
-                    <p className="text-2xs font-semibold text-apple-steel uppercase tracking-widest mb-4">
-                      Branch Summary
-                    </p>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                      {branchSummaries.map((branch, i) => (
-                        <motion.div
-                          key={branch.siteName}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: i * 0.05 }}
-                          className="rounded-xl border border-apple-mist bg-apple-snow px-4 py-3 hover:shadow-sm transition"
-                        >
-                          <p className="text-[11px] text-apple-steel uppercase tracking-wider">
-                            Branch
-                          </p>
-
-                          <p className="text-sm font-semibold text-apple-charcoal mt-1">
-                            {branch.siteName.split(" ")[0]}
-                          </p>
-
-                          <p className="text-sm text-apple-steel mt-1">
-                            {branch.employeeCount}{" "}
-                            {branch.employeeCount === 1
-                              ? "employee"
-                              : "employees"}
-                          </p>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {records.length > 0 && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <button
-                      onClick={() => {
-                        setStep2View("daily");
-                      }}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all duration-150
-                        ${
-                          step2View === "daily"
-                            ? "bg-apple-charcoal text-white border-apple-charcoal"
-                            : "bg-white text-apple-charcoal border-apple-silver hover:border-apple-charcoal"
-                        }`}
-                    >
-                      Daily View
-                    </button>
-                    <button
-                      onClick={() => {
-                        setStep2View("detailed");
-                      }}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all duration-150
-                        ${
-                          step2View === "detailed"
-                            ? "bg-apple-charcoal text-white border-apple-charcoal"
-                            : "bg-white text-apple-charcoal border-apple-silver hover:border-apple-charcoal"
-                        }`}
-                    >
-                      Detailed Logs
-                    </button>
-                  </div>
-                )}
-
-                {records.length > 0 && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                    <select
-                      value={step2SiteFilter}
-                      onChange={(e) => setStep2SiteFilter(e.target.value)}
-                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver  hover:border-apple-charcoal cursor-pointer bg-white text-sm text-apple-charcoal
-                        focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
-                    >
-                      <option value="ALL">All files/sites</option>
-                      {availableSites.map((siteOption) => (
-                        <option key={siteOption} value={siteOption}>
-                          {siteOption}
-                        </option>
-                      ))}
-                    </select>
-
-                    <div className="relative w-full">
-                      <Search
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-apple-silver"
-                        size={16}
-                      />
-
-                      <input
-                        type="text"
-                        value={step2NameFilter}
-                        onChange={(e) => setStep2NameFilter(e.target.value)}
-                        placeholder="Search employee… ( / )"
-                        id="searchEmployee"
-                        className="w-full hover:border-apple-charcoal pl-9 pr-9 py-2.5 rounded-2xl border border-apple-silver bg-white text-sm"
-                      />
-
-                      {step2NameFilter && (
-                        <button
-                          onClick={() => setStep2NameFilter("")}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-apple-steel"
-                        >
-                          <X size={14} />
-                        </button>
-                      )}
-                    </div>
-
-                    <input
-                      type="date"
-                      value={step2DateFilter}
-                      onChange={(e) => setStep2DateFilter(e.target.value)}
-                      className="w-full hover:border-apple-charcoal px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal
-                        focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
-                    />
-
-                    <select
-                      value={step2Sort}
-                      onChange={(e) =>
-                        setStep2Sort(e.target.value as Step2Sort)
-                      }
-                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver hover:border-apple-charcoal cursor-pointer bg-white text-sm text-apple-charcoal
-                        focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
-                    >
-                      <option value="date-asc">Date first (oldest)</option>
-                      <option value="date-desc">Date first (newest)</option>
-                      <option value="name-asc">Name first (A-Z)</option>
-                      <option value="name-desc">Name first (Z-A)</option>
-                    </select>
-
-                    <button
-                      onClick={() => {
-                        setStep2SiteFilter("ALL");
-                        setStep2NameFilter("");
-                        setStep2DateFilter("");
-                        setStep2Sort("date-asc");
-                      }}
-                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm font-semibold text-apple-charcoal
-                        hover:border-apple-charcoal transition-all"
-                    >
-                      Clear Filters
-                    </button>
-                  </div>
-                )}
-
-                {records.length > 0 ? (
-                  step2View === "daily" ? (
-                    <div className="rounded-3xl border border-apple-mist bg-white shadow-apple-xs w-full">
-                      <table className="w-full text-sm table-auto">
-                        <thead>
-                          <tr className="border-b border-apple-mist">
-                            {[
-                              "Date",
-                              "Employee",
-                              "Time1 In",
-                              "Time1 Out",
-                              "Time2 In",
-                              "Time2 Out",
-                              "OT In",
-                              "OT Out",
-                              "Hrs",
-                              "Site",
-                            ].map((h) => (
-                              <th
-                                key={h}
-                                className="px-4 py-3.5 text-left text-2xs font-semibold uppercase tracking-widest text-apple-steel"
-                              >
-                                {h}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {previewDailyRows.length === 0 ? (
-                            <tr>
-                              <td colSpan={10} className="py-10">
-                                <div className="flex flex-col items-center justify-center text-center gap-3 text-apple-steel">
-                                  <Search
-                                    size={22}
-                                    className="text-apple-silver"
-                                  />
-
-                                  <p className="text-sm font-semibold text-apple-charcoal">
-                                    No employees found
-                                  </p>
-
-                                  <p className="text-xs text-apple-steel max-w-sm">
-                                    Try clearing filters, searching another
-                                    name, or changing the date.
-                                  </p>
-                                </div>
-                              </td>
-                            </tr>
-                          ) : (
-                            previewDailyRows.map((row) => (
-                              <tr
-                                key={`${row.date}-${row.employee}`}
-                                className="border-b border-apple-mist/60 last:border-0 odd:bg-apple-snow/40 hover:bg-apple-snow/70 transition"
-                              >
-                                <td className="px-4 py-3 text-sm font-mono text-apple-ash">
-                                  {row.date}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-semibold text-apple-charcoal">
-                                  {highlight(row.employee, step2NameFilter)}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-mono text-apple-ash">
-                                  {row.time1In || "--:--"}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-mono text-apple-ash">
-                                  {row.time1Out || "--:--"}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-mono text-apple-ash">
-                                  {row.time2In || "--:--"}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-mono text-apple-ash">
-                                  {row.time2Out || "--:--"}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-mono text-apple-ash">
-                                  {row.otIn || "--:--"}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-mono text-apple-ash">
-                                  {row.otOut || "--:--"}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-semibold text-apple-charcoal">
-                                  {row.hours.toFixed(2)}
-                                </td>
-                                <td className="px-4 py-3 text-xs text-apple-smoke">
-                                  {row.site.split(" ")[0]}
-                                </td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto rounded-3xl border border-apple-mist bg-white shadow-apple-xs [-webkit-overflow-scrolling:touch]">
-                      <table className="w-full text-sm table-auto">
-                        <thead>
-                          <tr className="border-b border-apple-mist">
-                            {[
-                              "Date",
-                              "Employee",
-                              "Log Time",
-                              "Type",
-                              "Source",
-                              "Site",
-                            ].map((h) => (
-                              <th
-                                key={h}
-                                className="px-4 py-3.5 text-left text-2xs font-semibold uppercase tracking-widest text-apple-steel"
-                              >
-                                {h}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {previewRecords.map((r, idx) => (
-                            <tr
-                              key={`${r.employee}-${r.date}-${r.logTime}-${r.type}-${idx}`}
-                              className="border-b border-apple-mist/60 last:border-0 odd:bg-apple-snow/40 hover:bg-apple-snow/70 transition"
-                            >
-                              <td className="px-4 py-3 text-sm font-mono text-apple-ash">
-                                {r.date}
-                              </td>
-                              <td className="px-4 py-3 text-sm font-semibold text-apple-charcoal">
-                                {r.employee}
-                              </td>
-                              <td className="px-4 py-3 text-sm font-mono text-apple-ash">
-                                {r.logTime}
-                              </td>
-                              <td className="px-4 py-3 text-xs font-semibold text-apple-charcoal">
-                                {r.type}
-                              </td>
-                              <td className="px-4 py-3 text-xs font-semibold text-apple-steel">
-                                {r.source}
-                              </td>
-                              <td className="px-4 py-3 text-xs text-apple-smoke">
-                                {r.site}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )
+              <div className="overflow-x-auto rounded-2xl border border-apple-mist">
+                {step2View === "daily" ? (
+                  <AttendanceViewer
+                    rows={step2Rows as ReturnType<typeof buildDailyLogRows>}
+                    query={step2NameFilter}
+                  />
                 ) : (
-                  <p className="text-sm text-apple-smoke">
-                    No detailed time logs detected. Upload a raw biometric
-                    attendance sheet with Date/Week or Date/Weekday and IN/OUT
-                    time columns.
-                  </p>
-                )}
-
-                {activeRowsCount > 0 && (
-                  <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <p className="text-xs text-apple-steel">
-                      Showing {previewStart + 1}-
-                      {Math.min(previewEnd, activeRowsCount)} of{" "}
-                      {activeRowsCount}{" "}
-                      {step2View === "daily"
-                        ? "employee-day rows"
-                        : "cleaned logs"}
-                      {activeRowsCount !== totalRowsForCurrentView
-                        ? ` (filtered from ${totalRowsForCurrentView}).`
-                        : "."}
-                    </p>
-
-                    {activeRowsCount > PREVIEW_LIMIT && (
-                      <div className="flex items-center gap-1 flex-wrap">
-                        {/* First */}
-                        <motion.button
-                          whileTap={{ scale: 0.95 }}
-                          whileHover={{ scale: 1.05 }}
-                          onClick={() => setRecordsPage(1)}
-                          disabled={recordsPage === 1}
-                          className={`px-2.5 h-8 rounded-xl text-xs font-semibold border
-      ${
-        recordsPage === 1
-          ? "border-apple-mist text-apple-silver cursor-not-allowed"
-          : "border-apple-silver text-apple-charcoal hover:border-apple-charcoal"
-      }`}
-                        >
-                          First
-                        </motion.button>
-
-                        {/* Previous */}
-                        <motion.button
-                          whileTap={{ scale: 0.95 }}
-                          whileHover={{ scale: 1.05 }}
-                          onClick={() =>
-                            setRecordsPage((p) => Math.max(1, p - 1))
-                          }
-                          disabled={recordsPage === 1}
-                          className={`px-3 h-8 rounded-xl text-xs font-semibold border
-      ${
-        recordsPage === 1
-          ? "border-apple-mist text-apple-silver cursor-not-allowed"
-          : "border-apple-silver text-apple-charcoal hover:border-apple-charcoal"
-      }`}
-                        >
-                          <ArrowLeft size={16} />
-                        </motion.button>
-
-                        {/* Page numbers */}
-                        {pages.map((p) => (
-                          <motion.button
-                            whileTap={{ scale: 0.95 }}
-                            whileHover={{ scale: 1.05 }}
-                            key={p}
-                            onClick={() => setRecordsPage(p)}
-                            className={`w-8 h-8 rounded-lg text-xs font-semibold border transition
-        ${
-          recordsPage === p
-            ? "bg-apple-charcoal text-white border-apple-charcoal"
-            : "border-apple-silver text-apple-charcoal hover:border-apple-charcoal"
-        }`}
-                          >
-                            {p}
-                          </motion.button>
-                        ))}
-
-                        {/* Next */}
-                        <motion.button
-                          whileTap={{ scale: 0.95 }}
-                          whileHover={{ scale: 1.05 }}
-                          onClick={() =>
-                            setRecordsPage((p) =>
-                              Math.min(totalRecordPages, p + 1),
-                            )
-                          }
-                          disabled={recordsPage === totalRecordPages}
-                          className={`px-3 h-8 rounded-xl text-xs font-semibold border
-      ${
-        recordsPage === totalRecordPages
-          ? "border-apple-mist text-apple-silver cursor-not-allowed"
-          : "border-apple-silver text-apple-charcoal hover:border-apple-charcoal"
-      }`}
-                        >
-                          <ArrowRight size={16} />
-                        </motion.button>
-
-                        {/* Last */}
-                        <motion.button
-                          whileTap={{ scale: 0.95 }}
-                          whileHover={{ scale: 1.05 }}
-                          onClick={() => setRecordsPage(totalRecordPages)}
-                          disabled={recordsPage === totalRecordPages}
-                          className={`px-2.5 h-8 rounded-xl text-xs font-semibold border
-      ${
-        recordsPage === totalRecordPages
-          ? "border-apple-mist text-apple-silver cursor-not-allowed"
-          : "border-apple-silver text-apple-charcoal hover:border-apple-charcoal"
-      }`}
-                        >
-                          Last
-                        </motion.button>
-                      </div>
-                    )}
-                  </div>
+                  <RawLogsViewer rows={step2Rows as AttendanceRecord[]} query={step2NameFilter} />
                 )}
               </div>
+              <Pagination page={step2Page} totalPages={step2Pages} onChange={setStep2Page} />
             </div>
           </section>
         )}
-        {/* Charts */}
-        {employees.length > 0 && records.length > 0 && (
-          <section
-            className="animate-fade-up"
-            style={{ animationFillMode: "both", animationDelay: "40ms" }}
-          >
-            <div className="bg-white rounded-3xl border border-[#F5F5F7] shadow-sm overflow-hidden">
-              {/* Header */}
-              <div className="px-5 sm:px-8 pt-6 sm:pt-8 pb-5 sm:pb-6 border-b border-[#F5F5F7]">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className="text-[10px] font-mono font-semibold text-[#86868B] uppercase tracking-widest">
-                    Data Analytics
-                  </span>
-                </div>
-                <h2 className="text-xl sm:text-2xl font-bold text-[#1D1D1F] tracking-tight">
-                  Visualized Attendance Data
-                </h2>
-                <p className="text-sm text-[#86868B] mt-1">
-                  Overview of labor distribution and overtime trends across all
-                  sites.
-                </p>
+
+        {records.length > 0 && (
+          <section className="bg-white rounded-3xl border border-apple-mist shadow-apple-xs overflow-hidden">
+            <div className="px-5 sm:px-8 py-6 border-b border-apple-mist">
+              <h2 className="text-xl sm:text-2xl font-bold text-apple-charcoal">
+                Attendance Charts
+              </h2>
+              <p className="text-sm text-apple-smoke mt-1">
+                Quick visual summaries across all uploaded sites.
+              </p>
+            </div>
+            <div className="px-5 sm:px-8 py-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <ChartCard title="Overtime Hours by Site">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartOT}>
+                    <XAxis dataKey="site" axisLine={false} tickLine={false} tick={{ fontSize: 11 }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11 }} />
+                    <Tooltip content={(props) => <ChartTooltip {...props} unit="OT hrs" />} />
+                    <Bar dataKey="hours" fill="#1D1D1F" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+              <ChartCard title="Workers per Site">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartWorkers}>
+                    <XAxis dataKey="site" axisLine={false} tickLine={false} tick={{ fontSize: 11 }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11 }} />
+                    <Tooltip content={(props) => <ChartTooltip {...props} unit="workers" />} />
+                    <Bar dataKey="workers" fill="#1D1D1F" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+              <ChartCard title="Daily Labor Hours">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartDailyHours}>
+                    <defs>
+                      <linearGradient id="hoursFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#1D1D1F" stopOpacity={0.18} />
+                        <stop offset="95%" stopColor="#1D1D1F" stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F0F0F2" />
+                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10 }} />
+                    <Tooltip content={(props) => <ChartTooltip {...props} unit="hours" />} />
+                    <Area
+                      type="monotone"
+                      dataKey="hours"
+                      stroke="#1D1D1F"
+                      fill="url(#hoursFill)"
+                      strokeWidth={1.5}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+              <ChartCard title="Top Overtime Workers">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartTopOT} layout="vertical" margin={{ left: 40 }}>
+                    <XAxis type="number" hide />
+                    <YAxis
+                      dataKey="worker"
+                      type="category"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 11 }}
+                      width={120}
+                    />
+                    <Tooltip content={(props) => <ChartTooltip {...props} unit="OT hrs" />} />
+                    <Bar dataKey="hours" fill="#1D1D1F" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </div>
+          </section>
+        )}
+
+        {step >= 3 && (
+          <section className="bg-white rounded-3xl border border-apple-mist shadow-apple-xs overflow-hidden">
+            <div className="px-5 sm:px-8 py-6 border-b border-apple-mist">
+              <p className="text-2xs uppercase font-semibold tracking-widest text-apple-steel">
+                Step 3
+              </p>
+              <h2 className="text-xl sm:text-2xl font-bold text-apple-charcoal">
+                Generate Payroll
+              </h2>
+            </div>
+            <div className="px-5 sm:px-8 py-6 space-y-5">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={handleGeneratePayroll}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold bg-apple-charcoal text-white"
+                >
+                  Generate Payroll
+                </button>
+                <button
+                  onClick={handleExportPayroll}
+                  disabled={payrollEntries.length === 0 || exporting}
+                  className={`px-4 py-2 rounded-xl text-sm font-semibold inline-flex items-center gap-2 ${payrollEntries.length > 0 ? "border border-apple-silver text-apple-charcoal bg-white" : "bg-apple-mist text-apple-steel cursor-not-allowed"}`}
+                >
+                  <Download size={14} />
+                  {exporting ? "Exporting..." : "Export Excel"}
+                </button>
+                <Link href="/payroll-settings" className="px-4 py-2 rounded-xl border border-apple-silver text-sm font-semibold text-apple-charcoal">Edit Rates</Link>
+                <Link href="/attendance-logs" className="px-4 py-2 rounded-xl border border-apple-silver text-sm font-semibold text-apple-charcoal">View Attendance Logs</Link>
               </div>
-
-              {/* Content Area */}
-              <div className="px-5 sm:px-8 py-6 sm:py-8 space-y-10">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Overtime Hours */}
-                  <div className="space-y-4">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider ">
-                      Overtime Hours by Branch
-                    </h3>
-                    <div className="h-[300px] w-full bg-white rounded-2xl border border-[#F5F5F7] p-4">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={overtimeByBranch}
-                          margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                        >
-                          <XAxis
-                            dataKey="branch"
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fill: "#86868B", fontSize: 11 }}
-                          />
-                          <YAxis
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fill: "#86868B", fontSize: 11 }}
-                          />
-                          <Tooltip
-                            cursor={{ fill: "#F5F5F7" }}
-                            content={(props) => (
-                              <ChartTooltip {...props} unit="OT hours" />
-                            )}
-                          />
-                          <Bar
-                            dataKey="hours"
-                            fill="#1D1D1F"
-                            radius={[4, 4, 0, 0]}
-                            barSize={48}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-
-                  {/* Workforce */}
-                  <div className="space-y-4">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider">
-                      Employees per Branch
-                    </h3>
-                    <div className="h-[300px] w-full bg-white rounded-2xl border border-[#F5F5F7] p-4">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={workforceByBranch}
-                          margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                        >
-                          <XAxis
-                            dataKey="branch"
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fill: "#86868B", fontSize: 11 }}
-                          />
-                          <YAxis
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fill: "#86868B", fontSize: 11 }}
-                          />
-                          <Tooltip
-                            cursor={{ fill: "#F5F5F7" }}
-                            content={(props) => (
-                              <ChartTooltip {...props} unit="employees" />
-                            )}
-                          />
-                          <Bar
-                            dataKey="employees"
-                            fill="#1D1D1F"
-                            radius={[4, 4, 0, 0]}
-                            barSize={48}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-
-                  {/* Interactive Daily Labor Utilization */}
-                  <div className="lg:col-span-2 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-semibold uppercase tracking-wider">
-                        Daily Labor Utilization
-                      </h3>
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-2 h-2 rounded-full bg-[#1D1D1F]"></div>
-                          <span className="text-[10px] font-medium text-[#1D1D1F]">
-                            Current Period
-                          </span>
-                        </div>
-                        <span className="text-[10px] font-mono text-[#86868B]">
-                          LIVE TRACKING
-                        </span>
-                      </div>
-                    </div>
-                    <div className="h-[360px] w-full bg-white rounded-2xl border border-[#F5F5F7] p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart
-                          data={dailyLaborHours}
-                          margin={{ top: 20, right: 10, left: -20, bottom: 0 }}
-                          onMouseMove={(e) => {
-                            /* You can hook into state here for custom hover effects elsewhere */
-                          }}
-                        >
-                          <defs>
-                            <linearGradient
-                              id="colorHours"
-                              x1="0"
-                              y1="0"
-                              x2="0"
-                              y2="1"
-                            >
-                              <stop
-                                offset="5%"
-                                stopColor="#1D1D1F"
-                                stopOpacity={0.15}
-                              />
-                              <stop
-                                offset="95%"
-                                stopColor="#1D1D1F"
-                                stopOpacity={0.01}
-                              />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid
-                            strokeDasharray="3 3"
-                            vertical={false}
-                            stroke="#F5F5F7"
-                          />
-                          <XAxis
-                            dataKey="date"
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{
-                              fill: "#86868B",
-                              fontSize: 10,
-                              fontWeight: 500,
-                            }}
-                            dy={10}
-                          />
-                          <YAxis
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fill: "#86868B", fontSize: 10 }}
-                          />
-                          <Tooltip
-                            cursor={{
-                              stroke: "#1D1D1F",
-                              strokeWidth: 2,
-                              strokeDasharray: "6 6",
-                            }}
-                            content={(props) => (
-                              <ChartTooltip {...props} unit="hrs utilized" />
-                            )}
-                          />
-                          <Area
-                            type="monotone"
-                            dataKey="hours"
-                            stroke="#1D1D1F"
-                            strokeWidth={1}
-                            fillOpacity={1}
-                            fill="url(#colorHours)"
-                            dot={{
-                              r: 3,
-                              fill: "#1D1D1F",
-                              stroke: "#fff",
-                              strokeWidth: 1,
-                            }}
-                            activeDot={{
-                              r: 5,
-                              fill: "#1D1D1F",
-                              stroke: "#fff",
-                              strokeWidth: 2,
-                              style: {
-                                filter:
-                                  "drop-shadow(0px 2px 4px rgba(0,0,0,0.2))",
-                              },
-                            }}
-                            animationBegin={200}
-                            animationDuration={1200}
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-
-                  {/* Top OT Employees */}
-                  <div className="lg:col-span-2 space-y-4">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider">
-                      Top Overtime Performers
-                    </h3>
-                    <div className="h-[350px] w-full bg-white rounded-2xl border border-[#F5F5F7] p-6">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={topOTEmployees}
-                          layout="vertical"
-                          margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
-                        >
-                          <XAxis type="number" hide />
-                          <YAxis
-                            dataKey="name"
-                            type="category"
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{
-                              fill: "#1D1D1F",
-                              fontSize: 12,
-                              fontWeight: 500,
-                            }}
-                            width={140}
-                          />
-                          <Tooltip
-                            cursor={{ fill: "#F5F5F7" }}
-                            content={(props) => (
-                              <ChartTooltip {...props} unit="overtime hrs" />
-                            )}
-                          />
-                          <Bar
-                            dataKey="hours"
-                            fill="#1D1D1F"
-                            radius={[0, 4, 4, 0]}
-                            barSize={32}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <PayrollSummaryTables entries={payrollEntries} onEdit={(entry) => {
+                setEditingEntry(entry);
+                setEditDraft({ ...entry });
+              }} />
+              <AuditTable logs={auditLogs} />
             </div>
           </section>
         )}
       </main>
 
       <Footer />
+
+      {editingEntry && editDraft && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm px-4 py-8 overflow-y-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-xl mx-auto bg-white rounded-3xl border border-apple-mist shadow-apple-lg p-6 space-y-4"
+          >
+            <h3 className="text-lg font-bold text-apple-charcoal">Edit Payroll Entry</h3>
+            <p className="text-sm text-apple-smoke">{editingEntry.workerName} ({editingEntry.role}) - {editingEntry.site}</p>
+            <EditField type="date" label="Date" value={editDraft.date} onChange={(value) => setEditDraft((prev) => (prev ? { ...prev, date: value } : prev))} />
+            <EditField type="number" label="Hours Worked" value={editDraft.hoursWorked} onChange={(value) => setEditDraft((prev) => (prev ? { ...prev, hoursWorked: Number(value) || 0 } : prev))} />
+            <EditField type="number" label="Daily Rate" value={editDraft.rate} onChange={(value) => setEditDraft((prev) => (prev ? { ...prev, rate: Number(value) || 0 } : prev))} />
+            <EditField type="number" label="Overtime Hours" value={editDraft.overtimeHours} onChange={(value) => setEditDraft((prev) => (prev ? { ...prev, overtimeHours: Number(value) || 0 } : prev))} />
+            <EditField type="number" label="Bonuses" value={editDraft.bonuses} onChange={(value) => setEditDraft((prev) => (prev ? { ...prev, bonuses: Number(value) || 0 } : prev))} />
+            <EditField type="number" label="Deductions" value={editDraft.deductions} onChange={(value) => setEditDraft((prev) => (prev ? { ...prev, deductions: Number(value) || 0 } : prev))} />
+            <div className="pt-2 flex justify-end gap-2">
+              <button onClick={() => { setEditingEntry(null); setEditDraft(null); }} className="px-4 py-2 rounded-xl border border-apple-silver text-sm font-semibold">Cancel</button>
+              <button onClick={saveEdit} className="px-4 py-2 rounded-xl bg-apple-charcoal text-sm font-semibold text-white">Save Changes</button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
+}
+
+function AttendanceViewer({
+  rows,
+  query,
+}: {
+  rows: ReturnType<typeof buildDailyLogRows>;
+  query: string;
+}) {
+  return (
+    <table className="w-full text-sm min-w-[980px]">
+      <thead>
+        <tr className="border-b border-apple-mist">
+          {["Worker", "Role", "Site", "Date", "Time In", "Time Out", "Hours"].map((header) => (
+            <th key={header} className="px-4 py-3 text-left text-2xs font-semibold uppercase tracking-widest text-apple-steel">{header}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={`${row.date}-${row.site}-${row.mergeKey}`} className="border-b border-apple-mist/60 odd:bg-apple-snow/40">
+            <td className="px-4 py-3 font-semibold text-apple-charcoal">{highlight(row.workerName, query)}</td>
+            <td className="px-4 py-3 text-xs text-apple-ash">{row.role}</td>
+            <td className="px-4 py-3 text-xs text-apple-ash">{row.site}</td>
+            <td className="px-4 py-3 text-sm font-mono text-apple-ash">{formatDateDisplay(row.date)}</td>
+            <td className="px-4 py-3 text-sm font-mono text-apple-ash">{row.timeIn || "-"}</td>
+            <td className="px-4 py-3 text-sm font-mono text-apple-ash">{row.timeOut || "-"}</td>
+            <td className="px-4 py-3 text-sm font-semibold text-apple-charcoal">{formatNumber(row.totalHours, 2)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function RawLogsViewer({ rows, query }: { rows: AttendanceRecord[]; query: string }) {
+  return (
+    <table className="w-full text-sm min-w-[900px]">
+      <thead>
+        <tr className="border-b border-apple-mist">
+          {["Date", "Worker", "Role", "Site", "Time", "Type", "Source"].map((header) => (
+            <th key={header} className="px-4 py-3 text-left text-2xs font-semibold uppercase tracking-widest text-apple-steel">{header}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((record, index) => (
+          <tr key={`${record.date}-${record.mergeKey}-${record.logTime}-${index}`} className="border-b border-apple-mist/60 odd:bg-apple-snow/40">
+            <td className="px-4 py-3 text-sm font-mono text-apple-ash">{formatDateDisplay(record.date)}</td>
+            <td className="px-4 py-3 font-semibold text-apple-charcoal">{highlight(record.workerName, query)}</td>
+            <td className="px-4 py-3 text-xs text-apple-ash">{record.role}</td>
+            <td className="px-4 py-3 text-xs text-apple-ash">{record.site}</td>
+            <td className="px-4 py-3 text-sm font-mono text-apple-ash">{record.logTime}</td>
+            <td className="px-4 py-3 text-xs text-apple-charcoal">{record.type}</td>
+            <td className="px-4 py-3 text-xs text-apple-steel">{record.source}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function PayrollSummaryTables({
+  entries,
+  onEdit,
+}: {
+  entries: PayrollEntry[];
+  onEdit: (entry: PayrollEntry) => void;
+}) {
+  const summary = summarizePayroll(entries);
+  const [entryPage, setEntryPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(entries.length / STEP3_PER_PAGE));
+  const start = (entryPage - 1) * STEP3_PER_PAGE;
+  const pageRows = entries.slice(start, start + STEP3_PER_PAGE);
+
+  useEffect(() => setEntryPage((prev) => Math.min(prev, totalPages)), [totalPages]);
+  useEffect(() => setEntryPage(1), [entries.length]);
+
+  return (
+    <>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Card label="Workers" value={`${summary.summary.totalWorkers}`} />
+        <Card label="Days" value={`${summary.summary.totalDays}`} />
+        <Card label="Hours" value={formatNumber(summary.summary.totalHours, 2)} />
+        <Card label="Net Pay" value={formatPHP(summary.summary.totalNetPay)} />
+      </div>
+      <div className="overflow-x-auto rounded-2xl border border-apple-mist">
+        <table className="w-full text-sm min-w-[860px]">
+          <thead>
+            <tr className="border-b border-apple-mist">
+              {["Worker", "Role", "Site", "Days", "Rate", "Total Pay"].map((header) => (
+                <th key={header} className="px-4 py-3 text-left text-2xs font-semibold uppercase tracking-widest text-apple-steel">{header}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {summary.rows.map((row) => (
+              <tr key={`${row.site}-${row.mergeKey}`} className="border-b border-apple-mist/60 odd:bg-apple-snow/40">
+                <td className="px-4 py-3 font-semibold text-apple-charcoal">{row.workerName}</td>
+                <td className="px-4 py-3 text-xs text-apple-ash">{row.role}</td>
+                <td className="px-4 py-3 text-xs text-apple-ash">{row.site}</td>
+                <td className="px-4 py-3 text-sm font-mono text-apple-ash">{row.days}</td>
+                <td className="px-4 py-3 text-sm font-mono text-apple-ash">{formatPHP(row.rate)}</td>
+                <td className="px-4 py-3 text-sm font-semibold text-apple-charcoal">{formatPHP(row.totalPay)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="overflow-x-auto rounded-2xl border border-apple-mist">
+        <table className="w-full text-sm min-w-[1000px]">
+          <thead>
+            <tr className="border-b border-apple-mist">
+              {["Worker", "Role", "Site", "Date", "Hours", "OT", "Rate", "Net", "Edit"].map((header) => (
+                <th key={header} className="px-4 py-3 text-left text-2xs font-semibold uppercase tracking-widest text-apple-steel">{header}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {pageRows.map((entry) => (
+              <tr key={entry.id} className="border-b border-apple-mist/60 odd:bg-apple-snow/40">
+                <td className="px-4 py-3 font-semibold text-apple-charcoal">{entry.workerName}</td>
+                <td className="px-4 py-3 text-xs text-apple-ash">{entry.role}</td>
+                <td className="px-4 py-3 text-xs text-apple-ash">{entry.site}</td>
+                <td className="px-4 py-3 text-sm font-mono text-apple-ash">{formatDateDisplay(entry.date)}</td>
+                <td className="px-4 py-3 text-sm font-mono text-apple-ash">{formatNumber(entry.hoursWorked, 2)}</td>
+                <td className="px-4 py-3 text-sm font-mono text-apple-ash">{formatNumber(entry.overtimeHours, 2)}</td>
+                <td className="px-4 py-3 text-sm font-mono text-apple-ash">{formatPHP(entry.rate)}</td>
+                <td className="px-4 py-3 text-sm font-semibold text-apple-charcoal">{formatPHP(entry.netPay)}</td>
+                <td className="px-4 py-3">
+                  <button onClick={() => onEdit(entry)} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-semibold border-apple-silver text-apple-charcoal"><Pencil size={12} /> Edit</button>
+                </td>
+              </tr>
+            ))}
+            {pageRows.length === 0 && (
+              <tr>
+                <td colSpan={9} className="px-4 py-8 text-center text-sm text-apple-smoke">Generate payroll to show entries.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <Pagination page={entryPage} totalPages={totalPages} onChange={setEntryPage} />
+    </>
+  );
+}
+
+function AuditTable({ logs }: { logs: AuditLogEntry[] }) {
+  return (
+    <div className="rounded-2xl border border-apple-mist overflow-x-auto">
+      <table className="w-full text-sm min-w-[860px]">
+        <thead>
+          <tr className="border-b border-apple-mist">
+            {["User", "Worker", "Field", "Old", "New", "Time"].map((header) => (
+              <th key={header} className="px-4 py-3 text-left text-2xs font-semibold uppercase tracking-widest text-apple-steel">{header}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {logs.map((log) => (
+            <tr key={log.id} className="border-b border-apple-mist/60">
+              <td className="px-4 py-3 text-xs text-apple-charcoal">{log.user}</td>
+              <td className="px-4 py-3 text-xs text-apple-charcoal">{log.worker}</td>
+              <td className="px-4 py-3 text-xs text-apple-ash">{log.field}</td>
+              <td className="px-4 py-3 text-xs font-mono text-apple-ash">{log.oldValue}</td>
+              <td className="px-4 py-3 text-xs font-mono text-apple-charcoal">{log.newValue}</td>
+              <td className="px-4 py-3 text-xs text-apple-steel">{log.changedAt}</td>
+            </tr>
+          ))}
+          {logs.length === 0 && (
+            <tr>
+              <td colSpan={6} className="px-4 py-8 text-center text-sm text-apple-smoke">No payroll edits yet.</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Pagination({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (page: number) => void; }) {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="flex items-center justify-between">
+      <p className="text-xs text-apple-steel">Page {page} of {totalPages}</p>
+      <div className="flex items-center gap-2">
+        <button onClick={() => onChange(Math.max(1, page - 1))} disabled={page === 1} className={`h-8 px-2 rounded-lg border ${page === 1 ? "border-apple-mist text-apple-silver" : "border-apple-silver text-apple-charcoal"}`}><ArrowLeft size={14} /></button>
+        <button onClick={() => onChange(Math.min(totalPages, page + 1))} disabled={page === totalPages} className={`h-8 px-2 rounded-lg border ${page === totalPages ? "border-apple-mist text-apple-silver" : "border-apple-silver text-apple-charcoal"}`}><ArrowRight size={14} /></button>
+      </div>
+    </div>
+  );
+}
+
+function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h3 className="text-xs font-semibold uppercase tracking-wider mb-3">{title}</h3>
+      <div className="h-[280px] w-full rounded-2xl border border-apple-mist bg-white p-4">{children}</div>
+    </div>
+  );
+}
+
+function Card({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-apple-mist bg-white px-4 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-widest text-apple-steel">{label}</p>
+      <p className="text-lg font-bold text-apple-charcoal mt-1">{value}</p>
+    </div>
+  );
+}
+
+function EditField({ label, type, value, onChange }: { label: string; type: "date" | "number"; value: string | number; onChange: (value: string) => void; }) {
+  return (
+    <label className="block text-xs text-apple-steel">
+      {label}
+      <input type={type} value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full h-10 px-3 rounded-xl border border-apple-silver" />
+    </label>
+  );
+}
+
+function normalizeAuditValue(value: PayrollEntry[keyof PayrollEntry]): string {
+  if (typeof value === "number") return formatNumber(value, 2);
+  return String(value);
+}
+
+function formatDateDisplay(isoDate: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return isoDate;
+  const [year, month, day] = isoDate.split("-");
+  return `${month}/${day}/${year}`;
+}
+
+function dateDisplayToIso(mmddyyyy: string): string {
+  const [month, day, year] = mmddyyyy.split("/");
+  if (!year || !month || !day) return mmddyyyy;
+  return `${year}-${month}-${day}`;
 }

@@ -39,7 +39,7 @@ const Nav = ({ step, handleReset }: NavProps) => {
 
             {/* Reset Button */}
             <div className="flex items-center gap-2">
-              {step === 2 && (
+              {step >= 2 && (
                 <button
                   onClick={handleReset}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-apple-silver

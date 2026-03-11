@@ -10,6 +10,7 @@ interface StepIndicatorProps {
 const STEPS: { label: string }[] = [
   { label: "Upload Attendance" },
   { label: "Review Attendance" },
+  { label: "Generate Payroll" },
 ];
 
 export default function StepIndicator({ current }: StepIndicatorProps) {
