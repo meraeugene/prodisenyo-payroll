@@ -965,9 +965,6 @@ export default function HomePage() {
                             Current Period
                           </span>
                         </div>
-                        <span className="text-[10px] font-mono text-[#86868B]">
-                          LIVE TRACKING
-                        </span>
                       </div>
                     </div>
                     <div className="h-[360px] w-full bg-white rounded-2xl border border-[#F5F5F7] p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
