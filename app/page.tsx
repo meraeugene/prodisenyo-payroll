@@ -124,7 +124,11 @@ function parseIsoDate(isoDate: string): Date | null {
   const year = Number(match[1]);
   const month = Number(match[2]);
   const day = Number(match[3]);
-  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day))
+  if (
+    !Number.isFinite(year) ||
+    !Number.isFinite(month) ||
+    !Number.isFinite(day)
+  )
     return null;
   const date = new Date(Date.UTC(year, month - 1, day));
   if (
@@ -151,7 +155,8 @@ function expandIsoRange(startText: string, endText: string): string[] {
 
   const orderedStart =
     startDate.getTime() <= endDate.getTime() ? startDate : endDate;
-  const orderedEnd = startDate.getTime() <= endDate.getTime() ? endDate : startDate;
+  const orderedEnd =
+    startDate.getTime() <= endDate.getTime() ? endDate : startDate;
 
   const dates: string[] = [];
   const cursor = new Date(orderedStart.getTime());
@@ -167,9 +172,7 @@ function expandIsoRange(startText: string, endText: string): string[] {
 }
 
 function normalizePeriodLabel(label: string): string | null {
-  const match = label.match(
-    /(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})/i,
-  );
+  const match = label.match(/(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})/i);
   if (!match) return null;
 
   const dates = expandIsoRange(match[1], match[2]);
@@ -191,8 +194,13 @@ function expandDateSummary(
   }
 
   const trimmed = dateSummary.trim();
-  const [startText, endText] = trimmed.split(" to ").map((value) => value.trim());
-  const summaryDates = expandIsoRange(startText || "", endText || startText || "");
+  const [startText, endText] = trimmed
+    .split(" to ")
+    .map((value) => value.trim());
+  const summaryDates = expandIsoRange(
+    startText || "",
+    endText || startText || "",
+  );
   if (summaryDates.length > 0) return summaryDates;
 
   const validFallback = fallbackDates
@@ -1694,6 +1702,263 @@ export default function HomePage() {
           </section>
         )}
 
+        {/* Charts */}
+        {employees.length > 0 && records.length > 0 && (
+          <section
+            className="animate-fade-up"
+            style={{ animationFillMode: "both", animationDelay: "40ms" }}
+          >
+            <div className="bg-white rounded-3xl border border-[#F5F5F7] shadow-sm overflow-hidden">
+              {/* Header */}
+              <div className="px-5 sm:px-8 pt-6 sm:pt-8 pb-5 sm:pb-6 border-b border-[#F5F5F7]">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <span className="text-[10px] font-mono font-semibold text-[#86868B] uppercase tracking-widest">
+                    Data Analytics
+                  </span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold text-[#1D1D1F] tracking-tight">
+                  Visualized Attendance Data
+                </h2>
+                <p className="text-sm text-[#86868B] mt-1">
+                  Overview of labor distribution and overtime trends across all
+                  sites.
+                </p>
+              </div>
+
+              {/* Content Area */}
+              <div className="px-5 sm:px-8 py-6 sm:py-8 space-y-10">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Overtime Hours */}
+                  <div className="space-y-4">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider ">
+                      Overtime Hours by Branch
+                    </h3>
+                    <div className="h-[300px] w-full bg-white rounded-2xl border border-[#F5F5F7] p-4">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={overtimeByBranch}
+                          margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                        >
+                          <XAxis
+                            dataKey="branch"
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: "#86868B", fontSize: 11 }}
+                          />
+                          <YAxis
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: "#86868B", fontSize: 11 }}
+                          />
+                          <Tooltip
+                            cursor={{ fill: "#F5F5F7" }}
+                            content={(props) => (
+                              <ChartTooltip {...props} unit="OT hours" />
+                            )}
+                          />
+                          <Bar
+                            dataKey="hours"
+                            fill="#1D1D1F"
+                            radius={[4, 4, 0, 0]}
+                            barSize={48}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Workforce */}
+                  <div className="space-y-4">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider">
+                      Employees per Branch
+                    </h3>
+                    <div className="h-[300px] w-full bg-white rounded-2xl border border-[#F5F5F7] p-4">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={workforceByBranch}
+                          margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                        >
+                          <XAxis
+                            dataKey="branch"
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: "#86868B", fontSize: 11 }}
+                          />
+                          <YAxis
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: "#86868B", fontSize: 11 }}
+                          />
+                          <Tooltip
+                            cursor={{ fill: "#F5F5F7" }}
+                            content={(props) => (
+                              <ChartTooltip {...props} unit="employees" />
+                            )}
+                          />
+                          <Bar
+                            dataKey="employees"
+                            fill="#1D1D1F"
+                            radius={[4, 4, 0, 0]}
+                            barSize={48}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Interactive Daily Labor Utilization */}
+                  <div className="lg:col-span-2 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-semibold uppercase tracking-wider">
+                        Daily Labor Attendance{" "}
+                      </h3>
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-2 h-2 rounded-full bg-[#1D1D1F]"></div>
+                          <span className="text-[10px] font-medium text-[#1D1D1F]">
+                            Current Period
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="h-[360px] w-full bg-white rounded-2xl border border-[#F5F5F7] p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart
+                          data={dailyLaborHours}
+                          margin={{ top: 20, right: 10, left: -20, bottom: 0 }}
+                          onMouseMove={(e) => {
+                            /* You can hook into state here for custom hover effects elsewhere */
+                          }}
+                        >
+                          <defs>
+                            <linearGradient
+                              id="colorHours"
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="5%"
+                                stopColor="#1D1D1F"
+                                stopOpacity={0.15}
+                              />
+                              <stop
+                                offset="95%"
+                                stopColor="#1D1D1F"
+                                stopOpacity={0.01}
+                              />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            vertical={false}
+                            stroke="#F5F5F7"
+                          />
+                          <XAxis
+                            dataKey="date"
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{
+                              fill: "#86868B",
+                              fontSize: 10,
+                              fontWeight: 500,
+                            }}
+                            dy={10}
+                          />
+                          <YAxis
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: "#86868B", fontSize: 10 }}
+                          />
+                          <Tooltip
+                            cursor={{
+                              stroke: "#1D1D1F",
+                              strokeWidth: 2,
+                              strokeDasharray: "6 6",
+                            }}
+                            content={(props) => (
+                              <ChartTooltip {...props} unit="hrs utilized" />
+                            )}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="hours"
+                            stroke="#1D1D1F"
+                            strokeWidth={1}
+                            fillOpacity={1}
+                            fill="url(#colorHours)"
+                            dot={{
+                              r: 3,
+                              fill: "#1D1D1F",
+                              stroke: "#fff",
+                              strokeWidth: 1,
+                            }}
+                            activeDot={{
+                              r: 5,
+                              fill: "#1D1D1F",
+                              stroke: "#fff",
+                              strokeWidth: 2,
+                              style: {
+                                filter:
+                                  "drop-shadow(0px 2px 4px rgba(0,0,0,0.2))",
+                              },
+                            }}
+                            animationBegin={200}
+                            animationDuration={1200}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Top OT Employees */}
+                  <div className="lg:col-span-2 space-y-4">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider">
+                      Top Overtime Performers
+                    </h3>
+                    <div className="h-[350px] w-full bg-white rounded-2xl border border-[#F5F5F7] p-6">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={topOTEmployees}
+                          layout="vertical"
+                          margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
+                        >
+                          <XAxis type="number" hide />
+                          <YAxis
+                            dataKey="name"
+                            type="category"
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{
+                              fill: "#1D1D1F",
+                              fontSize: 12,
+                              fontWeight: 500,
+                            }}
+                            width={140}
+                          />
+                          <Tooltip
+                            cursor={{ fill: "#F5F5F7" }}
+                            content={(props) => (
+                              <ChartTooltip {...props} unit="overtime hrs" />
+                            )}
+                          />
+                          <Bar
+                            dataKey="hours"
+                            fill="#1D1D1F"
+                            radius={[0, 4, 4, 0]}
+                            barSize={32}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
         {dailyRows.length > 0 && (
           <section
             className="animate-fade-up"
@@ -2129,274 +2394,17 @@ export default function HomePage() {
                       </div>
                     )}
                   </div>
-
-                  {payrollTab === "payroll" && (
-                    <PayrollInsightsDashboard
-                      payrollRows={payrollRows}
-                      attendanceRows={payrollAttendanceInputs}
-                    />
-                  )}
                 </div>
               )}
             </div>
           </section>
         )}
 
-        {/* Charts */}
-        {employees.length > 0 && records.length > 0 && (
-          <section
-            className="animate-fade-up"
-            style={{ animationFillMode: "both", animationDelay: "40ms" }}
-          >
-            <div className="bg-white rounded-3xl border border-[#F5F5F7] shadow-sm overflow-hidden">
-              {/* Header */}
-              <div className="px-5 sm:px-8 pt-6 sm:pt-8 pb-5 sm:pb-6 border-b border-[#F5F5F7]">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className="text-[10px] font-mono font-semibold text-[#86868B] uppercase tracking-widest">
-                    Data Analytics
-                  </span>
-                </div>
-                <h2 className="text-xl sm:text-2xl font-bold text-[#1D1D1F] tracking-tight">
-                  Visualized Attendance Data
-                </h2>
-                <p className="text-sm text-[#86868B] mt-1">
-                  Overview of labor distribution and overtime trends across all
-                  sites.
-                </p>
-              </div>
-
-              {/* Content Area */}
-              <div className="px-5 sm:px-8 py-6 sm:py-8 space-y-10">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Overtime Hours */}
-                  <div className="space-y-4">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider ">
-                      Overtime Hours by Branch
-                    </h3>
-                    <div className="h-[300px] w-full bg-white rounded-2xl border border-[#F5F5F7] p-4">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={overtimeByBranch}
-                          margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                        >
-                          <XAxis
-                            dataKey="branch"
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fill: "#86868B", fontSize: 11 }}
-                          />
-                          <YAxis
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fill: "#86868B", fontSize: 11 }}
-                          />
-                          <Tooltip
-                            cursor={{ fill: "#F5F5F7" }}
-                            content={(props) => (
-                              <ChartTooltip {...props} unit="OT hours" />
-                            )}
-                          />
-                          <Bar
-                            dataKey="hours"
-                            fill="#1D1D1F"
-                            radius={[4, 4, 0, 0]}
-                            barSize={48}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-
-                  {/* Workforce */}
-                  <div className="space-y-4">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider">
-                      Employees per Branch
-                    </h3>
-                    <div className="h-[300px] w-full bg-white rounded-2xl border border-[#F5F5F7] p-4">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={workforceByBranch}
-                          margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                        >
-                          <XAxis
-                            dataKey="branch"
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fill: "#86868B", fontSize: 11 }}
-                          />
-                          <YAxis
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fill: "#86868B", fontSize: 11 }}
-                          />
-                          <Tooltip
-                            cursor={{ fill: "#F5F5F7" }}
-                            content={(props) => (
-                              <ChartTooltip {...props} unit="employees" />
-                            )}
-                          />
-                          <Bar
-                            dataKey="employees"
-                            fill="#1D1D1F"
-                            radius={[4, 4, 0, 0]}
-                            barSize={48}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-
-                  {/* Interactive Daily Labor Utilization */}
-                  <div className="lg:col-span-2 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-semibold uppercase tracking-wider">
-                        Daily Labor Attendance{" "}
-                      </h3>
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-2 h-2 rounded-full bg-[#1D1D1F]"></div>
-                          <span className="text-[10px] font-medium text-[#1D1D1F]">
-                            Current Period
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="h-[360px] w-full bg-white rounded-2xl border border-[#F5F5F7] p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart
-                          data={dailyLaborHours}
-                          margin={{ top: 20, right: 10, left: -20, bottom: 0 }}
-                          onMouseMove={(e) => {
-                            /* You can hook into state here for custom hover effects elsewhere */
-                          }}
-                        >
-                          <defs>
-                            <linearGradient
-                              id="colorHours"
-                              x1="0"
-                              y1="0"
-                              x2="0"
-                              y2="1"
-                            >
-                              <stop
-                                offset="5%"
-                                stopColor="#1D1D1F"
-                                stopOpacity={0.15}
-                              />
-                              <stop
-                                offset="95%"
-                                stopColor="#1D1D1F"
-                                stopOpacity={0.01}
-                              />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid
-                            strokeDasharray="3 3"
-                            vertical={false}
-                            stroke="#F5F5F7"
-                          />
-                          <XAxis
-                            dataKey="date"
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{
-                              fill: "#86868B",
-                              fontSize: 10,
-                              fontWeight: 500,
-                            }}
-                            dy={10}
-                          />
-                          <YAxis
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fill: "#86868B", fontSize: 10 }}
-                          />
-                          <Tooltip
-                            cursor={{
-                              stroke: "#1D1D1F",
-                              strokeWidth: 2,
-                              strokeDasharray: "6 6",
-                            }}
-                            content={(props) => (
-                              <ChartTooltip {...props} unit="hrs utilized" />
-                            )}
-                          />
-                          <Area
-                            type="monotone"
-                            dataKey="hours"
-                            stroke="#1D1D1F"
-                            strokeWidth={1}
-                            fillOpacity={1}
-                            fill="url(#colorHours)"
-                            dot={{
-                              r: 3,
-                              fill: "#1D1D1F",
-                              stroke: "#fff",
-                              strokeWidth: 1,
-                            }}
-                            activeDot={{
-                              r: 5,
-                              fill: "#1D1D1F",
-                              stroke: "#fff",
-                              strokeWidth: 2,
-                              style: {
-                                filter:
-                                  "drop-shadow(0px 2px 4px rgba(0,0,0,0.2))",
-                              },
-                            }}
-                            animationBegin={200}
-                            animationDuration={1200}
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-
-                  {/* Top OT Employees */}
-                  <div className="lg:col-span-2 space-y-4">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider">
-                      Top Overtime Performers
-                    </h3>
-                    <div className="h-[350px] w-full bg-white rounded-2xl border border-[#F5F5F7] p-6">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={topOTEmployees}
-                          layout="vertical"
-                          margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
-                        >
-                          <XAxis type="number" hide />
-                          <YAxis
-                            dataKey="name"
-                            type="category"
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{
-                              fill: "#1D1D1F",
-                              fontSize: 12,
-                              fontWeight: 500,
-                            }}
-                            width={140}
-                          />
-                          <Tooltip
-                            cursor={{ fill: "#F5F5F7" }}
-                            content={(props) => (
-                              <ChartTooltip {...props} unit="overtime hrs" />
-                            )}
-                          />
-                          <Bar
-                            dataKey="hours"
-                            fill="#1D1D1F"
-                            radius={[0, 4, 4, 0]}
-                            barSize={32}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
+        {payrollTab === "payroll" && (
+          <PayrollInsightsDashboard
+            payrollRows={payrollRows}
+            attendanceRows={payrollAttendanceInputs}
+          />
         )}
       </main>
 
@@ -2696,7 +2704,9 @@ export default function HomePage() {
                                 formatPayrollNumber(value),
                                 "Hours Worked",
                               ]}
-                              labelFormatter={(label: string) => `Date: ${label}`}
+                              labelFormatter={(label: string) =>
+                                `Date: ${label}`
+                              }
                             />
                             <Line
                               type="monotone"
@@ -2736,16 +2746,18 @@ export default function HomePage() {
                               paddingAngle={2}
                               isAnimationActive={false}
                             >
-                              {employeeAttendanceBreakdown.map((entry, index) => (
-                                <Cell
-                                  key={`${entry.name}-${index}`}
-                                  fill={
-                                    EMPLOYEE_ANALYTICS_COLORS[
-                                      index % EMPLOYEE_ANALYTICS_COLORS.length
-                                    ]
-                                  }
-                                />
-                              ))}
+                              {employeeAttendanceBreakdown.map(
+                                (entry, index) => (
+                                  <Cell
+                                    key={`${entry.name}-${index}`}
+                                    fill={
+                                      EMPLOYEE_ANALYTICS_COLORS[
+                                        index % EMPLOYEE_ANALYTICS_COLORS.length
+                                      ]
+                                    }
+                                  />
+                                ),
+                              )}
                             </Pie>
                             <Tooltip />
                           </PieChart>
@@ -2792,8 +2804,13 @@ export default function HomePage() {
                                 _value: number,
                                 _name: string,
                                 item: { payload?: { timeInLabel?: string } },
-                              ) => [item.payload?.timeInLabel ?? "-", "Time In"]}
-                              labelFormatter={(label: string) => `Date: ${label}`}
+                              ) => [
+                                item.payload?.timeInLabel ?? "-",
+                                "Time In",
+                              ]}
+                              labelFormatter={(label: string) =>
+                                `Date: ${label}`
+                              }
                             />
                             <Bar
                               dataKey="timeIn"
@@ -2900,14 +2917,12 @@ export default function HomePage() {
                               min={0}
                               step="0.01"
                               onFocus={(e) => e.currentTarget.select()}
-                              value={
-                                normalizeNumericInput(
-                                  String(
-                                    logHourOverrides[getLogOverrideKey(log)] ??
-                                      log.hours,
-                                  ),
-                                )
-                              }
+                              value={normalizeNumericInput(
+                                String(
+                                  logHourOverrides[getLogOverrideKey(log)] ??
+                                    log.hours,
+                                ),
+                              )}
                               onChange={(e) => {
                                 const normalized = normalizeNumericInput(
                                   e.target.value,
@@ -2947,20 +2962,20 @@ export default function HomePage() {
                   </span>
                 </p>
                 <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={closePayrollEditModal}
-                  className="px-4 h-10 rounded-2xl border border-apple-silver text-sm font-semibold text-apple-ash hover:border-apple-charcoal transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={savePayrollEdit}
-                  className="px-4 h-10 rounded-2xl bg-apple-charcoal text-white text-sm font-semibold hover:bg-apple-black transition"
-                >
-                  Save Changes
-                </button>
+                  <button
+                    type="button"
+                    onClick={closePayrollEditModal}
+                    className="px-4 h-10 rounded-2xl border border-apple-silver text-sm font-semibold text-apple-ash hover:border-apple-charcoal transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={savePayrollEdit}
+                    className="px-4 h-10 rounded-2xl bg-apple-charcoal text-white text-sm font-semibold hover:bg-apple-black transition"
+                  >
+                    Save Changes
+                  </button>
                 </div>
               </div>
             </div>
