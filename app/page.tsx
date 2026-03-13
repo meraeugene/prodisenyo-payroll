@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { X, Search, ArrowRight, ArrowLeft } from "lucide-react";
+import { X, Search, ArrowRight, ArrowLeft, Calculator } from "lucide-react";
 import { motion } from "framer-motion";
 import StepIndicator from "@/components/StepIndicator";
 import UploadZone from "@/components/UploadZone";
@@ -144,6 +144,12 @@ export default function HomePage() {
     useState<PayrollEditDraft | null>(null);
   const [payrollOverrides, setPayrollOverrides] = useState<
     Record<string, PayrollRowOverride>
+  >({});
+  const [payrollRoleFilter, setPayrollRoleFilter] = useState<RoleCode | "ALL">(
+    "ALL",
+  );
+  const [logHourOverrides, setLogHourOverrides] = useState<
+    Record<string, number>
   >({});
 
   const dailyRows = useMemo<DailyLogRow[]>(() => {
@@ -431,9 +437,16 @@ export default function HomePage() {
       ) {
         return false;
       }
+
+      if (payrollRoleFilter !== "ALL" && row.role !== payrollRoleFilter) {
+        return false;
+      }
+
       if (dateFilter && !row.date.includes(dateFilter)) return false;
+
       if (nameFilter && !row.worker.toLowerCase().includes(nameFilter))
         return false;
+
       return true;
     });
 
@@ -450,6 +463,7 @@ export default function HomePage() {
     payrollNameFilter,
     payrollDateFilter,
     payrollSort,
+    payrollRoleFilter,
   ]);
 
   const filteredPayrollLogs = useMemo(() => {
@@ -459,9 +473,15 @@ export default function HomePage() {
     const filtered = payrollAttendanceInputs.filter((record) => {
       if (payrollSiteFilter !== "ALL" && record.site !== payrollSiteFilter)
         return false;
+
+      if (payrollRoleFilter !== "ALL" && record.role !== payrollRoleFilter)
+        return false;
+
       if (dateFilter && record.date !== dateFilter) return false;
+
       if (nameFilter && !record.name.toLowerCase().includes(nameFilter))
         return false;
+
       return true;
     });
 
@@ -476,6 +496,7 @@ export default function HomePage() {
     payrollNameFilter,
     payrollDateFilter,
     payrollSort,
+    payrollRoleFilter,
   ]);
 
   const payrollActiveRowsCount =
@@ -538,7 +559,9 @@ export default function HomePage() {
       };
     }
 
-    const attendanceDays = editingPayrollLogs.filter((log) => log.hours > 0).length;
+    const attendanceDays = editingPayrollLogs.filter(
+      (log) => log.hours > 0,
+    ).length;
     const absenceDays = Math.max(editingPayrollLogs.length - attendanceDays, 0);
     const regularHours = attendanceDays * HOURS_PER_DAY;
     const otNormalHours = editingPayrollLogs.reduce((sum, log) => {
@@ -651,11 +674,12 @@ export default function HomePage() {
   function openPayrollRateModal() {
     setPayrollRateDraft({ ...payrollRoleRates });
     setShowPayrollRateModal(true);
+    document.body.style.overflow = "hidden";
   }
-
   function applyPayrollRates() {
     setPayrollRoleRates({ ...payrollRateDraft });
     setShowPayrollRateModal(false);
+    document.body.style.overflow = "auto";
   }
 
   function clearPayrollFilters() {
@@ -663,6 +687,7 @@ export default function HomePage() {
     setPayrollNameFilter("");
     setPayrollDateFilter("");
     setPayrollSort("date-asc");
+    setPayrollRoleFilter("ALL");
   }
 
   function openPayrollEditModal(row: PayrollRow) {
@@ -673,11 +698,13 @@ export default function HomePage() {
       rate: row.customRate === null ? "" : String(row.customRate),
       overtimeHours: String(row.overtimeHours),
     });
+    document.body.style.overflow = "hidden";
   }
 
   function closePayrollEditModal() {
     setEditingPayrollRowId(null);
     setPayrollEditDraft(null);
+    document.body.style.overflow = "auto";
   }
 
   function savePayrollEdit() {
@@ -836,7 +863,9 @@ export default function HomePage() {
       const next = Object.fromEntries(
         Object.entries(prev).filter(([id]) => validIds.has(id)),
       );
-      return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+      return Object.keys(next).length === Object.keys(prev).length
+        ? prev
+        : next;
     });
   }, [payrollBaseRows]);
 
@@ -1607,8 +1636,9 @@ export default function HomePage() {
                     type="button"
                     onClick={handleGeneratePayroll}
                     disabled={payrollRows.length === 0}
-                    className="px-4 py-2 rounded-2xl bg-apple-charcoal text-white text-sm font-semibold hover:bg-apple-black transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-5 py-3 rounded-2xl bg-apple-charcoal text-white text-sm font-semibold hover:bg-apple-black transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   >
+                    <Calculator size={18} />
                     Generate Payroll
                   </button>
                 )}
@@ -1659,7 +1689,7 @@ export default function HomePage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
                     <select
                       value={payrollSiteFilter}
                       onChange={(e) => setPayrollSiteFilter(e.target.value)}
@@ -1670,6 +1700,24 @@ export default function HomePage() {
                       {availableSites.map((siteOption) => (
                         <option key={siteOption} value={siteOption}>
                           {siteOption}
+                        </option>
+                      ))}
+                    </select>
+
+                    <select
+                      value={payrollRoleFilter}
+                      onChange={(e) =>
+                        setPayrollRoleFilter(e.target.value as RoleCode | "ALL")
+                      }
+                      className="w-full h-10 px-3 rounded-2xl border border-apple-silver
+  focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15
+  focus:border-apple-charcoal hover:border-apple-charcoal cursor-pointer text-sm text-apple-charcoal bg-white"
+                    >
+                      <option value="ALL">All Roles</option>
+
+                      {ROLE_CODES.map((role) => (
+                        <option key={role} value={role}>
+                          {role} - {ROLE_CODE_TO_NAME[role]}
                         </option>
                       ))}
                     </select>
@@ -1686,7 +1734,7 @@ export default function HomePage() {
                         onChange={(e) => setPayrollNameFilter(e.target.value)}
                         placeholder="Search employee… ( / )"
                         id="searchPayrollEmployee"
-                        className="w-full h-10 pl-9 pr-3 rounded-2xl border border-apple-silver
+                        className="w-full  hover:border-apple-charcoal h-10 pl-9 pr-3 rounded-2xl border border-apple-silver
                           focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal
                           text-sm text-apple-charcoal placeholder:text-apple-silver transition-all"
                       />
@@ -1696,7 +1744,7 @@ export default function HomePage() {
                       type="date"
                       value={payrollDateFilter}
                       onChange={(e) => setPayrollDateFilter(e.target.value)}
-                      className="w-full h-10 px-3 rounded-2xl border border-apple-silver
+                      className="w-full h-10 hover:border-apple-charcoal px-3 rounded-2xl border border-apple-silver
                         focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal
                         text-sm text-apple-charcoal placeholder:text-apple-silver transition-all"
                     />
@@ -1707,7 +1755,7 @@ export default function HomePage() {
                         setPayrollSort(e.target.value as Step2Sort)
                       }
                       className="w-full h-10 px-3 rounded-2xl border border-apple-silver
-                        focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal
+                        focus:outline-none hover:border-apple-charcoal cursor-pointer  focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal
                         text-sm text-apple-charcoal bg-white transition-all"
                     >
                       <option value="date-asc">Date first (oldest)</option>
@@ -1743,7 +1791,9 @@ export default function HomePage() {
                               <th
                                 key={h}
                                 className={`px-4 py-3.5 text-2xs font-semibold uppercase tracking-widest text-apple-steel ${
-                                  h === "Hours" || h === "Rate" || h === "Total Pay"
+                                  h === "Hours" ||
+                                  h === "Rate" ||
+                                  h === "Total Pay"
                                     ? "text-right"
                                     : h === "Edit"
                                       ? "text-center"
@@ -1830,16 +1880,18 @@ export default function HomePage() {
                       <table className="w-full text-sm table-auto min-w-[760px]">
                         <thead>
                           <tr className="border-b border-apple-mist">
-                            {["Worker", "Role", "Site", "Date", "Hours"].map((h) => (
-                              <th
-                                key={h}
-                                className={`px-4 py-3.5 text-2xs font-semibold uppercase tracking-widest text-apple-steel ${
-                                  h === "Hours" ? "text-right" : "text-left"
-                                }`}
-                              >
-                                {h}
-                              </th>
-                            ))}
+                            {["Worker", "Role", "Site", "Date", "Hours"].map(
+                              (h) => (
+                                <th
+                                  key={h}
+                                  className={`px-4 py-3.5 text-2xs font-semibold uppercase tracking-widest text-apple-steel ${
+                                    h === "Hours" ? "text-right" : "text-left"
+                                  }`}
+                                >
+                                  {h}
+                                </th>
+                              ),
+                            )}
                           </tr>
                         </thead>
                         <tbody>
@@ -1882,14 +1934,15 @@ export default function HomePage() {
                   )}
 
                   <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <p className="text-xs text-apple-steel">
+                    <p className="text-sm  text-apple-steel">
                       Showing{" "}
-                      {payrollActiveRowsCount === 0 ? 0 : payrollPreviewStart + 1}
-                      -
-                      {Math.min(payrollPreviewEnd, payrollActiveRowsCount)} of{" "}
+                      {payrollActiveRowsCount === 0
+                        ? 0
+                        : payrollPreviewStart + 1}
+                      -{Math.min(payrollPreviewEnd, payrollActiveRowsCount)} of{" "}
                       {payrollActiveRowsCount}{" "}
                       {payrollTab === "payroll"
-                        ? "payroll rows"
+                        ? "employee payroll rows"
                         : "attendance log rows"}
                       .
                     </p>
@@ -2028,7 +2081,10 @@ export default function HomePage() {
             <div className="flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setShowPayrollRateModal(false)}
+                onClick={() => {
+                  setShowPayrollRateModal(false);
+                  document.body.style.overflow = "auto";
+                }}
                 className="px-4 h-10 rounded-2xl border border-apple-silver text-sm font-semibold text-apple-ash hover:border-apple-charcoal transition"
               >
                 Cancel
@@ -2047,13 +2103,13 @@ export default function HomePage() {
 
       {editingPayrollRow && payrollEditDraft && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm p-4 flex items-center justify-center">
-          <div className="w-full max-w-6xl max-h-[88vh] overflow-y-auto rounded-2xl border border-apple-mist bg-white shadow-apple-xs">
+          <div className="w-full max-w-6xl max-h-[88vh] overflow-y-auto rounded-lg border border-apple-mist bg-white shadow-apple-xs">
             <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-apple-mist px-5 sm:px-7 py-4 flex items-start justify-between gap-3">
               <div>
                 <p className="text-2xs font-semibold text-apple-steel uppercase tracking-widest">
                   Calculation Details
                 </p>
-                <h3 className="text-2xl font-bold text-apple-charcoal tracking-tight">
+                <h3 className="text-xl font-bold text-apple-charcoal tracking-tight">
                   {editingPayrollRow.worker} ({editingPayrollRow.role})
                 </h3>
               </div>
@@ -2071,14 +2127,13 @@ export default function HomePage() {
                 <p>
                   <span className="font-semibold">Reg Hours</span> = Attendance
                   Days x 8 = {editingPayrollSummary.attendanceDays} x{" "}
-                  {HOURS_PER_DAY} = {formatPayrollNumber(
-                    editingPayrollSummary.regularHours,
-                  )}
+                  {HOURS_PER_DAY} ={" "}
+                  {formatPayrollNumber(editingPayrollSummary.regularHours)}
                 </p>
                 <p>
                   <span className="font-semibold">OT Hours</span> = OT Normal +
-                  OT Special = {toClockHours(editingPayrollSummary.otNormalHours)}{" "}
-                  + 00:00 ={" "}
+                  OT Special ={" "}
+                  {toClockHours(editingPayrollSummary.otNormalHours)} + 00:00 ={" "}
                   {toClockHours(editingPayrollSummary.otNormalHours)}
                 </p>
               </div>
@@ -2145,7 +2200,7 @@ export default function HomePage() {
                           prev ? { ...prev, date: e.target.value } : prev,
                         )
                       }
-                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
+                      className="w-full hover:border-apple-charcoal px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
                     />
                   </label>
 
@@ -2160,10 +2215,12 @@ export default function HomePage() {
                       value={payrollEditDraft.hoursWorked}
                       onChange={(e) =>
                         setPayrollEditDraft((prev) =>
-                          prev ? { ...prev, hoursWorked: e.target.value } : prev,
+                          prev
+                            ? { ...prev, hoursWorked: e.target.value }
+                            : prev,
                         )
                       }
-                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
+                      className="w-full hover:border-apple-charcoal px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
                     />
                   </label>
 
@@ -2181,7 +2238,7 @@ export default function HomePage() {
                           prev ? { ...prev, rate: e.target.value } : prev,
                         )
                       }
-                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
+                      className="w-full hover:border-apple-charcoal px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
                     />
                   </label>
 
@@ -2201,7 +2258,7 @@ export default function HomePage() {
                             : prev,
                         )
                       }
-                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
+                      className="w-full hover:border-apple-charcoal px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
                     />
                   </label>
                 </div>
@@ -2265,17 +2322,44 @@ export default function HomePage() {
                           <td className="px-3 py-2.5 text-sm text-apple-charcoal">
                             {toWeekLabel(log.date)}
                           </td>
+
                           <td className="px-3 py-2.5 text-sm text-apple-charcoal">
-                            {log.time1In || "Missed"}
+                            {log.time1In ? (
+                              log.time1In
+                            ) : (
+                              <span className="text-red-500 font-medium">
+                                Missed
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="px-3 py-2.5 text-sm text-apple-charcoal">
+                            {log.time1Out ? (
+                              log.time1Out
+                            ) : (
+                              <span className="text-red-500 font-medium">
+                                Missed
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="px-3 py-2.5 text-sm text-apple-charcoal">
+                            {log.time2In ? (
+                              log.time2In
+                            ) : (
+                              <span className="text-red-500 font-medium">
+                                Missed
+                              </span>
+                            )}
                           </td>
                           <td className="px-3 py-2.5 text-sm text-apple-charcoal">
-                            {log.time1Out || "Missed"}
-                          </td>
-                          <td className="px-3 py-2.5 text-sm text-apple-charcoal">
-                            {log.time2In || "Missed"}
-                          </td>
-                          <td className="px-3 py-2.5 text-sm text-apple-charcoal">
-                            {log.time2Out || "Missed"}
+                            {log.time2Out ? (
+                              log.time2Out
+                            ) : (
+                              <span className="text-red-500 font-medium">
+                                Missed
+                              </span>
+                            )}
                           </td>
                           <td className="px-3 py-2.5 text-sm text-apple-charcoal">
                             {log.otIn || "-"}
@@ -2283,8 +2367,26 @@ export default function HomePage() {
                           <td className="px-3 py-2.5 text-sm text-apple-charcoal">
                             {log.otOut || "-"}
                           </td>
-                          <td className="px-3 py-2.5 text-sm text-right font-mono text-apple-charcoal">
-                            {formatPayrollNumber(log.hours)}
+                          <td className="px-3 py-2.5 text-right">
+                            <input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={
+                                logHourOverrides[
+                                  `${log.date}-${log.employee}`
+                                ] ?? log.hours
+                              }
+                              onChange={(e) => {
+                                const value = parseFloat(e.target.value) || 0;
+
+                                setLogHourOverrides((prev) => ({
+                                  ...prev,
+                                  [`${log.date}-${log.employee}`]: value,
+                                }));
+                              }}
+                              className="w-20 hover:border-apple-charcoal text-right px-2 py-1 rounded-lg border border-apple-charcoal/40 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-apple-charcoal/20"
+                            />
                           </td>
                         </tr>
                       ))
