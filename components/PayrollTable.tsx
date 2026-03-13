@@ -9,7 +9,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import type { Employee, EmployeeCalculated, PayrollConfig } from "@/types";
-import { capitalize, formatNumber } from "@/app/lib/payroll";
+import { capitalize, formatNumber } from "@/lib/payroll";
 import { RateInput } from "./RateInput";
 import { InlineInput } from "./InlineInput";
 import { PageButton } from "./PageButton";

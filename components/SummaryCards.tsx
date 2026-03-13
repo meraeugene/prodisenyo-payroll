@@ -2,7 +2,7 @@
 
 import { Users, Calendar, Clock, Banknote } from "lucide-react";
 import type { PayrollSummary } from "@/types";
-import { formatNumber } from "@/app/lib/payroll";
+import { formatNumber } from "@/lib/payroll";
 
 interface SummaryCardsProps {
   summary: PayrollSummary;

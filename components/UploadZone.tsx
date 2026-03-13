@@ -2,7 +2,7 @@
 
 import { useRef, useState, DragEvent, ChangeEvent } from "react";
 import { Upload, FileSpreadsheet, X, AlertCircle, Loader2 } from "lucide-react";
-import { parseAttendanceFiles, type ParseResult } from "@/app/lib/parser";
+import { parseAttendanceFiles, type ParseResult } from "@/lib/parser";
 
 interface UploadZoneProps {
   onParsed: (result: ParseResult) => void;
