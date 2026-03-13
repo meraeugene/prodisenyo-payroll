@@ -50,9 +50,12 @@ async function parseSpreadsheet(file: File): Promise<ParseResult> {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
   const site = getFileBaseName(file.name);
+  const filenamePeriodRange = detectPeriodRangeFromFilename(file.name);
 
   let rawRows = 0;
-  let period = "Current Period";
+  let period = filenamePeriodRange
+    ? formatPeriodLabel(filenamePeriodRange)
+    : "Current Period";
   let removedEntries = 0;
   const records: AttendanceRecord[] = [];
   const stats = new Map<string, EmployeeAccumulator>();
@@ -66,7 +69,7 @@ async function parseSpreadsheet(file: File): Promise<ParseResult> {
 
     rawRows += rows.length;
 
-    const detectedPeriod = detectPeriodRange(rows);
+    const detectedPeriod = detectPeriodRange(rows) ?? filenamePeriodRange;
     if (period === "Current Period" && detectedPeriod) {
       period = formatPeriodLabel(detectedPeriod);
     }
@@ -269,6 +272,55 @@ function detectPeriodRange(rows: unknown[][]): DateRange | null {
     }
   }
   return null;
+}
+
+function detectPeriodRangeFromFilename(filename: string): DateRange | null {
+  const match = filename.match(/(\d{2})(\d{2})\s*to\s*(\d{2})(\d{2})/i);
+  if (!match) return null;
+
+  const startMonth = Number(match[1]);
+  const startDay = Number(match[2]);
+  const endMonth = Number(match[3]);
+  const endDay = Number(match[4]);
+  if (
+    !Number.isInteger(startMonth) ||
+    !Number.isInteger(startDay) ||
+    !Number.isInteger(endMonth) ||
+    !Number.isInteger(endDay)
+  ) {
+    return null;
+  }
+  if (
+    startMonth < 1 ||
+    startMonth > 12 ||
+    endMonth < 1 ||
+    endMonth > 12 ||
+    startDay < 1 ||
+    startDay > 31 ||
+    endDay < 1 ||
+    endDay > 31
+  ) {
+    return null;
+  }
+
+  const currentYear = new Date().getFullYear();
+  const start = new Date(currentYear, startMonth - 1, startDay);
+  const sameYearEnd = new Date(currentYear, endMonth - 1, endDay);
+  const end =
+    sameYearEnd >= start
+      ? sameYearEnd
+      : new Date(currentYear + 1, endMonth - 1, endDay);
+
+  if (
+    start.getMonth() !== startMonth - 1 ||
+    start.getDate() !== startDay ||
+    end.getMonth() !== endMonth - 1 ||
+    end.getDate() !== endDay
+  ) {
+    return null;
+  }
+
+  return normalizeDateRange(start, end);
 }
 
 function normalizeDateRange(start: Date, end: Date): DateRange {
@@ -711,6 +763,20 @@ function resolveMergedPeriod(
   results: ParseResult[],
   records: AttendanceRecord[],
 ): string {
+  const parsedRanges = results
+    .map((result) => parsePeriodLabelRange(result.period))
+    .filter((range): range is DateRange => Boolean(range));
+
+  if (parsedRanges.length > 0) {
+    let start = parsedRanges[0].start;
+    let end = parsedRanges[0].end;
+    for (const range of parsedRanges.slice(1)) {
+      if (range.start < start) start = range.start;
+      if (range.end > end) end = range.end;
+    }
+    return formatPeriodLabel({ start, end });
+  }
+
   if (records.length > 0) {
     const parsedDates = records
       .map((record) => parseDate(record.date))
@@ -725,20 +791,6 @@ function resolveMergedPeriod(
       }
       return formatPeriodLabel({ start: minDate, end: maxDate });
     }
-  }
-
-  const parsedRanges = results
-    .map((result) => parsePeriodLabelRange(result.period))
-    .filter((range): range is DateRange => Boolean(range));
-
-  if (parsedRanges.length > 0) {
-    let start = parsedRanges[0].start;
-    let end = parsedRanges[0].end;
-    for (const range of parsedRanges.slice(1)) {
-      if (range.start < start) start = range.start;
-      if (range.end > end) end = range.end;
-    }
-    return formatPeriodLabel({ start, end });
   }
 
   const labels = Array.from(

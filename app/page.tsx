@@ -118,6 +118,91 @@ function toWeekLabel(isoDate: string): string {
   return `${parsed.getDate()}/${days[parsed.getDay()]}`;
 }
 
+function parseIsoDate(isoDate: string): Date | null {
+  const match = isoDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day))
+    return null;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return date;
+}
+
+function formatIsoDate(date: Date): string {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function expandIsoRange(startText: string, endText: string): string[] {
+  const startDate = parseIsoDate(startText);
+  const endDate = parseIsoDate(endText);
+  if (!startDate || !endDate) return [];
+
+  const orderedStart =
+    startDate.getTime() <= endDate.getTime() ? startDate : endDate;
+  const orderedEnd = startDate.getTime() <= endDate.getTime() ? endDate : startDate;
+
+  const dates: string[] = [];
+  const cursor = new Date(orderedStart.getTime());
+  let guard = 0;
+
+  while (cursor.getTime() <= orderedEnd.getTime() && guard < 370) {
+    dates.push(formatIsoDate(cursor));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    guard += 1;
+  }
+
+  return dates;
+}
+
+function normalizePeriodLabel(label: string): string | null {
+  const match = label.match(
+    /(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})/i,
+  );
+  if (!match) return null;
+
+  const dates = expandIsoRange(match[1], match[2]);
+  if (dates.length === 0) return null;
+  return `${dates[0]} to ${dates[dates.length - 1]}`;
+}
+
+function expandDateSummary(
+  dateSummary: string,
+  fallbackDates: string[],
+  payrollPeriodLabel?: string,
+): string[] {
+  const periodMatch = payrollPeriodLabel?.match(
+    /(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})/i,
+  );
+  if (periodMatch) {
+    const periodDates = expandIsoRange(periodMatch[1], periodMatch[2]);
+    if (periodDates.length > 0) return periodDates;
+  }
+
+  const trimmed = dateSummary.trim();
+  const [startText, endText] = trimmed.split(" to ").map((value) => value.trim());
+  const summaryDates = expandIsoRange(startText || "", endText || startText || "");
+  if (summaryDates.length > 0) return summaryDates;
+
+  const validFallback = fallbackDates
+    .map((dateText) => dateText.trim())
+    .filter((dateText) => parseIsoDate(dateText))
+    .sort((a, b) => a.localeCompare(b));
+
+  return Array.from(new Set(validFallback));
+}
+
 function toClockHours(value: number): string {
   const totalMinutes = Math.max(0, Math.round(value * 60));
   const hours = Math.floor(totalMinutes / 60);
@@ -175,6 +260,7 @@ export default function HomePage() {
   const [step2DateFilter, setStep2DateFilter] = useState("");
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [site, setSite] = useState("Unknown Site");
+  const [attendancePeriod, setAttendancePeriod] = useState("Current Period");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [payrollRoleRates, setPayrollRoleRates] = useState<
     Record<RoleCode, number>
@@ -472,21 +558,28 @@ export default function HomePage() {
   }, [dailyRows]);
 
   const payrollBaseRows = useMemo<PayrollRow[]>(() => {
-    return generatePayroll(payrollAttendanceInputs, {
+    const generated = generatePayroll(payrollAttendanceInputs, {
       roleRates: payrollRoleRates,
       hoursPerDay: HOURS_PER_DAY,
       overtimeMultiplier: DEFAULT_OVERTIME_MULTIPLIER,
     });
-  }, [payrollAttendanceInputs, payrollRoleRates]);
+    const normalizedPeriod = normalizePeriodLabel(attendancePeriod);
+    if (!normalizedPeriod) return generated;
+    return generated.map((row) => ({ ...row, date: normalizedPeriod }));
+  }, [payrollAttendanceInputs, payrollRoleRates, attendancePeriod]);
 
   const payrollRows = useMemo<PayrollRow[]>(() => {
+    const normalizedPeriod = normalizePeriodLabel(attendancePeriod);
     return payrollBaseRows.map((row) => {
       const override = payrollOverrides[row.id];
-      if (!override) return row;
+      if (!override) {
+        return normalizedPeriod ? { ...row, date: normalizedPeriod } : row;
+      }
+
       return recalculatePayrollRow(
         {
           ...row,
-          date: override.date,
+          date: normalizedPeriod ?? override.date,
           hoursWorked: override.hoursWorked,
           overtimeHours: override.overtimeHours,
           customRate: override.customRate,
@@ -494,7 +587,7 @@ export default function HomePage() {
         DEFAULT_OVERTIME_MULTIPLIER,
       );
     });
-  }, [payrollBaseRows, payrollOverrides]);
+  }, [payrollBaseRows, payrollOverrides, attendancePeriod]);
 
   const filteredPayrollRows = useMemo(() => {
     const nameFilter = payrollNameFilter.trim().toLowerCase();
@@ -619,8 +712,42 @@ export default function HomePage() {
     });
 
     matched.sort((a, b) => a.date.localeCompare(b.date));
-    return matched;
-  }, [dailyRows, editingPayrollRow]);
+
+    const dateRange = expandDateSummary(
+      editingPayrollRow.date,
+      matched.map((row) => row.date),
+      attendancePeriod,
+    );
+    const allDates = Array.from(
+      new Set([...dateRange, ...matched.map((row) => row.date)]),
+    ).sort((a, b) => a.localeCompare(b));
+
+    if (allDates.length === 0) return matched;
+
+    const byDate = new Map<string, DailyLogRow>();
+    for (const row of matched) {
+      if (!byDate.has(row.date)) byDate.set(row.date, row);
+    }
+
+    const employeeLabel = matched[0]?.employee ?? editingPayrollRow.worker;
+    const siteLabel = matched[0]?.site ?? "";
+
+    return allDates.map(
+      (date) =>
+        byDate.get(date) ?? {
+          date,
+          employee: employeeLabel,
+          time1In: "",
+          time1Out: "",
+          time2In: "",
+          time2Out: "",
+          otIn: "",
+          otOut: "",
+          hours: 0,
+          site: siteLabel,
+        },
+    );
+  }, [dailyRows, editingPayrollRow, attendancePeriod]);
 
   const editingPayrollSummary = useMemo(() => {
     if (!editingPayrollRow) {
@@ -757,6 +884,7 @@ export default function HomePage() {
   const handleParsed = useCallback((result: ParseResult) => {
     setEmployees(result.employees);
     setRecords(result.records);
+    setAttendancePeriod(result.period);
     setStep2View("daily");
     setStep2Sort("date-asc");
     setStep2SiteFilter("ALL");
@@ -786,6 +914,7 @@ export default function HomePage() {
     setStep2DateFilter("");
     setRecordsPage(1);
     setSite("Unknown Site");
+    setAttendancePeriod("Current Period");
     setPayrollOverrides({});
     setPayrollGenerated(false);
     setPayrollTab("payroll");
@@ -839,11 +968,12 @@ export default function HomePage() {
 
   function openPayrollEditModal(row: PayrollRow) {
     const existingOverride = payrollOverrides[row.id];
+    const normalizedPeriod = normalizePeriodLabel(attendancePeriod);
     setPayrollSaveNotice(null);
     setEditingPayrollRowId(row.id);
     setLogHourOverrides(existingOverride?.logHours ?? {});
     setPayrollEditDraft({
-      date: row.date,
+      date: normalizedPeriod ?? row.date,
       hoursWorked: String(row.hoursWorked),
       rate: row.customRate === null ? "" : String(row.customRate),
       overtimeHours: String(row.overtimeHours),
@@ -893,10 +1023,11 @@ export default function HomePage() {
           )
         : undefined;
 
+    const normalizedPeriod = normalizePeriodLabel(attendancePeriod);
     setPayrollOverrides((prev) => ({
       ...prev,
       [editingPayrollRow.id]: {
-        date: payrollEditDraft.date.trim(),
+        date: normalizedPeriod ?? payrollEditDraft.date.trim(),
         hoursWorked: nextHours,
         overtimeHours: nextOvertime,
         customRate: nextCustomRate,
@@ -2424,12 +2555,8 @@ export default function HomePage() {
                     <input
                       type="text"
                       value={payrollEditDraft.date}
-                      onChange={(e) =>
-                        setPayrollEditDraft((prev) =>
-                          prev ? { ...prev, date: e.target.value } : prev,
-                        )
-                      }
-                      className="w-full hover:border-apple-charcoal px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
+                      readOnly
+                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-apple-snow text-sm text-apple-charcoal cursor-not-allowed"
                     />
                   </label>
 
