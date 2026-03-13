@@ -17,6 +17,11 @@ import {
   CartesianGrid,
   ResponsiveContainer,
   Tooltip,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
   Area,
   AreaChart,
 } from "recharts";
@@ -47,8 +52,10 @@ import {
   type PayrollRow,
 } from "@/lib/payrollEngine";
 import { exportPayrollToExcel } from "@/lib/payrollExport";
+import PayrollInsightsDashboard from "@/components/PayrollInsightsDashboard";
 
 const PREVIEW_LIMIT = 10;
+const EMPLOYEE_ANALYTICS_COLORS = ["#2563EB", "#F59E0B", "#10B981", "#8B5CF6"];
 
 interface PayrollEditDraft {
   date: string;
@@ -62,6 +69,7 @@ interface PayrollRowOverride {
   hoursWorked: number;
   overtimeHours: number;
   customRate: number | null;
+  logHours?: Record<string, number>;
 }
 
 function formatPayrollNumber(value: number): string {
@@ -75,6 +83,11 @@ function parseNonNegativeOrFallback(value: string, fallback: number): number {
   const parsed = Number.parseFloat(value);
   if (!Number.isFinite(parsed) || parsed < 0) return fallback;
   return parsed;
+}
+
+function normalizeNumericInput(value: string): string {
+  if (value === "") return "";
+  return value.replace(/^0+(?=\d)/, "");
 }
 
 function parsePayrollIdentity(employeeText: string): {
@@ -110,6 +123,46 @@ function toClockHours(value: number): string {
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function getLogOverrideKey(log: DailyLogRow): string {
+  return `${log.date}|||${log.employee}|||${log.site}`;
+}
+
+function toShortDateLabel(isoDate: string): string {
+  const parsed = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return isoDate;
+  return `${parsed.getMonth() + 1}/${parsed.getDate()}`;
+}
+
+function parseTimeToDecimal(timeText: string): number | null {
+  const match = timeText.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return Math.round((hours + minutes / 60) * 100) / 100;
+}
+
+function inferMinutesFromPunches(times: string[]): number {
+  const punches = times.filter(Boolean);
+  if (punches.length < 2) return 0;
+
+  let best = 0;
+  const maxShiftMinutes = 16 * 60;
+
+  for (let i = 0; i < punches.length; i++) {
+    for (let j = 0; j < punches.length; j++) {
+      if (i === j) continue;
+      const diff = pairMinutes(punches[i], punches[j]);
+      if (diff > best && diff <= maxShiftMinutes) {
+        best = diff;
+      }
+    }
+  }
+
+  return best;
 }
 
 export default function HomePage() {
@@ -151,6 +204,9 @@ export default function HomePage() {
   const [logHourOverrides, setLogHourOverrides] = useState<
     Record<string, number>
   >({});
+  const [payrollSaveNotice, setPayrollSaveNotice] = useState<string | null>(
+    null,
+  );
 
   const dailyRows = useMemo<DailyLogRow[]>(() => {
     const grouped = new Map<string, DailyLogRow>();
@@ -207,7 +263,19 @@ export default function HomePage() {
           ? pairMinutes(row.otIn, row.otOut)
           : 0;
 
-      const minutes = regularMinutes + otMinutes;
+      const strictMinutes = regularMinutes + otMinutes;
+      const inferredMinutes =
+        strictMinutes === 0
+          ? inferMinutesFromPunches([
+              row.time1In,
+              row.time1Out,
+              row.time2In,
+              row.time2Out,
+              row.otIn,
+              row.otOut,
+            ])
+          : 0;
+      const minutes = strictMinutes || inferredMinutes;
       return {
         ...row,
         hours: Math.round((minutes / 60) * 100) / 100,
@@ -395,7 +463,12 @@ export default function HomePage() {
           hours: row.hours,
         };
       })
-      .filter((record) => record.name.length > 0 && record.hours > 0);
+      .filter(
+        (record) =>
+          record.name.length > 0 &&
+          Number.isFinite(record.hours) &&
+          record.hours >= 0,
+      );
   }, [dailyRows]);
 
   const payrollBaseRows = useMemo<PayrollRow[]>(() => {
@@ -577,13 +650,81 @@ export default function HomePage() {
     };
   }, [editingPayrollLogs, editingPayrollRow]);
 
+  const editingPayrollLogsForAnalytics = useMemo(() => {
+    return editingPayrollLogs.map((log) => {
+      const key = getLogOverrideKey(log);
+      return {
+        ...log,
+        hours: logHourOverrides[key] ?? log.hours,
+      };
+    });
+  }, [editingPayrollLogs, logHourOverrides]);
+
+  const hasLogHourOverrides = useMemo(
+    () =>
+      Object.values(logHourOverrides).some(
+        (value) => Number.isFinite(value) && value >= 0,
+      ),
+    [logHourOverrides],
+  );
+
+  const totalEditedLogHours = useMemo(() => {
+    const hours = editingPayrollLogsForAnalytics.reduce(
+      (sum, log) => sum + log.hours,
+      0,
+    );
+    return Math.round(hours * 100) / 100;
+  }, [editingPayrollLogsForAnalytics]);
+
+  const employeeDailyHoursTrend = useMemo(() => {
+    return editingPayrollLogsForAnalytics.map((log) => ({
+      date: toShortDateLabel(log.date),
+      isoDate: log.date,
+      hoursWorked: Math.round(log.hours * 100) / 100,
+    }));
+  }, [editingPayrollLogsForAnalytics]);
+
+  const employeeAttendanceBreakdown = useMemo(() => {
+    const attendanceDays = editingPayrollLogsForAnalytics.filter(
+      (log) => log.hours > 0,
+    ).length;
+    const absences = Math.max(
+      editingPayrollLogsForAnalytics.length - attendanceDays,
+      0,
+    );
+    const leaveDays = 0;
+    const businessTripDays = 0;
+
+    return [
+      { name: "Attendance", value: attendanceDays },
+      { name: "Absences", value: absences },
+      { name: "Leave", value: leaveDays },
+      { name: "Business Trip", value: businessTripDays },
+    ];
+  }, [editingPayrollLogsForAnalytics]);
+
+  const employeeClockInConsistency = useMemo(() => {
+    return editingPayrollLogsForAnalytics.map((log) => {
+      const firstIn = earliestNonEmptyTime(log.time1In, log.time2In);
+      const parsed = firstIn ? parseTimeToDecimal(firstIn) : null;
+      return {
+        date: toShortDateLabel(log.date),
+        isoDate: log.date,
+        timeIn: parsed ?? 0,
+        timeInLabel: firstIn || "Missed",
+      };
+    });
+  }, [editingPayrollLogsForAnalytics]);
+
   const payrollEditPreview = useMemo(() => {
     if (!editingPayrollRow || !payrollEditDraft) return null;
 
-    const nextHours = parseNonNegativeOrFallback(
-      payrollEditDraft.hoursWorked,
-      editingPayrollRow.hoursWorked,
-    );
+    const nextHours = hasLogHourOverrides
+      ? totalEditedLogHours
+      : parseNonNegativeOrFallback(
+          payrollEditDraft.hoursWorked,
+          editingPayrollRow.hoursWorked,
+        );
     const nextOvertime = parseNonNegativeOrFallback(
       payrollEditDraft.overtimeHours,
       editingPayrollRow.overtimeHours,
@@ -606,7 +747,12 @@ export default function HomePage() {
       },
       DEFAULT_OVERTIME_MULTIPLIER,
     );
-  }, [editingPayrollRow, payrollEditDraft]);
+  }, [
+    editingPayrollRow,
+    payrollEditDraft,
+    hasLogHourOverrides,
+    totalEditedLogHours,
+  ]);
 
   const handleParsed = useCallback((result: ParseResult) => {
     setEmployees(result.employees);
@@ -656,6 +802,7 @@ export default function HomePage() {
 
   function handleGeneratePayroll() {
     if (payrollRows.length === 0) return;
+    setPayrollSaveNotice(null);
     setPayrollGenerated(true);
     setPayrollTab("payroll");
     setPayrollPage(1);
@@ -691,7 +838,10 @@ export default function HomePage() {
   }
 
   function openPayrollEditModal(row: PayrollRow) {
+    const existingOverride = payrollOverrides[row.id];
+    setPayrollSaveNotice(null);
     setEditingPayrollRowId(row.id);
+    setLogHourOverrides(existingOverride?.logHours ?? {});
     setPayrollEditDraft({
       date: row.date,
       hoursWorked: String(row.hoursWorked),
@@ -704,16 +854,19 @@ export default function HomePage() {
   function closePayrollEditModal() {
     setEditingPayrollRowId(null);
     setPayrollEditDraft(null);
+    setLogHourOverrides({});
     document.body.style.overflow = "auto";
   }
 
   function savePayrollEdit() {
     if (!editingPayrollRow || !payrollEditDraft) return;
 
-    const nextHours = parseNonNegativeOrFallback(
-      payrollEditDraft.hoursWorked,
-      editingPayrollRow.hoursWorked,
-    );
+    const nextHours = hasLogHourOverrides
+      ? totalEditedLogHours
+      : parseNonNegativeOrFallback(
+          payrollEditDraft.hoursWorked,
+          editingPayrollRow.hoursWorked,
+        );
     const nextOvertime = parseNonNegativeOrFallback(
       payrollEditDraft.overtimeHours,
       editingPayrollRow.overtimeHours,
@@ -725,6 +878,20 @@ export default function HomePage() {
             payrollEditDraft.rate,
             editingPayrollRow.customRate ?? editingPayrollRow.defaultRate,
           );
+    const nextLogHours =
+      hasLogHourOverrides && editingPayrollLogs.length > 0
+        ? Object.fromEntries(
+            editingPayrollLogs.map((log) => {
+              const key = getLogOverrideKey(log);
+              const value = logHourOverrides[key] ?? log.hours;
+              const normalized =
+                Number.isFinite(value) && value >= 0
+                  ? Math.round(value * 100) / 100
+                  : 0;
+              return [key, normalized];
+            }),
+          )
+        : undefined;
 
     setPayrollOverrides((prev) => ({
       ...prev,
@@ -733,8 +900,12 @@ export default function HomePage() {
         hoursWorked: nextHours,
         overtimeHours: nextOvertime,
         customRate: nextCustomRate,
+        logHours: nextLogHours,
       },
     }));
+    setPayrollSaveNotice(
+      `Saved ${editingPayrollRow.worker}: ${formatPayrollNumber(nextHours)} hours`,
+    );
 
     closePayrollEditModal();
   }
@@ -795,6 +966,24 @@ export default function HomePage() {
     payrollNameFilter,
     payrollDateFilter,
     payrollSort,
+  ]);
+
+  useEffect(() => {
+    if (!payrollEditDraft || !editingPayrollRowId || !hasLogHourOverrides) {
+      return;
+    }
+
+    const nextHoursText = String(totalEditedLogHours);
+    if (payrollEditDraft.hoursWorked === nextHoursText) return;
+
+    setPayrollEditDraft((prev) =>
+      prev ? { ...prev, hoursWorked: nextHoursText } : prev,
+    );
+  }, [
+    payrollEditDraft,
+    editingPayrollRowId,
+    hasLogHourOverrides,
+    totalEditedLogHours,
   ]);
 
   useEffect(() => {
@@ -1398,6 +1587,11 @@ export default function HomePage() {
                   <p className="text-sm text-apple-smoke mt-1">
                     Generate payroll after reviewing attendance logs.
                   </p>
+                  {payrollSaveNotice && (
+                    <p className="mt-2 text-xs font-semibold text-green-700">
+                      {payrollSaveNotice}
+                    </p>
+                  )}
                 </div>
 
                 {!payrollGenerated && (
@@ -1804,6 +1998,13 @@ export default function HomePage() {
                       </div>
                     )}
                   </div>
+
+                  {payrollTab === "payroll" && (
+                    <PayrollInsightsDashboard
+                      payrollRows={payrollRows}
+                      attendanceRows={payrollAttendanceInputs}
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -2241,10 +2442,16 @@ export default function HomePage() {
                       min={0}
                       step="0.01"
                       value={payrollEditDraft.hoursWorked}
+                      onFocus={(e) => e.currentTarget.select()}
                       onChange={(e) =>
                         setPayrollEditDraft((prev) =>
                           prev
-                            ? { ...prev, hoursWorked: e.target.value }
+                            ? {
+                                ...prev,
+                                hoursWorked: normalizeNumericInput(
+                                  e.target.value,
+                                ),
+                              }
                             : prev,
                         )
                       }
@@ -2261,9 +2468,15 @@ export default function HomePage() {
                       min={0}
                       step="0.01"
                       value={payrollEditDraft.rate}
+                      onFocus={(e) => e.currentTarget.select()}
                       onChange={(e) =>
                         setPayrollEditDraft((prev) =>
-                          prev ? { ...prev, rate: e.target.value } : prev,
+                          prev
+                            ? {
+                                ...prev,
+                                rate: normalizeNumericInput(e.target.value),
+                              }
+                            : prev,
                         )
                       }
                       className="w-full hover:border-apple-charcoal px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
@@ -2279,10 +2492,16 @@ export default function HomePage() {
                       min={0}
                       step="0.01"
                       value={payrollEditDraft.overtimeHours}
+                      onFocus={(e) => e.currentTarget.select()}
                       onChange={(e) =>
                         setPayrollEditDraft((prev) =>
                           prev
-                            ? { ...prev, overtimeHours: e.target.value }
+                            ? {
+                                ...prev,
+                                overtimeHours: normalizeNumericInput(
+                                  e.target.value,
+                                ),
+                              }
                             : prev,
                         )
                       }
@@ -2300,6 +2519,167 @@ export default function HomePage() {
                   </span>
                 </div>
               )}
+
+              <div className="rounded-2xl border border-apple-mist bg-white">
+                <div className="px-4 py-3 border-b border-apple-mist">
+                  <h4 className="text-base font-semibold text-apple-charcoal">
+                    Employee Analytics
+                  </h4>
+                  <p className="text-xs text-apple-smoke mt-1">
+                    Visual insights into the employee&apos;s attendance and work
+                    patterns.
+                  </p>
+                </div>
+
+                <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-white rounded-2xl border border-gray-100 p-4">
+                    <p className="text-xs font-semibold text-apple-charcoal mb-2">
+                      Daily Hours Worked Trend
+                    </p>
+                    <div className="h-[220px]">
+                      {employeeDailyHoursTrend.length === 0 ? (
+                        <p className="text-sm text-apple-smoke">
+                          No attendance logs yet.
+                        </p>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart
+                            data={employeeDailyHoursTrend}
+                            margin={{ top: 8, right: 8, left: -18, bottom: 8 }}
+                          >
+                            <CartesianGrid
+                              strokeDasharray="3 3"
+                              vertical={false}
+                              stroke="#F1F5F9"
+                            />
+                            <XAxis
+                              dataKey="date"
+                              axisLine={false}
+                              tickLine={false}
+                              tick={{ fill: "#64748B", fontSize: 10 }}
+                              minTickGap={12}
+                            />
+                            <YAxis
+                              axisLine={false}
+                              tickLine={false}
+                              tick={{ fill: "#64748B", fontSize: 10 }}
+                            />
+                            <Tooltip
+                              formatter={(value: number) => [
+                                formatPayrollNumber(value),
+                                "Hours Worked",
+                              ]}
+                              labelFormatter={(label: string) => `Date: ${label}`}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="hoursWorked"
+                              stroke="#2563EB"
+                              strokeWidth={2.2}
+                              dot={{ r: 2 }}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-2xl border border-gray-100 p-4">
+                    <p className="text-xs font-semibold text-apple-charcoal mb-2">
+                      Attendance Breakdown
+                    </p>
+                    <div className="h-[220px]">
+                      {employeeAttendanceBreakdown.every(
+                        (item) => item.value === 0,
+                      ) ? (
+                        <p className="text-sm text-apple-smoke">
+                          No attendance distribution yet.
+                        </p>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={employeeAttendanceBreakdown}
+                              dataKey="value"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={42}
+                              outerRadius={72}
+                              paddingAngle={2}
+                              isAnimationActive={false}
+                            >
+                              {employeeAttendanceBreakdown.map((entry, index) => (
+                                <Cell
+                                  key={`${entry.name}-${index}`}
+                                  fill={
+                                    EMPLOYEE_ANALYTICS_COLORS[
+                                      index % EMPLOYEE_ANALYTICS_COLORS.length
+                                    ]
+                                  }
+                                />
+                              ))}
+                            </Pie>
+                            <Tooltip />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-2xl border border-gray-100 p-4">
+                    <p className="text-xs font-semibold text-apple-charcoal mb-2">
+                      Clock-in Time Consistency
+                    </p>
+                    <div className="h-[220px]">
+                      {employeeClockInConsistency.length === 0 ? (
+                        <p className="text-sm text-apple-smoke">
+                          No clock-in data yet.
+                        </p>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={employeeClockInConsistency}
+                            margin={{ top: 8, right: 8, left: -18, bottom: 8 }}
+                          >
+                            <CartesianGrid
+                              strokeDasharray="3 3"
+                              vertical={false}
+                              stroke="#F1F5F9"
+                            />
+                            <XAxis
+                              dataKey="date"
+                              axisLine={false}
+                              tickLine={false}
+                              tick={{ fill: "#64748B", fontSize: 10 }}
+                              minTickGap={12}
+                            />
+                            <YAxis
+                              axisLine={false}
+                              tickLine={false}
+                              tick={{ fill: "#64748B", fontSize: 10 }}
+                              domain={[0, 24]}
+                            />
+                            <Tooltip
+                              formatter={(
+                                _value: number,
+                                _name: string,
+                                item: { payload?: { timeInLabel?: string } },
+                              ) => [item.payload?.timeInLabel ?? "-", "Time In"]}
+                              labelFormatter={(label: string) => `Date: ${label}`}
+                            />
+                            <Bar
+                              dataKey="timeIn"
+                              fill="#10B981"
+                              radius={[4, 4, 0, 0]}
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               <div className="rounded-2xl border border-apple-mist bg-white overflow-x-auto">
                 <div className="px-4 py-3 border-b border-apple-mist">
@@ -2392,17 +2772,27 @@ export default function HomePage() {
                               type="number"
                               min={0}
                               step="0.01"
+                              onFocus={(e) => e.currentTarget.select()}
                               value={
-                                logHourOverrides[
-                                  `${log.date}-${log.employee}`
-                                ] ?? log.hours
+                                normalizeNumericInput(
+                                  String(
+                                    logHourOverrides[getLogOverrideKey(log)] ??
+                                      log.hours,
+                                  ),
+                                )
                               }
                               onChange={(e) => {
-                                const value = parseFloat(e.target.value) || 0;
+                                const normalized = normalizeNumericInput(
+                                  e.target.value,
+                                );
+                                const value = Number.parseFloat(normalized);
 
                                 setLogHourOverrides((prev) => ({
                                   ...prev,
-                                  [`${log.date}-${log.employee}`]: value,
+                                  [getLogOverrideKey(log)]:
+                                    Number.isFinite(value) && value >= 0
+                                      ? Math.round(value * 100) / 100
+                                      : 0,
                                 }));
                               }}
                               className="w-20 hover:border-apple-charcoal text-right px-2 py-1 rounded-lg border border-apple-charcoal/40 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-apple-charcoal/20"
@@ -2415,7 +2805,21 @@ export default function HomePage() {
                 </table>
               </div>
 
-              <div className="flex justify-end gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-apple-steel">
+                  Saving total hours:{" "}
+                  <span className="font-semibold text-apple-charcoal">
+                    {formatPayrollNumber(
+                      hasLogHourOverrides
+                        ? totalEditedLogHours
+                        : parseNonNegativeOrFallback(
+                            payrollEditDraft.hoursWorked,
+                            editingPayrollRow.hoursWorked,
+                          ),
+                    )}
+                  </span>
+                </p>
+                <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={closePayrollEditModal}
@@ -2428,8 +2832,9 @@ export default function HomePage() {
                   onClick={savePayrollEdit}
                   className="px-4 h-10 rounded-2xl bg-apple-charcoal text-white text-sm font-semibold hover:bg-apple-black transition"
                 >
-                  Save
+                  Save Changes
                 </button>
+                </div>
               </div>
             </div>
           </div>

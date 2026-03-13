@@ -9,6 +9,7 @@ export const ROLE_CODE_TO_NAME = {
   PA: "Painter",
   FORE: "Foreman",
   S: "Skilled",
+  UNKNOWN: "Unknown",
 } as const;
 
 export type RoleCode = keyof typeof ROLE_CODE_TO_NAME;
@@ -22,6 +23,7 @@ export const DEFAULT_DAILY_RATE_BY_ROLE: Record<RoleCode, number> = {
   PA: 430,
   FORE: 625,
   S: 650,
+  UNKNOWN: 500,
 };
 
 const ROLE_ALIAS_TO_CODE: Record<string, RoleCode> = {
@@ -39,6 +41,7 @@ const ROLE_ALIAS_TO_CODE: Record<string, RoleCode> = {
   foreman: "FORE",
   s: "S",
   skilled: "S",
+  unknown: "UNKNOWN",
 };
 
 export function normalizeRoleCode(value: string | null | undefined): RoleCode | null {

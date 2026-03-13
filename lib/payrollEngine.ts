@@ -144,7 +144,7 @@ export function generatePayroll(
     const role = normalizeRole(record.role, parsedName.roleFromName);
     const key = `${role}|||${workerName}`;
     const numericHours = Number(record.hours);
-    if (!Number.isFinite(numericHours) || numericHours <= 0) continue;
+    if (!Number.isFinite(numericHours) || numericHours < 0) continue;
 
     const site = normalizeWhitespace(record.site) || "Unknown Site";
     const date = normalizeWhitespace(record.date);
