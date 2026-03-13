@@ -77,6 +77,41 @@ function parseNonNegativeOrFallback(value: string, fallback: number): number {
   return parsed;
 }
 
+function parsePayrollIdentity(employeeText: string): {
+  role: string;
+  name: string;
+} {
+  const normalizedEmployee = employeeText.replace(/\s+/g, " ").trim();
+  const [firstToken, ...rest] = normalizedEmployee.split(" ");
+  const roleFromPrefix = normalizeRoleCode(firstToken);
+
+  if (roleFromPrefix && rest.length > 0) {
+    return {
+      role: roleFromPrefix,
+      name: rest.join(" ").trim(),
+    };
+  }
+
+  return {
+    role: "UNKNOWN",
+    name: normalizedEmployee,
+  };
+}
+
+function toWeekLabel(isoDate: string): string {
+  const parsed = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return isoDate;
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  return `${parsed.getDate()}/${days[parsed.getDay()]}`;
+}
+
+function toClockHours(value: number): string {
+  const totalMinutes = Math.max(0, Math.round(value * 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
 export default function HomePage() {
   const [step, setStep] = useState<Step>(1);
   const [step2View, setStep2View] = useState<Step2View>("daily");
@@ -344,19 +379,11 @@ export default function HomePage() {
   const payrollAttendanceInputs = useMemo<AttendanceRecordInput[]>(() => {
     return dailyRows
       .map((row) => {
-        const normalizedEmployee = row.employee.replace(/\s+/g, " ").trim();
-        const [firstToken, ...rest] = normalizedEmployee.split(" ");
-        const roleFromPrefix = normalizeRoleCode(firstToken);
-
-        const role = roleFromPrefix ?? "UNKNOWN";
-        const name =
-          roleFromPrefix && rest.length > 0
-            ? rest.join(" ").trim()
-            : normalizedEmployee;
+        const identity = parsePayrollIdentity(row.employee);
 
         return {
-          name,
-          role,
+          name: identity.name,
+          role: identity.role,
           site: row.site,
           date: row.date,
           hours: row.hours,
@@ -485,6 +512,47 @@ export default function HomePage() {
     () => payrollRows.find((row) => row.id === editingPayrollRowId) ?? null,
     [payrollRows, editingPayrollRowId],
   );
+
+  const editingPayrollLogs = useMemo(() => {
+    if (!editingPayrollRow) return [] as DailyLogRow[];
+
+    const matched = dailyRows.filter((row) => {
+      const identity = parsePayrollIdentity(row.employee);
+      return (
+        identity.role === editingPayrollRow.role &&
+        identity.name === editingPayrollRow.worker
+      );
+    });
+
+    matched.sort((a, b) => a.date.localeCompare(b.date));
+    return matched;
+  }, [dailyRows, editingPayrollRow]);
+
+  const editingPayrollSummary = useMemo(() => {
+    if (!editingPayrollRow) {
+      return {
+        attendanceDays: 0,
+        absenceDays: 0,
+        regularHours: 0,
+        otNormalHours: 0,
+      };
+    }
+
+    const attendanceDays = editingPayrollLogs.filter((log) => log.hours > 0).length;
+    const absenceDays = Math.max(editingPayrollLogs.length - attendanceDays, 0);
+    const regularHours = attendanceDays * HOURS_PER_DAY;
+    const otNormalHours = editingPayrollLogs.reduce((sum, log) => {
+      if (!log.otIn || !log.otOut) return sum;
+      return sum + pairMinutes(log.otIn, log.otOut) / 60;
+    }, 0);
+
+    return {
+      attendanceDays,
+      absenceDays,
+      regularHours,
+      otNormalHours,
+    };
+  }, [editingPayrollLogs, editingPayrollRow]);
 
   const payrollEditPreview = useMemo(() => {
     if (!editingPayrollRow || !payrollEditDraft) return null;
@@ -1979,112 +2047,268 @@ export default function HomePage() {
 
       {editingPayrollRow && payrollEditDraft && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm p-4 flex items-center justify-center">
-          <div className="w-full max-w-xl rounded-2xl border border-apple-mist bg-white shadow-apple-xs p-5 sm:p-6 space-y-4">
-            <div>
-              <h3 className="text-lg font-bold text-apple-charcoal">
-                Edit Payroll Row
-              </h3>
-              <p className="text-sm text-apple-smoke">
-                {editingPayrollRow.worker} ({editingPayrollRow.role})
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <label className="space-y-1.5">
-                <span className="text-xs font-semibold text-apple-steel uppercase tracking-wider">
-                  Date
-                </span>
-                <input
-                  type="text"
-                  value={payrollEditDraft.date}
-                  onChange={(e) =>
-                    setPayrollEditDraft((prev) =>
-                      prev ? { ...prev, date: e.target.value } : prev,
-                    )
-                  }
-                  className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
-                />
-              </label>
-
-              <label className="space-y-1.5">
-                <span className="text-xs font-semibold text-apple-steel uppercase tracking-wider">
-                  Hours Worked
-                </span>
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={payrollEditDraft.hoursWorked}
-                  onChange={(e) =>
-                    setPayrollEditDraft((prev) =>
-                      prev ? { ...prev, hoursWorked: e.target.value } : prev,
-                    )
-                  }
-                  className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
-                />
-              </label>
-
-              <label className="space-y-1.5">
-                <span className="text-xs font-semibold text-apple-steel uppercase tracking-wider">
-                  Rate (Hourly, blank = default)
-                </span>
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={payrollEditDraft.rate}
-                  onChange={(e) =>
-                    setPayrollEditDraft((prev) =>
-                      prev ? { ...prev, rate: e.target.value } : prev,
-                    )
-                  }
-                  className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
-                />
-              </label>
-
-              <label className="space-y-1.5">
-                <span className="text-xs font-semibold text-apple-steel uppercase tracking-wider">
-                  Overtime Hours
-                </span>
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={payrollEditDraft.overtimeHours}
-                  onChange={(e) =>
-                    setPayrollEditDraft((prev) =>
-                      prev ? { ...prev, overtimeHours: e.target.value } : prev,
-                    )
-                  }
-                  className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
-                />
-              </label>
-            </div>
-
-            {payrollEditPreview && (
-              <div className="rounded-xl border border-apple-mist bg-apple-snow px-3 py-2 text-sm text-apple-ash">
-                Preview Total Pay:{" "}
-                <span className="font-semibold text-apple-charcoal">
-                  {formatPayrollNumber(payrollEditPreview.totalPay)}
-                </span>
+          <div className="w-full max-w-6xl max-h-[88vh] overflow-y-auto rounded-2xl border border-apple-mist bg-white shadow-apple-xs">
+            <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-apple-mist px-5 sm:px-7 py-4 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-2xs font-semibold text-apple-steel uppercase tracking-widest">
+                  Calculation Details
+                </p>
+                <h3 className="text-2xl font-bold text-apple-charcoal tracking-tight">
+                  {editingPayrollRow.worker} ({editingPayrollRow.role})
+                </h3>
               </div>
-            )}
-
-            <div className="flex justify-end gap-2">
               <button
                 type="button"
                 onClick={closePayrollEditModal}
-                className="px-4 h-10 rounded-2xl border border-apple-silver text-sm font-semibold text-apple-ash hover:border-apple-charcoal transition"
+                className="w-9 h-9 rounded-full border border-apple-silver text-apple-smoke hover:text-apple-charcoal hover:border-apple-charcoal transition flex items-center justify-center"
               >
-                Cancel
+                <X size={16} />
               </button>
-              <button
-                type="button"
-                onClick={savePayrollEdit}
-                className="px-4 h-10 rounded-2xl bg-apple-charcoal text-white text-sm font-semibold hover:bg-apple-black transition"
-              >
-                Save
-              </button>
+            </div>
+
+            <div className="px-5 sm:px-7 py-5 sm:py-6 space-y-5">
+              <div className="rounded-2xl border border-apple-mist bg-apple-snow px-4 py-3 text-sm text-apple-charcoal space-y-1">
+                <p>
+                  <span className="font-semibold">Reg Hours</span> = Attendance
+                  Days x 8 = {editingPayrollSummary.attendanceDays} x{" "}
+                  {HOURS_PER_DAY} = {formatPayrollNumber(
+                    editingPayrollSummary.regularHours,
+                  )}
+                </p>
+                <p>
+                  <span className="font-semibold">OT Hours</span> = OT Normal +
+                  OT Special = {toClockHours(editingPayrollSummary.otNormalHours)}{" "}
+                  + 00:00 ={" "}
+                  {toClockHours(editingPayrollSummary.otNormalHours)}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-apple-mist bg-white">
+                <div className="px-4 py-3 border-b border-apple-mist">
+                  <p className="text-2xs font-semibold text-apple-steel uppercase tracking-widest">
+                    Source Summary
+                  </p>
+                  <p className="text-xs text-apple-smoke mt-1">
+                    {editingPayrollLogs.length} attendance log row
+                    {editingPayrollLogs.length !== 1 ? "s" : ""}
+                  </p>
+                </div>
+                <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {[
+                    {
+                      label: "Absences (Day)",
+                      value: String(editingPayrollSummary.absenceDays),
+                    },
+                    { label: "Leave (Day)", value: "0" },
+                    { label: "Business Trip (Day)", value: "0" },
+                    {
+                      label: "Attendance (Day)",
+                      value: String(editingPayrollSummary.attendanceDays),
+                    },
+                    {
+                      label: "OT Normal",
+                      value: toClockHours(editingPayrollSummary.otNormalHours),
+                    },
+                    { label: "OT Special", value: "00:00" },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      className="rounded-xl border border-apple-mist bg-apple-snow px-3 py-2"
+                    >
+                      <p className="text-2xs font-semibold text-apple-steel uppercase tracking-wider">
+                        {item.label}
+                      </p>
+                      <p className="mt-1 text-lg font-mono text-apple-charcoal">
+                        {item.value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-apple-mist bg-white">
+                <div className="px-4 py-3 border-b border-apple-mist">
+                  <p className="text-2xs font-semibold text-apple-steel uppercase tracking-widest">
+                    Finance Adjustments
+                  </p>
+                </div>
+                <div className="p-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                  <label className="space-y-1.5">
+                    <span className="text-xs font-semibold text-apple-steel uppercase tracking-wider">
+                      Date
+                    </span>
+                    <input
+                      type="text"
+                      value={payrollEditDraft.date}
+                      onChange={(e) =>
+                        setPayrollEditDraft((prev) =>
+                          prev ? { ...prev, date: e.target.value } : prev,
+                        )
+                      }
+                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
+                    />
+                  </label>
+
+                  <label className="space-y-1.5">
+                    <span className="text-xs font-semibold text-apple-steel uppercase tracking-wider">
+                      Hours Worked
+                    </span>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={payrollEditDraft.hoursWorked}
+                      onChange={(e) =>
+                        setPayrollEditDraft((prev) =>
+                          prev ? { ...prev, hoursWorked: e.target.value } : prev,
+                        )
+                      }
+                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
+                    />
+                  </label>
+
+                  <label className="space-y-1.5">
+                    <span className="text-xs font-semibold text-apple-steel uppercase tracking-wider">
+                      Rate (Hourly)
+                    </span>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={payrollEditDraft.rate}
+                      onChange={(e) =>
+                        setPayrollEditDraft((prev) =>
+                          prev ? { ...prev, rate: e.target.value } : prev,
+                        )
+                      }
+                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
+                    />
+                  </label>
+
+                  <label className="space-y-1.5">
+                    <span className="text-xs font-semibold text-apple-steel uppercase tracking-wider">
+                      Overtime Hours
+                    </span>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={payrollEditDraft.overtimeHours}
+                      onChange={(e) =>
+                        setPayrollEditDraft((prev) =>
+                          prev
+                            ? { ...prev, overtimeHours: e.target.value }
+                            : prev,
+                        )
+                      }
+                      className="w-full px-3 h-10 rounded-2xl border border-apple-silver bg-white text-sm text-apple-charcoal focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15 focus:border-apple-charcoal transition-all"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {payrollEditPreview && (
+                <div className="rounded-xl border border-apple-mist bg-apple-snow px-3 py-2 text-sm text-apple-ash">
+                  Preview Total Pay:{" "}
+                  <span className="font-semibold text-apple-charcoal">
+                    {formatPayrollNumber(payrollEditPreview.totalPay)}
+                  </span>
+                </div>
+              )}
+
+              <div className="rounded-2xl border border-apple-mist bg-white overflow-x-auto">
+                <div className="px-4 py-3 border-b border-apple-mist">
+                  <p className="text-2xs font-semibold text-apple-steel uppercase tracking-widest">
+                    All Report Logs
+                  </p>
+                </div>
+                <table className="w-full text-sm min-w-[980px]">
+                  <thead>
+                    <tr className="border-b border-apple-mist">
+                      {[
+                        "Date/Week",
+                        "Time1 In",
+                        "Time1 Out",
+                        "Time2 In",
+                        "Time2 Out",
+                        "OT In",
+                        "OT Out",
+                        "Hours",
+                      ].map((h) => (
+                        <th
+                          key={h}
+                          className={`px-3 py-2.5 text-2xs font-semibold uppercase tracking-widest text-apple-steel ${
+                            h === "Hours" ? "text-right" : "text-left"
+                          }`}
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {editingPayrollLogs.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={8}
+                          className="px-3 py-5 text-center text-sm text-apple-smoke"
+                        >
+                          No attendance logs found for this worker.
+                        </td>
+                      </tr>
+                    ) : (
+                      editingPayrollLogs.map((log) => (
+                        <tr
+                          key={`${log.date}-${log.employee}`}
+                          className="border-b border-apple-mist/60 last:border-0 odd:bg-apple-snow/40"
+                        >
+                          <td className="px-3 py-2.5 text-sm text-apple-charcoal">
+                            {toWeekLabel(log.date)}
+                          </td>
+                          <td className="px-3 py-2.5 text-sm text-apple-charcoal">
+                            {log.time1In || "Missed"}
+                          </td>
+                          <td className="px-3 py-2.5 text-sm text-apple-charcoal">
+                            {log.time1Out || "Missed"}
+                          </td>
+                          <td className="px-3 py-2.5 text-sm text-apple-charcoal">
+                            {log.time2In || "Missed"}
+                          </td>
+                          <td className="px-3 py-2.5 text-sm text-apple-charcoal">
+                            {log.time2Out || "Missed"}
+                          </td>
+                          <td className="px-3 py-2.5 text-sm text-apple-charcoal">
+                            {log.otIn || "-"}
+                          </td>
+                          <td className="px-3 py-2.5 text-sm text-apple-charcoal">
+                            {log.otOut || "-"}
+                          </td>
+                          <td className="px-3 py-2.5 text-sm text-right font-mono text-apple-charcoal">
+                            {formatPayrollNumber(log.hours)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={closePayrollEditModal}
+                  className="px-4 h-10 rounded-2xl border border-apple-silver text-sm font-semibold text-apple-ash hover:border-apple-charcoal transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={savePayrollEdit}
+                  className="px-4 h-10 rounded-2xl bg-apple-charcoal text-white text-sm font-semibold hover:bg-apple-black transition"
+                >
+                  Save
+                </button>
+              </div>
             </div>
           </div>
         </div>
