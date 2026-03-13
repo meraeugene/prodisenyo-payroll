@@ -2476,10 +2476,23 @@ export default function HomePage() {
                 <p className="text-2xs font-semibold text-apple-steel uppercase tracking-widest">
                   Calculation Details
                 </p>
-                <h3 className="text-xl font-semibold text-apple-charcoal tracking-tight">
-                  {editingPayrollRow.worker} | ({editingPayrollRow.role}) |{" "}
-                  {editingPayrollRow.site}
-                </h3>
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Employee name */}
+                  <h3 className="text-lg font-semibold text-apple-charcoal tracking-tight">
+                    {editingPayrollRow.worker}
+                  </h3>
+
+                  {/* Role name */}
+                  <span className="px-2.5 py-1 rounded-full border border-apple-mist bg-white text-xs text-apple-smoke">
+                    {ROLE_CODE_TO_NAME[editingPayrollRow.role as RoleCode] ??
+                      "Unknown Role"}
+                  </span>
+
+                  {/* Site */}
+                  <span className="text-sm text-apple-smoke">
+                    {editingPayrollRow.site}
+                  </span>
+                </div>
               </div>
               <button
                 type="button"
