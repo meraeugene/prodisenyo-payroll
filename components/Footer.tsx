@@ -1,12 +1,12 @@
 const Footer = () => {
   return (
-    <footer className="border-t border-apple-mist bg-white py-8 mt-8 no-print">
-      <div className="max-w-[1400px] mx-auto px-5 sm:px-8 flex items-center justify-between flex-wrap gap-4">
+    <footer className="no-print border-t border-apple-mist bg-white py-6">
+      <div className="max-w-[1400px] mx-auto flex flex-wrap items-center justify-between gap-4 px-5 sm:px-8">
         <p className="text-xs text-apple-steel">
-          © {new Date().getFullYear()} Prodisenyo — Automated Payroll System
+          (c) {new Date().getFullYear()} Prodisenyo - Automated Payroll System
         </p>
         <p className="text-xs text-apple-steel">
-          All data is processed locally · No server uploads · Private by design
+          All data is processed locally - No server uploads - Private by design
         </p>
       </div>
     </footer>

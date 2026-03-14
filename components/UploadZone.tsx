@@ -1,31 +1,64 @@
 "use client";
 
-import { useRef, useState, DragEvent, ChangeEvent } from "react";
+import { useEffect, useRef, useState, DragEvent, ChangeEvent } from "react";
 import { Upload, FileSpreadsheet, X, AlertCircle, Loader2 } from "lucide-react";
 import { parseAttendanceFiles, type ParseResult } from "@/lib/parser";
 
 interface UploadZoneProps {
   onParsed: (result: ParseResult) => void;
+  resetSignal?: number;
 }
 
-export default function UploadZone({ onParsed }: UploadZoneProps) {
+function getFileKey(file: File): string {
+  return `${file.name}-${file.size}-${file.lastModified}`;
+}
+
+function mergeFiles(existing: File[], incoming: File[]): File[] {
+  const map = new Map<string, File>();
+  [...existing, ...incoming].forEach((file) => {
+    map.set(getFileKey(file), file);
+  });
+  return Array.from(map.values());
+}
+
+export default function UploadZone({ onParsed, resetSignal }: UploadZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    setFiles([]);
+    setDragging(false);
+    setLoading(false);
+    setError(null);
+    if (inputRef.current) inputRef.current.value = "";
+  }, [resetSignal]);
+
   function handleDrop(e: DragEvent<HTMLDivElement>) {
     e.preventDefault();
     setDragging(false);
     const dropped = Array.from(e.dataTransfer.files);
-    if (dropped.length > 0) setFiles(dropped);
+    if (dropped.length > 0) {
+      setFiles((prev) => mergeFiles(prev, dropped));
+      setError(null);
+    }
   }
 
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(e.target.files ?? []);
-    if (selected.length > 0) setFiles(selected);
+    if (selected.length > 0) {
+      setFiles((prev) => mergeFiles(prev, selected));
+      setError(null);
+    }
     e.target.value = "";
+  }
+
+  function handleRemoveSingle(file: File) {
+    const keyToRemove = getFileKey(file);
+    setFiles((prev) => prev.filter((item) => getFileKey(item) !== keyToRemove));
+    setError(null);
   }
 
   async function handleProcess() {
@@ -125,6 +158,15 @@ export default function UploadZone({ onParsed }: UploadZoneProps) {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
+                  inputRef.current?.click();
+                }}
+                className="h-8 rounded-xl border border-apple-silver px-3 text-xs font-semibold text-apple-ash hover:border-apple-ash transition-colors"
+              >
+                Add files
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
                   setFiles([]);
                   setError(null);
                 }}
@@ -138,20 +180,33 @@ export default function UploadZone({ onParsed }: UploadZoneProps) {
               <p className="text-2xs font-semibold text-apple-steel uppercase tracking-widest">
                 Uploaded Reports
               </p>
-              <div className="rounded-2xl border border-apple-mist bg-apple-snow px-3 py-2 h-full overflow-auto">
-                {files.slice(0, 8).map((current) => (
-                  <p
-                    key={`${current.name}-${current.size}`}
-                    className="text-xs text-apple-ash truncate"
+              <div className="space-y-1 rounded-2xl border border-apple-mist bg-apple-snow p-2">
+                {files.map((current) => (
+                  <div
+                    key={getFileKey(current)}
+                    className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-white/70"
                   >
-                    {current.name}
-                  </p>
+                    <div className="min-w-0">
+                      <p className="truncate text-xs text-apple-ash">
+                        {current.name}
+                      </p>
+                      <p className="text-2xs text-apple-steel">
+                        {(current.size / 1024).toFixed(1)} KB
+                      </p>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveSingle(current);
+                      }}
+                      className="h-6 w-6 flex-shrink-0 rounded-full hover:bg-apple-mist transition-colors flex items-center justify-center"
+                      aria-label={`Remove ${current.name}`}
+                      title={`Remove ${current.name}`}
+                    >
+                      <X size={12} className="text-apple-ash" />
+                    </button>
+                  </div>
                 ))}
-                {files.length > 8 && (
-                  <p className="text-xs text-apple-smoke mt-1">
-                    +{files.length - 8} more files
-                  </p>
-                )}
               </div>
             </div>
           </div>

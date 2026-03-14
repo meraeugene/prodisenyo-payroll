@@ -2,18 +2,20 @@
 
 import { X } from "lucide-react";
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
   Line,
-  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
+  type TooltipProps,
 } from "recharts";
 import { ROLE_CODE_TO_NAME, type RoleCode } from "@/lib/payrollConfig";
 import type { DailyLogRow } from "@/types";
@@ -26,7 +28,57 @@ import {
 } from "@/features/payroll/utils/payrollFormatters";
 import { getLogOverrideKey } from "@/features/payroll/utils/payrollMappers";
 
-const EMPLOYEE_ANALYTICS_COLORS = ["#2563EB", "#F59E0B", "#10B981", "#8B5CF6"];
+const EMPLOYEE_ANALYTICS_COLORS = ["#2563EB", "#38BDF8", "#F59E0B", "#10B981"];
+
+function chartTickFormatter(value: string): string {
+  if (!value) return "";
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value.slice(5) : value;
+}
+
+function AnalyticsTooltip({
+  active,
+  payload,
+  label,
+  valueFormatter,
+}: TooltipProps<number, string> & {
+  valueFormatter?: (value: number, name: string, item: any) => string;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+
+  return (
+    <div className="min-w-[148px] rounded-xl border border-[#E5EAF2] bg-white px-3 py-2 shadow-[0_10px_28px_rgba(2,6,23,0.08)]">
+      {label ? (
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#6B7280]">
+          {label}
+        </p>
+      ) : null}
+      <div className="space-y-1">
+        {payload.map((entry, index) => {
+          const numericValue =
+            typeof entry.value === "number"
+              ? entry.value
+              : Number(entry.value ?? 0);
+          const name = String(entry.name ?? entry.dataKey ?? "Value");
+
+          return (
+            <div key={`${name}-${index}`} className="flex items-center gap-2">
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{ backgroundColor: entry.color ?? "#2563EB" }}
+              />
+              <span className="text-[11px] text-[#6B7280]">{name}</span>
+              <span className="ml-auto text-[12px] font-semibold text-[#0F172A]">
+                {valueFormatter
+                  ? valueFormatter(numericValue, name, entry.payload)
+                  : formatPayrollNumber(numericValue)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 interface PayrollEditModalProps {
   payroll: UsePayrollStateResult;
@@ -230,75 +282,110 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
             </div>
           )}
 
-          <div className="rounded-2xl border border-apple-mist bg-white">
-            <div className="px-4 py-3 border-b border-apple-mist">
-              <h4 className="text-sm font-semibold text-apple-charcoal">
+          <div className="overflow-hidden rounded-2xl border border-[#E7ECF3] bg-gradient-to-b from-[#FCFDFF] to-white">
+            <div className="border-b border-[#EEF2F7] px-4 py-3.5">
+              <h4 className="text-sm font-semibold tracking-tight text-apple-charcoal">
                 Employee Analytics
               </h4>
-              <p className="text-xs text-apple-smoke mt-1">
+              <p className="mt-1 text-xs text-apple-smoke">
                 Visual insights into the employee&apos;s attendance and work
                 patterns.
               </p>
             </div>
 
-            <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white rounded-2xl border border-gray-100 p-4">
-                <p className="text-xs font-semibold text-apple-charcoal mb-2">
+            <div className="grid grid-cols-1 gap-5 p-4 md:grid-cols-3">
+              <div className="rounded-2xl border border-[#E8EDF5] bg-gradient-to-b from-white to-[#FAFCFF] p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+                <p className="mb-2 text-xs font-semibold tracking-wide text-apple-charcoal">
                   Daily Hours Worked Trend
                 </p>
-                <div className="h-[220px]">
+                <div className="h-[230px]">
                   {payroll.employeeDailyHoursTrend.length === 0 ? (
                     <p className="text-sm text-apple-smoke">
                       No attendance logs yet.
                     </p>
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart
+                      <AreaChart
                         data={payroll.employeeDailyHoursTrend}
-                        margin={{ top: 8, right: 8, left: -18, bottom: 8 }}
+                        margin={{ top: 12, right: 10, left: -14, bottom: 0 }}
                       >
+                        <defs>
+                          <linearGradient
+                            id="employeeHoursArea"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="5%"
+                              stopColor="#2563EB"
+                              stopOpacity={0.24}
+                            />
+                            <stop
+                              offset="95%"
+                              stopColor="#2563EB"
+                              stopOpacity={0.02}
+                            />
+                          </linearGradient>
+                        </defs>
                         <CartesianGrid
-                          strokeDasharray="3 3"
+                          strokeDasharray="4 4"
                           vertical={false}
-                          stroke="#F1F5F9"
+                          stroke="#E8EEF6"
                         />
                         <XAxis
                           dataKey="date"
                           axisLine={false}
                           tickLine={false}
-                          tick={{ fill: "#64748B", fontSize: 10 }}
-                          minTickGap={12}
+                          tick={{ fill: "#64748B", fontSize: 11 }}
+                          tickFormatter={chartTickFormatter}
+                          minTickGap={16}
+                          tickMargin={10}
                         />
                         <YAxis
                           axisLine={false}
                           tickLine={false}
-                          tick={{ fill: "#64748B", fontSize: 10 }}
+                          tick={{ fill: "#64748B", fontSize: 11 }}
+                          tickMargin={8}
                         />
                         <Tooltip
-                          formatter={(value: number) => [
-                            formatPayrollNumber(value),
-                            "Hours Worked",
-                          ]}
-                          labelFormatter={(label: string) => `Date: ${label}`}
+                          cursor={{ stroke: "#BFDBFE", strokeWidth: 1.5 }}
+                          content={
+                            <AnalyticsTooltip
+                              valueFormatter={(value) =>
+                                `${formatPayrollNumber(value)} hrs`
+                              }
+                            />
+                          }
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="hoursWorked"
+                          fill="url(#employeeHoursArea)"
+                          stroke="none"
+                          animationDuration={900}
                         />
                         <Line
                           type="monotone"
                           dataKey="hoursWorked"
                           stroke="#2563EB"
-                          strokeWidth={2.2}
-                          dot={{ r: 2 }}
+                          strokeWidth={2.4}
+                          dot={{ r: 2.5, fill: "#fff", stroke: "#2563EB" }}
+                          activeDot={{ r: 4, fill: "#2563EB", stroke: "#fff" }}
+                          animationDuration={1100}
                         />
-                      </LineChart>
+                      </AreaChart>
                     </ResponsiveContainer>
                   )}
                 </div>
               </div>
 
-              <div className="bg-white rounded-2xl border border-gray-100 p-4">
-                <p className="text-xs font-semibold text-apple-charcoal mb-2">
+              <div className="rounded-2xl border border-[#E8EDF5] bg-gradient-to-b from-white to-[#FAFCFF] p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+                <p className="mb-2 text-xs font-semibold tracking-wide text-apple-charcoal">
                   Attendance Breakdown
                 </p>
-                <div className="h-[220px]">
+                <div className="h-[230px]">
                   {payroll.employeeAttendanceBreakdown.every(
                     (item) => item.value === 0,
                   ) ? (
@@ -316,8 +403,10 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                           cy="50%"
                           innerRadius={42}
                           outerRadius={72}
-                          paddingAngle={2}
-                          isAnimationActive={false}
+                          paddingAngle={3}
+                          stroke="none"
+                          isAnimationActive
+                          animationDuration={850}
                         >
                           {payroll.employeeAttendanceBreakdown.map(
                             (entry, index) => (
@@ -332,18 +421,47 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                             ),
                           )}
                         </Pie>
-                        <Tooltip />
+                        <Tooltip
+                          content={
+                            <AnalyticsTooltip
+                              valueFormatter={(value) =>
+                                `${formatPayrollNumber(value)} day(s)`
+                              }
+                            />
+                          }
+                        />
                       </PieChart>
                     </ResponsiveContainer>
                   )}
                 </div>
+                <div className="mt-2 grid grid-cols-2 gap-1.5">
+                  {payroll.employeeAttendanceBreakdown.map((item, index) => (
+                    <div
+                      key={`attendance-legend-${item.name}`}
+                      className="flex items-center gap-2"
+                    >
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{
+                          backgroundColor:
+                            EMPLOYEE_ANALYTICS_COLORS[
+                              index % EMPLOYEE_ANALYTICS_COLORS.length
+                            ],
+                        }}
+                      />
+                      <span className="truncate text-[11px] text-[#64748B]">
+                        {item.name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <div className="bg-white rounded-2xl border border-gray-100 p-4">
-                <p className="text-xs font-semibold text-apple-charcoal mb-2">
+              <div className="rounded-2xl border border-[#E8EDF5] bg-gradient-to-b from-white to-[#FAFCFF] p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+                <p className="mb-2 text-xs font-semibold tracking-wide text-apple-charcoal">
                   Clock-in Time Consistency
                 </p>
-                <div className="h-[220px]">
+                <div className="h-[230px]">
                   {payroll.employeeClockInConsistency.length === 0 ? (
                     <p className="text-sm text-apple-smoke">
                       No clock-in data yet.
@@ -352,38 +470,66 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
                         data={payroll.employeeClockInConsistency}
-                        margin={{ top: 8, right: 8, left: -18, bottom: 8 }}
+                        margin={{ top: 12, right: 10, left: -14, bottom: 0 }}
                       >
+                        <defs>
+                          <linearGradient
+                            id="clockInBar"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="5%"
+                              stopColor="#14B8A6"
+                              stopOpacity={0.95}
+                            />
+                            <stop
+                              offset="95%"
+                              stopColor="#0EA5E9"
+                              stopOpacity={0.85}
+                            />
+                          </linearGradient>
+                        </defs>
                         <CartesianGrid
-                          strokeDasharray="3 3"
+                          strokeDasharray="4 4"
                           vertical={false}
-                          stroke="#F1F5F9"
+                          stroke="#E8EEF6"
                         />
                         <XAxis
                           dataKey="date"
                           axisLine={false}
                           tickLine={false}
-                          tick={{ fill: "#64748B", fontSize: 10 }}
-                          minTickGap={12}
+                          tick={{ fill: "#64748B", fontSize: 11 }}
+                          tickFormatter={chartTickFormatter}
+                          minTickGap={16}
+                          tickMargin={10}
                         />
                         <YAxis
                           axisLine={false}
                           tickLine={false}
-                          tick={{ fill: "#64748B", fontSize: 10 }}
+                          tick={{ fill: "#64748B", fontSize: 11 }}
                           domain={[0, 24]}
+                          tickMargin={8}
                         />
                         <Tooltip
-                          formatter={(
-                            _value: number,
-                            _name: string,
-                            item: { payload?: { timeInLabel?: string } },
-                          ) => [item.payload?.timeInLabel ?? "-", "Time In"]}
-                          labelFormatter={(label: string) => `Date: ${label}`}
+                          cursor={{ fill: "#ECFEFF" }}
+                          content={
+                            <AnalyticsTooltip
+                              valueFormatter={(_value, _name, item) =>
+                                item?.timeInLabel ?? "-"
+                              }
+                            />
+                          }
                         />
                         <Bar
                           dataKey="timeIn"
-                          fill="#10B981"
+                          name="Time In"
+                          fill="url(#clockInBar)"
                           radius={[4, 4, 0, 0]}
+                          maxBarSize={26}
+                          animationDuration={950}
                         />
                       </BarChart>
                     </ResponsiveContainer>

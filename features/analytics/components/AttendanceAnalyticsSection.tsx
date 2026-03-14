@@ -125,7 +125,7 @@ export default function AttendanceAnalyticsSection({
                 Overtime Hours by Branch
               </h3>
 
-              <div className="min-h-[280px] rounded-2xl border border-[#F5F5F7] bg-white p-4">
+              <div className="h-[280px] rounded-2xl border border-[#F5F5F7] bg-white p-4 sm:h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={overtimeByBranch}
@@ -173,7 +173,7 @@ export default function AttendanceAnalyticsSection({
                 Employees per Branch
               </h3>
 
-              <div className="min-h-[280px] rounded-2xl border border-[#F5F5F7] bg-white p-4">
+              <div className="h-[280px] rounded-2xl border border-[#F5F5F7] bg-white p-4 sm:h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={workforceByBranch}
@@ -232,7 +232,7 @@ export default function AttendanceAnalyticsSection({
                 </div>
               </div>
 
-              <div className="min-h-[320px] rounded-2xl border border-[#F5F5F7] bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)] sm:min-h-[360px]">
+              <div className="h-[320px] rounded-2xl border border-[#F5F5F7] bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)] sm:h-[360px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart
                     data={dailyLaborHours}
@@ -329,7 +329,7 @@ export default function AttendanceAnalyticsSection({
                 Top Overtime Performers
               </h3>
 
-              <div className="min-h-[320px] rounded-2xl border border-[#F5F5F7] bg-white p-6 sm:min-h-[360px]">
+              <div className="h-[320px] rounded-2xl border border-[#F5F5F7] bg-white p-6 sm:h-[360px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={topOTEmployees}

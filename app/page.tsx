@@ -22,6 +22,7 @@ export default function HomePage() {
   const [site, setSite] = useState("Unknown Site");
   const [attendancePeriod, setAttendancePeriod] = useState("Current Period");
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [uploadResetSignal, setUploadResetSignal] = useState(0);
 
   const attendance = useAttendanceReview(records);
   const payroll = usePayrollState({
@@ -45,6 +46,7 @@ export default function HomePage() {
     setEmployees([]);
     setSite("Unknown Site");
     setAttendancePeriod("Current Period");
+    setUploadResetSignal((prev) => prev + 1);
     attendance.resetAttendanceReview();
     payroll.resetPayrollState();
     setStep(1);
@@ -116,14 +118,14 @@ export default function HomePage() {
   ]);
 
   return (
-    <div className="min-h-screen bg-apple-snow">
+    <div className="min-h-screen flex flex-col bg-apple-snow">
       <Nav step={step} handleReset={handleReset} />
 
       <div className="md:hidden border-b border-apple-mist bg-white px-5 py-3">
         <StepIndicator current={step} />
       </div>
 
-      <main className="max-w-[1400px] mx-auto px-4 sm:px-8 py-6 sm:py-10 space-y-6 sm:space-y-8">
+      <main className="flex-1 max-w-[1400px] mx-auto w-full px-4 sm:px-8 py-6 sm:py-10 space-y-6 sm:space-y-8">
         <section
           className="animate-fade-up"
           style={{ animationFillMode: "both" }}
@@ -156,7 +158,10 @@ export default function HomePage() {
                 step > 1 ? "opacity-50 pointer-events-none" : ""
               }`}
             >
-              <UploadZone onParsed={handleParsed} />
+              <UploadZone
+                onParsed={handleParsed}
+                resetSignal={uploadResetSignal}
+              />
             </div>
           </div>
         </section>

@@ -223,6 +223,7 @@ export default function AttendanceReviewSection({
                       {[
                         "Date",
                         "Employee",
+                        "Site",
                         "Time1 In",
                         "Time1 Out",
                         "Time2 In",
@@ -230,7 +231,6 @@ export default function AttendanceReviewSection({
                         "OT In",
                         "OT Out",
                         "Hrs",
-                        "Site",
                       ].map((h) => (
                         <th
                           key={h}
@@ -271,6 +271,9 @@ export default function AttendanceReviewSection({
                           <td className="px-4 py-3 text-sm font-semibold text-apple-charcoal">
                             {highlight(row.employee, step2NameFilter)}
                           </td>
+                          <td className="px-4 py-3 text-xs text-apple-smoke">
+                            {row.site.split(" ")[0]}
+                          </td>
                           <td className="px-4 py-3 text-sm  text-apple-ash">
                             {row.time1In ? (
                               row.time1In
@@ -307,9 +310,6 @@ export default function AttendanceReviewSection({
                           </td>
                           <td className="px-4 py-3 text-sm font-semibold text-apple-charcoal">
                             {row.hours.toFixed(2)}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-apple-smoke">
-                            {row.site.split(" ")[0]}
                           </td>
                         </tr>
                       ))

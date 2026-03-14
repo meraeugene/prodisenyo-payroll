@@ -54,7 +54,7 @@ function formatCurrency(value: number): string {
 function shorten(value: string, max = 16): string {
   if (!value) return "";
   if (value.length <= max) return value;
-  return `${value.slice(0, max - 1)}…`;
+  return `${value.slice(0, max - 3)}...`;
 }
 
 function extractBranchName(value: string): string {
@@ -242,7 +242,7 @@ export default function PayrollInsightsDashboard({
           <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
             <ChartCard
               title="Payroll Distribution by Project"
-              height="h-[400px]"
+              height="min-h-[350px]"
             >
               {projectDistributionData.length === 0 ? (
                 <div className="flex h-full items-center justify-center">
@@ -251,8 +251,8 @@ export default function PayrollInsightsDashboard({
                   </p>
                 </div>
               ) : (
-                <div className="grid h-full grid-cols-1 gap-5 md:grid-cols-[1fr_190px]">
-                  <div className="h-full min-h-[240px]">
+                <div className="grid h-full min-h-0 grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_220px]">
+                  <div className="h-[220px] min-h-0 sm:h-[240px] lg:h-full lg:min-h-[260px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -282,21 +282,21 @@ export default function PayrollInsightsDashboard({
                     </ResponsiveContainer>
                   </div>
 
-                  <div className="flex min-h-0 flex-col justify-center gap-3 ">
+                  <div className="min-h-0 pr-1 lg:pr-2">
                     {projectDistributionData.map((item, index) => (
                       <div
                         key={`${item.name}-${index}`}
-                        className="flex items-start gap-2 "
+                        className="flex items-start gap-2 py-1"
                       >
                         <span
                           className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
                           style={{ backgroundColor: item.fill }}
                         />
-                        <div className="min-w-0 flex-1 ">
+                        <div className="min-w-0 flex-1">
                           <p className="truncate text-2xs font-medium text-[#6B7280]">
                             {item.shortName}
                           </p>
-                          <p className="truncate text-sm font-medium  text-[#1D1D1F] ">
+                          <p className="truncate text-sm font-medium text-[#1D1D1F]">
                             {formatCurrency(item.value)}
                           </p>
                         </div>
