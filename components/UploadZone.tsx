@@ -229,7 +229,7 @@ export default function UploadZone({ onParsed, resetSignal }: UploadZoneProps) {
             ${
               hasFiles && !loading
                 ? "bg-apple-charcoal text-white hover:bg-apple-charcoal/90 active:scale-[0.98] shadow-apple"
-                : "bg-apple-charcoal text-white cursor-not-allowed"
+                : "bg-apple-charcoal/80 text-white cursor-not-allowed"
             }
           `}
         >

@@ -45,6 +45,7 @@ export interface PayrollSummary {
 }
 
 export type Step = 1 | 2 | 3 | 4;
+export type ThemeMode = "default" | "prodisenyo" | "light";
 
 export type Step2View = "daily" | "detailed";
 export type Step2Sort = "date-asc" | "date-desc" | "name-asc" | "name-desc";

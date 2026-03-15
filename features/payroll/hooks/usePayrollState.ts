@@ -1,4 +1,5 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import type { AttendanceRecordInput, PayrollRow } from "@/lib/payrollEngine";
 import {
   DEFAULT_DAILY_RATE_BY_ROLE,
@@ -362,7 +363,7 @@ export function usePayrollState({
     setPayrollRoleFilter("ALL");
   }
 
-  function resetPayrollState() {
+    function resetPayrollState() {
     setPayrollRoleRates(DEFAULT_DAILY_RATE_BY_ROLE);
     setPayrollGenerated(false);
     setPayrollTab("payroll");
@@ -500,10 +501,12 @@ export function usePayrollState({
         maximumFractionDigits: 2,
       })} hours`,
     );
+    toast.success("Payroll edit saved", {
+      description: `${editingPayrollRow.worker} updated successfully.`,
+    });
 
     closePayrollEditModal();
   }
-
   function updateLogHour(log: DailyLogRow, valueText: string) {
     const normalized = normalizeNumericInput(valueText);
     const value = Number.parseFloat(normalized);

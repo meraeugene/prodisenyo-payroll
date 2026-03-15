@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo } from "react";
 import {
@@ -27,21 +27,21 @@ interface AttendanceAnalyticsSectionProps {
   records: AttendanceRecord[];
 }
 
-const BLUE_BRANCH_COLORS = [
-  "#1D4ED8",
-  "#2563EB",
-  "#3B82F6",
-  "#60A5FA",
-  "#93C5FD",
-  "#0EA5E9",
-  "#38BDF8",
-  "#0284C7",
-  "#1E40AF",
-  "#1D4ED8",
+const THEME_BRANCH_COLORS = [
+  "rgb(var(--theme-chart-1))",
+  "rgb(var(--theme-chart-2))",
+  "rgb(var(--theme-chart-3))",
+  "rgb(var(--theme-chart-4))",
+  "rgb(var(--theme-chart-5))",
+  "rgb(var(--theme-chart-2))",
+  "rgb(var(--theme-chart-3))",
+  "rgb(var(--theme-chart-4))",
+  "rgb(var(--theme-chart-5))",
+  "rgb(var(--theme-chart-1))",
 ];
 
 function getBranchColor(index: number) {
-  return BLUE_BRANCH_COLORS[index % BLUE_BRANCH_COLORS.length];
+  return THEME_BRANCH_COLORS[index % THEME_BRANCH_COLORS.length];
 }
 
 function extractBranchName(value: string): string {
@@ -52,7 +52,7 @@ function extractBranchName(value: string): string {
 function shorten(value: string, max = 18): string {
   if (!value) return "";
   if (value.length <= max) return value;
-  return `${value.slice(0, max - 1)}…`;
+  return `${value.slice(0, max - 1)}...`;
 }
 
 export default function AttendanceAnalyticsSection({
@@ -101,19 +101,19 @@ export default function AttendanceAnalyticsSection({
       className="animate-fade-up"
       style={{ animationFillMode: "both", animationDelay: "40ms" }}
     >
-      <div className="overflow-hidden rounded-3xl border border-[#F5F5F7] bg-white shadow-sm">
-        <div className="border-b border-[#F5F5F7] px-5 pb-5 pt-6 sm:px-8 sm:pb-6 sm:pt-8">
+      <div className="overflow-hidden rounded-3xl border border-apple-mist bg-white shadow-sm">
+        <div className="border-b border-apple-mist px-5 pb-5 pt-6 sm:px-8 sm:pb-6 sm:pt-8">
           <div className="mb-1 flex flex-wrap items-center gap-2">
-            <span className="font-mono text-[10px] font-semibold uppercase tracking-widest text-[#86868B]">
+            <span className="font-mono text-[10px] font-semibold uppercase tracking-widest text-apple-steel">
               Data Analytics
             </span>
           </div>
 
-          <h2 className="text-xl font-bold tracking-tight text-[#1D1D1F] sm:text-2xl">
+          <h2 className="text-xl font-bold tracking-tight text-apple-charcoal sm:text-2xl">
             Visualized Attendance Data
           </h2>
 
-          <p className="mt-1 text-sm text-[#86868B]">
+          <p className="mt-1 text-sm text-apple-steel">
             Overview of labor distribution and overtime trends across all sites.
           </p>
         </div>
@@ -121,11 +121,11 @@ export default function AttendanceAnalyticsSection({
         <div className="space-y-10 px-5 py-6 sm:px-8 sm:py-8">
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
             <div className="space-y-4">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-[#1D1D1F]">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-apple-charcoal">
                 Overtime Hours by Branch
               </h3>
 
-              <div className="h-[280px] rounded-2xl border border-[#F5F5F7] bg-white p-4 sm:h-[320px]">
+              <div className="h-[280px] rounded-2xl border border-apple-mist bg-white p-4 sm:h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={overtimeByBranch}
@@ -135,22 +135,22 @@ export default function AttendanceAnalyticsSection({
                     <CartesianGrid
                       strokeDasharray="3 3"
                       vertical={false}
-                      stroke="#F1F5F9"
+                      stroke="rgb(var(--theme-chart-grid))"
                     />
                     <XAxis
                       dataKey="shortBranch"
                       axisLine={false}
                       tickLine={false}
                       interval={0}
-                      tick={{ fill: "#010101", fontSize: 11 }}
+                      tick={{ fill: "rgb(var(--theme-chart-axis))", fontSize: 11 }}
                     />
                     <YAxis
                       axisLine={false}
                       tickLine={false}
-                      tick={{ fill: "#010101", fontSize: 11 }}
+                      tick={{ fill: "rgb(var(--theme-chart-axis))", fontSize: 11 }}
                     />
                     <Tooltip
-                      cursor={{ fill: "#EFF6FF" }}
+                      cursor={{ fill: "rgb(var(--theme-chart-cursor))" }}
                       content={(props) => (
                         <ChartTooltip {...props} unit="OT hours" />
                       )}
@@ -169,11 +169,11 @@ export default function AttendanceAnalyticsSection({
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-[#1D1D1F]">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-apple-charcoal">
                 Employees per Branch
               </h3>
 
-              <div className="h-[280px] rounded-2xl border border-[#F5F5F7] bg-white p-4 sm:h-[320px]">
+              <div className="h-[280px] rounded-2xl border border-apple-mist bg-white p-4 sm:h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={workforceByBranch}
@@ -183,22 +183,22 @@ export default function AttendanceAnalyticsSection({
                     <CartesianGrid
                       strokeDasharray="3 3"
                       vertical={false}
-                      stroke="#F1F5F9"
+                      stroke="rgb(var(--theme-chart-grid))"
                     />
                     <XAxis
                       dataKey="shortBranch"
                       axisLine={false}
                       tickLine={false}
                       interval={0}
-                      tick={{ fill: "#010101", fontSize: 11 }}
+                      tick={{ fill: "rgb(var(--theme-chart-axis))", fontSize: 11 }}
                     />
                     <YAxis
                       axisLine={false}
                       tickLine={false}
-                      tick={{ fill: "#010101", fontSize: 11 }}
+                      tick={{ fill: "rgb(var(--theme-chart-axis))", fontSize: 11 }}
                     />
                     <Tooltip
-                      cursor={{ fill: "#EFF6FF" }}
+                      cursor={{ fill: "rgb(var(--theme-chart-cursor))" }}
                       content={(props) => (
                         <ChartTooltip {...props} unit="employees" />
                       )}
@@ -218,21 +218,27 @@ export default function AttendanceAnalyticsSection({
 
             <div className="space-y-4 lg:col-span-2">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-[#1D1D1F]">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-apple-charcoal">
                   Daily Labor Attendance
                 </h3>
 
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-1.5">
-                    <div className="h-2 w-2 rounded-full bg-[#2563EB]" />
-                    <span className="text-[10px] font-medium text-[#2563EB]">
+                    <div
+                      className="h-2 w-2 rounded-full"
+                      style={{ backgroundColor: "rgb(var(--theme-chart-2))" }}
+                    />
+                    <span
+                      className="text-[10px] font-medium"
+                      style={{ color: "rgb(var(--theme-chart-2))" }}
+                    >
                       Current Period
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="h-[320px] rounded-2xl border border-[#F5F5F7] bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)] sm:h-[360px]">
+              <div className="h-[320px] rounded-2xl border border-apple-mist bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)] sm:h-[360px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart
                     data={dailyLaborHours}
@@ -248,12 +254,12 @@ export default function AttendanceAnalyticsSection({
                       >
                         <stop
                           offset="5%"
-                          stopColor="#3B82F6"
+                          stopColor="rgb(var(--theme-chart-3))"
                           stopOpacity={0.25}
                         />
                         <stop
                           offset="95%"
-                          stopColor="#3B82F6"
+                          stopColor="rgb(var(--theme-chart-3))"
                           stopOpacity={0.02}
                         />
                       </linearGradient>
@@ -262,7 +268,7 @@ export default function AttendanceAnalyticsSection({
                     <CartesianGrid
                       strokeDasharray="3 3"
                       vertical={false}
-                      stroke="#F1F5F9"
+                      stroke="rgb(var(--theme-chart-grid))"
                     />
 
                     <XAxis
@@ -270,7 +276,7 @@ export default function AttendanceAnalyticsSection({
                       axisLine={false}
                       tickLine={false}
                       tick={{
-                        fill: "#010101",
+                        fill: "rgb(var(--theme-chart-axis))",
                         fontSize: 10,
                       }}
                       dy={10}
@@ -279,12 +285,12 @@ export default function AttendanceAnalyticsSection({
                     <YAxis
                       axisLine={false}
                       tickLine={false}
-                      tick={{ fill: "#010101", fontSize: 10 }}
+                      tick={{ fill: "rgb(var(--theme-chart-axis))", fontSize: 10 }}
                     />
 
                     <Tooltip
                       cursor={{
-                        stroke: "#3B82F6",
+                        stroke: "rgb(var(--theme-chart-3))",
                         strokeWidth: 2,
                         strokeDasharray: "6 6",
                       }}
@@ -296,24 +302,24 @@ export default function AttendanceAnalyticsSection({
                     <Area
                       type="monotone"
                       dataKey="hours"
-                      stroke="#2563EB"
+                      stroke="rgb(var(--theme-chart-2))"
                       strokeWidth={2}
                       fillOpacity={1}
                       fill="url(#attendanceBlueHours)"
                       dot={{
                         r: 3,
-                        fill: "#2563EB",
+                        fill: "rgb(var(--theme-chart-2))",
                         stroke: "#fff",
                         strokeWidth: 1,
                       }}
                       activeDot={{
                         r: 5,
-                        fill: "#2563EB",
+                        fill: "rgb(var(--theme-chart-2))",
                         stroke: "#fff",
                         strokeWidth: 2,
                         style: {
                           filter:
-                            "drop-shadow(0px 2px 4px rgba(37,99,235,0.25))",
+                            "drop-shadow(0px 2px 4px rgba(var(--theme-chart-2),0.22))",
                         },
                       }}
                       animationBegin={200}
@@ -325,11 +331,11 @@ export default function AttendanceAnalyticsSection({
             </div>
 
             <div className="space-y-4 lg:col-span-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-[#1D1D1F]">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-apple-charcoal">
                 Top Overtime Performers
               </h3>
 
-              <div className="h-[320px] rounded-2xl border border-[#F5F5F7] bg-white p-6 sm:h-[360px]">
+              <div className="h-[320px] rounded-2xl border border-apple-mist bg-white p-6 sm:h-[360px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={topOTEmployees}
@@ -345,14 +351,14 @@ export default function AttendanceAnalyticsSection({
                       axisLine={false}
                       tickLine={false}
                       tick={{
-                        fill: "#010101",
+                        fill: "rgb(var(--theme-chart-axis))",
                         fontSize: 13,
                         fontWeight: 500,
                       }}
                       width={140}
                     />
                     <Tooltip
-                      cursor={{ fill: "#DBEAFE" }}
+                      cursor={{ fill: "rgb(var(--theme-chart-grid))" }}
                       content={(props) => (
                         <ChartTooltip {...props} unit="overtime hrs" />
                       )}
@@ -375,3 +381,4 @@ export default function AttendanceAnalyticsSection({
     </section>
   );
 }
+

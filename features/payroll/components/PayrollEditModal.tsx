@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { X } from "lucide-react";
 import {
@@ -28,7 +28,12 @@ import {
 } from "@/features/payroll/utils/payrollFormatters";
 import { getLogOverrideKey } from "@/features/payroll/utils/payrollMappers";
 
-const EMPLOYEE_ANALYTICS_COLORS = ["#2563EB", "#38BDF8", "#F59E0B", "#10B981"];
+const EMPLOYEE_ANALYTICS_COLORS = [
+  "rgb(var(--theme-chart-2))",
+  "rgb(var(--theme-chart-3))",
+  "rgb(var(--theme-chart-4))",
+  "rgb(var(--theme-chart-5))",
+];
 
 function chartTickFormatter(value: string): string {
   if (!value) return "";
@@ -46,9 +51,9 @@ function AnalyticsTooltip({
   if (!active || !payload || payload.length === 0) return null;
 
   return (
-    <div className="min-w-[148px] rounded-xl border border-[#E5EAF2] bg-white px-3 py-2 shadow-[0_10px_28px_rgba(2,6,23,0.08)]">
+    <div className="min-w-[148px] rounded-xl border border-apple-mist bg-white px-3 py-2 shadow-[0_10px_28px_rgba(2,6,23,0.08)]">
       {label ? (
-        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#6B7280]">
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-apple-smoke">
           {label}
         </p>
       ) : null}
@@ -64,10 +69,12 @@ function AnalyticsTooltip({
             <div key={`${name}-${index}`} className="flex items-center gap-2">
               <span
                 className="h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: entry.color ?? "#2563EB" }}
+                style={{
+                  backgroundColor: entry.color ?? "rgb(var(--theme-chart-2))",
+                }}
               />
-              <span className="text-[11px] text-[#6B7280]">{name}</span>
-              <span className="ml-auto text-[12px] font-semibold text-[#0F172A]">
+              <span className="text-[11px] text-apple-smoke">{name}</span>
+              <span className="ml-auto text-[12px] font-semibold text-apple-charcoal">
                 {valueFormatter
                   ? valueFormatter(numericValue, name, entry.payload)
                   : formatPayrollNumber(numericValue)}
@@ -123,7 +130,7 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                 {editingPayrollRow.worker}
               </h3>
 
-              <span className="text-apple-silver">•</span>
+              <span className="text-apple-silver">&middot;</span>
 
               {/* Role */}
               <span className="px-2.5 py-1 rounded-full bg-apple-charcoal text-xs font-medium text-white">
@@ -131,7 +138,7 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                   "Unknown Role"}
               </span>
 
-              <span className="text-apple-silver">•</span>
+              <span className="text-apple-silver">&middot;</span>
 
               {/* Site */}
               <span className="text-sm ">{editingPayrollRow.site}</span>
@@ -317,12 +324,12 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                           >
                             <stop
                               offset="5%"
-                              stopColor="#2563EB"
+                              stopColor="rgb(var(--theme-chart-2))"
                               stopOpacity={0.24}
                             />
                             <stop
                               offset="95%"
-                              stopColor="#2563EB"
+                              stopColor="rgb(var(--theme-chart-2))"
                               stopOpacity={0.02}
                             />
                           </linearGradient>
@@ -330,13 +337,13 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                         <CartesianGrid
                           strokeDasharray="4 4"
                           vertical={false}
-                          stroke="#E8EEF6"
+                          stroke="rgb(var(--theme-chart-grid))"
                         />
                         <XAxis
                           dataKey="date"
                           axisLine={false}
                           tickLine={false}
-                          tick={{ fill: "#64748B", fontSize: 11 }}
+                          tick={{ fill: "rgb(var(--theme-chart-axis))", fontSize: 11 }}
                           tickFormatter={chartTickFormatter}
                           minTickGap={16}
                           tickMargin={10}
@@ -344,11 +351,11 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                         <YAxis
                           axisLine={false}
                           tickLine={false}
-                          tick={{ fill: "#64748B", fontSize: 11 }}
+                          tick={{ fill: "rgb(var(--theme-chart-axis))", fontSize: 11 }}
                           tickMargin={8}
                         />
                         <Tooltip
-                          cursor={{ stroke: "#BFDBFE", strokeWidth: 1.5 }}
+                          cursor={{ stroke: "#A8CFD2", strokeWidth: 1.5 }}
                           content={
                             <AnalyticsTooltip
                               valueFormatter={(value) =>
@@ -367,10 +374,18 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                         <Line
                           type="monotone"
                           dataKey="hoursWorked"
-                          stroke="#2563EB"
+                          stroke="rgb(var(--theme-chart-2))"
                           strokeWidth={2.4}
-                          dot={{ r: 2.5, fill: "#fff", stroke: "#2563EB" }}
-                          activeDot={{ r: 4, fill: "#2563EB", stroke: "#fff" }}
+                          dot={{
+                            r: 2.5,
+                            fill: "#fff",
+                            stroke: "rgb(var(--theme-chart-2))",
+                          }}
+                          activeDot={{
+                            r: 4,
+                            fill: "rgb(var(--theme-chart-2))",
+                            stroke: "#fff",
+                          }}
                           animationDuration={1100}
                         />
                       </AreaChart>
@@ -447,7 +462,7 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                             ],
                         }}
                       />
-                      <span className="truncate text-[11px] text-[#64748B]">
+                      <span className="truncate text-[11px] text-apple-smoke">
                         {item.name}
                       </span>
                     </div>
@@ -480,12 +495,12 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                           >
                             <stop
                               offset="5%"
-                              stopColor="#14B8A6"
+                              stopColor="rgb(var(--theme-chart-4))"
                               stopOpacity={0.95}
                             />
                             <stop
                               offset="95%"
-                              stopColor="#0EA5E9"
+                              stopColor="rgb(var(--theme-chart-3))"
                               stopOpacity={0.85}
                             />
                           </linearGradient>
@@ -493,13 +508,13 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                         <CartesianGrid
                           strokeDasharray="4 4"
                           vertical={false}
-                          stroke="#E8EEF6"
+                          stroke="rgb(var(--theme-chart-grid))"
                         />
                         <XAxis
                           dataKey="date"
                           axisLine={false}
                           tickLine={false}
-                          tick={{ fill: "#64748B", fontSize: 11 }}
+                          tick={{ fill: "rgb(var(--theme-chart-axis))", fontSize: 11 }}
                           tickFormatter={chartTickFormatter}
                           minTickGap={16}
                           tickMargin={10}
@@ -507,12 +522,12 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                         <YAxis
                           axisLine={false}
                           tickLine={false}
-                          tick={{ fill: "#64748B", fontSize: 11 }}
+                          tick={{ fill: "rgb(var(--theme-chart-axis))", fontSize: 11 }}
                           domain={[0, 24]}
                           tickMargin={8}
                         />
                         <Tooltip
-                          cursor={{ fill: "#ECFEFF" }}
+                          cursor={{ fill: "rgb(var(--theme-chart-cursor))" }}
                           content={
                             <AnalyticsTooltip
                               valueFormatter={(_value, _name, item) =>
@@ -680,3 +695,4 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
     </div>
   );
 }
+

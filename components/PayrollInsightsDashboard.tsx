@@ -23,23 +23,23 @@ interface PayrollInsightsDashboardProps {
   attendanceRows: AttendanceRecordInput[];
 }
 
-const BLUE_BRANCH_COLORS = [
-  "#1D4ED8",
-  "#2563EB",
-  "#3B82F6",
-  "#60A5FA",
-  "#93C5FD",
-  "#0EA5E9",
-  "#38BDF8",
-  "#0284C7",
-  "#1E40AF",
-  "#1D4ED8",
+const THEME_BRANCH_COLORS = [
+  "rgb(var(--theme-chart-1))",
+  "rgb(var(--theme-chart-2))",
+  "rgb(var(--theme-chart-3))",
+  "rgb(var(--theme-chart-4))",
+  "rgb(var(--theme-chart-5))",
+  "rgb(var(--theme-chart-2))",
+  "rgb(var(--theme-chart-3))",
+  "rgb(var(--theme-chart-4))",
+  "rgb(var(--theme-chart-5))",
+  "rgb(var(--theme-chart-1))",
 ];
 
 const STACK_COLORS = {
-  regular: "#2563EB",
-  overtime: "#60A5FA",
-  allowance: "#BFDBFE",
+  regular: "rgb(var(--theme-chart-2))",
+  overtime: "rgb(var(--theme-chart-3))",
+  allowance: "rgb(var(--theme-chart-5))",
 };
 
 function formatCurrency(value: number): string {
@@ -63,7 +63,7 @@ function extractBranchName(value: string): string {
 }
 
 function getBranchColor(index: number) {
-  return BLUE_BRANCH_COLORS[index % BLUE_BRANCH_COLORS.length];
+  return THEME_BRANCH_COLORS[index % THEME_BRANCH_COLORS.length];
 }
 
 type CustomChartTooltipProps = TooltipProps<number, string> & {
@@ -81,9 +81,9 @@ function ChartTooltip({
   if (!active || !payload || payload.length === 0) return null;
 
   return (
-    <div className="rounded-2xl border border-[#E5E7EB] bg-white px-3 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
+    <div className="rounded-2xl border border-apple-mist bg-white px-3 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
       {label ? (
-        <p className="mb-2 text-[14px] font-semibold text-[#1D1D1F]">
+        <p className="mb-2 text-[14px] font-semibold text-apple-charcoal">
           {String(label)}
         </p>
       ) : null}
@@ -102,12 +102,14 @@ function ChartTooltip({
             >
               <span
                 className="h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: entry.color || "#2563EB" }}
+                style={{
+                  backgroundColor: entry.color || "rgb(var(--theme-chart-2))",
+                }}
               />
-              <span className="text-[12px] text-[#6B7280]">
+              <span className="text-[12px] text-apple-smoke">
                 {String(entry.name || entry.dataKey || "")}
               </span>
-              <span className="ml-auto text-[12px] font-semibold text-[#1D1D1F]">
+              <span className="ml-auto text-[12px] font-semibold text-apple-charcoal">
                 {valueFormatter ? valueFormatter(rawValue) : rawValue}
                 {unit ? ` ${unit}` : ""}
               </span>
@@ -133,14 +135,14 @@ function ChartCard({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-[#1D1D1F]">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-apple-charcoal">
           {title}
         </h3>
         {actions}
       </div>
 
       <div
-        className={`${height} w-full rounded-2xl border border-[#F5F5F7] bg-white p-4 sm:p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)]`}
+        className={`${height} w-full rounded-2xl border border-apple-mist bg-white p-4 sm:p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)]`}
       >
         {children}
       </div>
@@ -201,19 +203,19 @@ export default function PayrollInsightsDashboard({
       className="animate-fade-up"
       style={{ animationFillMode: "both", animationDelay: "40ms" }}
     >
-      <div className="overflow-hidden rounded-3xl border border-[#F5F5F7] bg-white shadow-sm">
-        <div className="border-b border-[#F5F5F7] px-5 pb-5 pt-6 sm:px-8 sm:pb-6 sm:pt-8">
+      <div className="overflow-hidden rounded-3xl border border-apple-mist bg-white shadow-sm">
+        <div className="border-b border-apple-mist px-5 pb-5 pt-6 sm:px-8 sm:pb-6 sm:pt-8">
           <div className="mb-1 flex flex-wrap items-center gap-2">
-            <span className="font-mono text-[10px] font-semibold uppercase tracking-widest text-[#86868B]">
+            <span className="font-mono text-[10px] font-semibold uppercase tracking-widest text-apple-steel">
               Data Analytics
             </span>
           </div>
 
-          <h2 className="text-xl font-bold tracking-tight text-[#1D1D1F] sm:text-2xl">
+          <h2 className="text-xl font-bold tracking-tight text-apple-charcoal sm:text-2xl">
             Payroll Insights Dashboard
           </h2>
 
-          <p className="mt-1 text-sm text-[#86868B]">
+          <p className="mt-1 text-sm text-apple-steel">
             Financial analytics and workforce payroll overview for the selected
             pay period.
           </p>
@@ -246,7 +248,7 @@ export default function PayrollInsightsDashboard({
             >
               {projectDistributionData.length === 0 ? (
                 <div className="flex h-full items-center justify-center">
-                  <p className="text-sm text-[#86868B]">
+                  <p className="text-sm text-apple-steel">
                     No project distribution data.
                   </p>
                 </div>
@@ -293,10 +295,10 @@ export default function PayrollInsightsDashboard({
                           style={{ backgroundColor: item.fill }}
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-2xs font-medium text-[#6B7280]">
+                          <p className="truncate text-2xs font-medium text-apple-smoke">
                             {item.shortName}
                           </p>
-                          <p className="truncate text-sm font-medium text-[#1D1D1F]">
+                          <p className="truncate text-sm font-medium text-apple-charcoal">
                             {formatCurrency(item.value)}
                           </p>
                         </div>
@@ -324,13 +326,13 @@ export default function PayrollInsightsDashboard({
                     tickLine={false}
                     width={140}
                     tick={{
-                      fill: "#1D1D1F",
+                      fill: "rgb(var(--theme-chart-axis))",
                       fontSize: 13,
                       fontWeight: 500,
                     }}
                   />
                   <Tooltip
-                    cursor={{ fill: "#DBEAFE" }}
+                    cursor={{ fill: "rgb(var(--theme-chart-grid))" }}
                     content={<ChartTooltip valueFormatter={formatCurrency} />}
                   />
                   <Bar
@@ -357,20 +359,38 @@ export default function PayrollInsightsDashboard({
                 actions={
                   <div className="flex flex-wrap items-center gap-4">
                     <div className="flex items-center gap-1.5">
-                      <div className="h-2 w-2 rounded-full bg-[#2563EB]" />
-                      <span className="text-[11px] font-medium text-[#2563EB]">
+                      <div
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: "rgb(var(--theme-chart-2))" }}
+                      />
+                      <span
+                        className="text-[11px] font-medium"
+                        style={{ color: "rgb(var(--theme-chart-2))" }}
+                      >
                         Regular
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <div className="h-2 w-2 rounded-full bg-[#60A5FA]" />
-                      <span className="text-[11px] font-medium text-[#60A5FA]">
+                      <div
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: "rgb(var(--theme-chart-3))" }}
+                      />
+                      <span
+                        className="text-[11px] font-medium"
+                        style={{ color: "rgb(var(--theme-chart-3))" }}
+                      >
                         Overtime
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <div className="h-2 w-2 rounded-full bg-[#BFDBFE]" />
-                      <span className="text-[11px] font-medium text-[#93C5FD]">
+                      <div
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: "rgb(var(--theme-chart-5))" }}
+                      />
+                      <span
+                        className="text-[11px] font-medium"
+                        style={{ color: "rgb(var(--theme-chart-4))" }}
+                      >
                         Allowance
                       </span>
                     </div>
@@ -386,22 +406,22 @@ export default function PayrollInsightsDashboard({
                     <CartesianGrid
                       strokeDasharray="3 3"
                       vertical={false}
-                      stroke="#F1F5F9"
+                      stroke="rgb(var(--theme-chart-grid))"
                     />
                     <XAxis
                       dataKey="shortProject"
                       axisLine={false}
                       tickLine={false}
                       interval={0}
-                      tick={{ fill: "#010101", fontSize: 12 }}
+                      tick={{ fill: "rgb(var(--theme-chart-axis))", fontSize: 12 }}
                     />
                     <YAxis
                       axisLine={false}
                       tickLine={false}
-                      tick={{ fill: "#010101", fontSize: 12 }}
+                      tick={{ fill: "rgb(var(--theme-chart-axis))", fontSize: 12 }}
                     />
                     <Tooltip
-                      cursor={{ fill: "#EFF6FF" }}
+                      cursor={{ fill: "rgb(var(--theme-chart-cursor))" }}
                       content={<ChartTooltip valueFormatter={formatCurrency} />}
                     />
                     <Bar
@@ -440,3 +460,6 @@ export default function PayrollInsightsDashboard({
     </section>
   );
 }
+
+
+

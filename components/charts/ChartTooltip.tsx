@@ -8,7 +8,7 @@ type Props = {
 export default function ChartTooltip({ active, payload, label, unit }: Props) {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-white text-black p-3 rounded-xl shadow-xl border border-white/10 backdrop-blur-md">
+      <div className="rounded-xl border border-apple-mist bg-white p-3 text-apple-charcoal shadow-xl backdrop-blur-md">
         <p className="text-[10px] uppercase tracking-widest opacity-60 mb-1">
           {label}
         </p>

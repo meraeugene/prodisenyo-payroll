@@ -64,17 +64,17 @@ const config: Config = {
           foreground: "oklch(var(--popover-foreground))",
         },
 
-        // your Apple palette
+        // Prodisenyo teal palette
         apple: {
-          white: "#ffffff",
-          snow: "#f5f5f7",
-          mist: "#ebebeb",
-          silver: "#d2d2d7",
-          steel: "#a1a1a6",
-          smoke: "#6e6e73",
-          ash: "#424245",
-          charcoal: "#1d1d1f",
-          black: "#000000",
+          white: "rgb(var(--apple-white) / <alpha-value>)",
+          snow: "rgb(var(--apple-snow) / <alpha-value>)",
+          mist: "rgb(var(--apple-mist) / <alpha-value>)",
+          silver: "rgb(var(--apple-silver) / <alpha-value>)",
+          steel: "rgb(var(--apple-steel) / <alpha-value>)",
+          smoke: "rgb(var(--apple-smoke) / <alpha-value>)",
+          ash: "rgb(var(--apple-ash) / <alpha-value>)",
+          charcoal: "rgb(var(--apple-charcoal) / <alpha-value>)",
+          black: "rgb(var(--apple-black) / <alpha-value>)",
         },
       },
       fontSize: {

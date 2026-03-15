@@ -14,7 +14,7 @@ import PayrollRateModal from "@/features/payroll/components/PayrollRateModal";
 import PayrollSection from "@/features/payroll/components/PayrollSection";
 import { usePayrollState } from "@/features/payroll/hooks/usePayrollState";
 import type { ParseResult } from "@/lib/parser";
-import type { AttendanceRecord, Employee, Step } from "@/types";
+import type { AttendanceRecord, Employee, Step, ThemeMode } from "@/types";
 
 export default function HomePage() {
   const [step, setStep] = useState<Step>(1);
@@ -23,6 +23,7 @@ export default function HomePage() {
   const [attendancePeriod, setAttendancePeriod] = useState("Current Period");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [uploadResetSignal, setUploadResetSignal] = useState(0);
+  const [theme, setTheme] = useState<ThemeMode>("default");
 
   const attendance = useAttendanceReview(records);
   const payroll = usePayrollState({
@@ -54,9 +55,25 @@ export default function HomePage() {
 
   function handleGeneratePayroll() {
     if (payroll.handleGeneratePayroll()) {
-      setStep(3);
+      setStep(4);
     }
   }
+
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem("theme-mode");
+    if (
+      savedTheme === "default" ||
+      savedTheme === "prodisenyo" ||
+      savedTheme === "light"
+    ) {
+      setTheme(savedTheme);
+    }
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    window.localStorage.setItem("theme-mode", theme);
+  }, [theme]);
 
   useEffect(() => {
     if (step === 2) {
@@ -69,7 +86,7 @@ export default function HomePage() {
       if (event.key === "/") {
         event.preventDefault();
 
-        if (step === 3 && payroll.payrollGenerated) {
+        if (step >= 3 && payroll.payrollGenerated) {
           document.getElementById("searchPayrollEmployee")?.focus();
         } else {
           document.getElementById("searchEmployee")?.focus();
@@ -84,7 +101,7 @@ export default function HomePage() {
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (event.key === "ArrowRight") {
-        if (step === 3 && payroll.payrollGenerated) {
+        if (step >= 3 && payroll.payrollGenerated) {
           payroll.setPayrollPage((page) =>
             Math.min(payroll.payrollTotalPages, page + 1),
           );
@@ -96,7 +113,7 @@ export default function HomePage() {
       }
 
       if (event.key === "ArrowLeft") {
-        if (step === 3 && payroll.payrollGenerated) {
+        if (step >= 3 && payroll.payrollGenerated) {
           payroll.setPayrollPage((page) => Math.max(1, page - 1));
         } else {
           attendance.setRecordsPage((page) => Math.max(1, page - 1));
@@ -119,7 +136,12 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-apple-snow">
-      <Nav step={step} handleReset={handleReset} />
+      <Nav
+        step={step}
+        handleReset={handleReset}
+        theme={theme}
+        onThemeChange={setTheme}
+      />
 
       <div className="md:hidden border-b border-apple-mist bg-white px-5 py-3">
         <StepIndicator current={step} />
