@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import type { Employee, EmployeeCalculated, PayrollConfig } from "@/types";
 import { capitalize, formatNumber } from "@/lib/payroll";
+import { matchesSearchText } from "@/lib/utils";
 import { RateInput } from "./RateInput";
 import { InlineInput } from "./InlineInput";
 import { PageButton } from "./PageButton";
@@ -40,11 +41,10 @@ export default function PayrollTable({
   // }, [employees]);
 
   const filtered = useMemo(() => {
-    const q = query.toLowerCase();
     return calculated.filter((e) =>
       // (deptFilter === "All" || e.dept === deptFilter) &&
       // e.name.toLowerCase().includes(q) || e.dept.toLowerCase().includes(q),
-      e.name.toLowerCase().includes(q),
+      matchesSearchText(e.name, query),
     );
   }, [calculated, query]);
 

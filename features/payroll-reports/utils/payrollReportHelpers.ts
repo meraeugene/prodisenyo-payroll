@@ -8,6 +8,7 @@ import {
   computeBasePay,
 } from "@/features/payroll/utils/payrollSelectors";
 import { normalizeEmployeeNameKey } from "@/features/payroll/utils/payrollMappers";
+import { calculateDailyWorkMinutes } from "@/lib/utils";
 import type {
   AttendanceLogRow,
   EmployeeAttendanceModalData,
@@ -125,16 +126,6 @@ function toMinutes(value: string | null): number {
   return hours * 60 + minutes;
 }
 
-function pairHours(inTime: string | null, outTime: string | null): number {
-  const inMinutes = toMinutes(inTime);
-  const outMinutes = toMinutes(outTime);
-  if (inMinutes < 0 || outMinutes < 0) return 0;
-  let diff = outMinutes - inMinutes;
-  if (diff < 0) diff += 24 * 60;
-  if (diff <= 0 || diff > 16 * 60) return 0;
-  return diff / 60;
-}
-
 export function buildPayrollReportDailyRows(
   logs: AttendanceLogRow[],
 ): DailyLogRow[] {
@@ -157,6 +148,9 @@ export function buildPayrollReportDailyRows(
       time2Out: "",
       otIn: "",
       otOut: "",
+      regularHours: 0,
+      overtimeHours: 0,
+      totalHours: 0,
       hours: 0,
       site,
     };
@@ -216,14 +210,24 @@ export function buildPayrollReportDailyRows(
   }
 
   return Array.from(map.values())
-    .map((row) => ({
-      ...row,
-      hours: roundPayrollReportValue(
-        pairHours(row.time1In || null, row.time1Out || null) +
-          pairHours(row.time2In || null, row.time2Out || null) +
-          pairHours(row.otIn || null, row.otOut || null),
-      ),
-    }))
+    .map((row) => {
+      const minutes = calculateDailyWorkMinutes(row);
+      const regularHours = roundPayrollReportValue(
+        minutes.regularMinutes / 60,
+      );
+      const overtimeHours = roundPayrollReportValue(
+        minutes.overtimeMinutes / 60,
+      );
+      const totalHours = roundPayrollReportValue(minutes.totalMinutes / 60);
+
+      return {
+        ...row,
+        regularHours,
+        overtimeHours,
+        totalHours,
+        hours: totalHours,
+      };
+    })
     .sort((a, b) => {
       const byDate = a.date.localeCompare(b.date);
       if (byDate !== 0) return byDate;

@@ -15,6 +15,17 @@ function normalizeLogRow(log: DailyLogRow): DailyLogRow {
     time2Out: String(log.time2Out ?? ""),
     otIn: String(log.otIn ?? ""),
     otOut: String(log.otOut ?? ""),
+    regularHours: Number.isFinite(log.regularHours)
+      ? Math.round(log.regularHours * 100) / 100
+      : 0,
+    overtimeHours: Number.isFinite(log.overtimeHours)
+      ? Math.round(log.overtimeHours * 100) / 100
+      : 0,
+    totalHours: Number.isFinite(log.totalHours)
+      ? Math.round(log.totalHours * 100) / 100
+      : Number.isFinite(log.hours)
+        ? Math.round(log.hours * 100) / 100
+        : 0,
     hours: Number.isFinite(log.hours) ? Math.round(log.hours * 100) / 100 : 0,
     site: String(log.site ?? ""),
   };

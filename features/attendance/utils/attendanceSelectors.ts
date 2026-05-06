@@ -1,8 +1,10 @@
 import type { AttendanceRecord, DailyLogRow, Step2Sort } from "@/types";
 import {
+  calculateDailyWorkMinutes,
   compareStep2Rows,
   earlierTime,
   laterTime,
+  matchesSearchText,
 } from "@/lib/utils";
 
 export interface AttendanceFilters {
@@ -35,13 +37,6 @@ function forwardPairMinutes(inTime: string, outTime: string): number {
   if (inMinutes < 0 || outMinutes < 0) return 0;
   if (outMinutes <= inMinutes) return 0;
   return outMinutes - inMinutes;
-}
-
-function boundedPairMinutes(inTime: string, outTime: string): number {
-  if (!inTime || !outTime) return 0;
-  const minutes = forwardPairMinutes(inTime, outTime);
-  if (minutes <= 0 || minutes > MAX_SHIFT_MINUTES) return 0;
-  return minutes;
 }
 
 export function inferMinutesFromPunches(times: string[]): number {
@@ -77,6 +72,9 @@ export function buildDailyRows(records: AttendanceRecord[]): DailyLogRow[] {
       time2Out: "",
       otIn: "",
       otOut: "",
+      regularHours: 0,
+      overtimeHours: 0,
+      totalHours: 0,
       hours: 0,
       site: record.site,
     };
@@ -101,14 +99,8 @@ export function buildDailyRows(records: AttendanceRecord[]): DailyLogRow[] {
   }
 
   return Array.from(grouped.values()).map((row) => {
-    // Biometric rule: Time1 IN/OUT is one session, Time2 IN/OUT is another.
-    // Never mix boundaries across sources because that can inflate
-    // impossible overnight totals (for example 14:06 -> 11:38 = 21.53h).
-    const morningMinutes = boundedPairMinutes(row.time1In, row.time1Out);
-    const afternoonMinutes = boundedPairMinutes(row.time2In, row.time2Out);
-    const regularMinutes = morningMinutes + afternoonMinutes;
-    const otMinutes = boundedPairMinutes(row.otIn, row.otOut);
-    const strictMinutes = regularMinutes + otMinutes;
+    const dailyMinutes = calculateDailyWorkMinutes(row);
+    const strictMinutes = dailyMinutes.totalMinutes;
     const inferredMinutes =
       strictMinutes === 0
         ? inferMinutesFromPunches([
@@ -122,10 +114,15 @@ export function buildDailyRows(records: AttendanceRecord[]): DailyLogRow[] {
         : 0;
 
     const minutes = strictMinutes || inferredMinutes;
+    const totalHours = Math.round((minutes / 60) * 100) / 100;
 
     return {
       ...row,
-      hours: Math.round((minutes / 60) * 100) / 100,
+      regularHours: Math.round((dailyMinutes.regularMinutes / 60) * 100) / 100,
+      overtimeHours:
+        Math.round((dailyMinutes.overtimeMinutes / 60) * 100) / 100,
+      totalHours,
+      hours: totalHours,
     };
   });
 }
@@ -152,7 +149,7 @@ export function filterDetailedRecords(
       return false;
     }
     if (dateFilter && record.date !== dateFilter) return false;
-    if (nameFilter && !record.employee.toLowerCase().includes(nameFilter)) {
+    if (nameFilter && !matchesSearchText(record.employee, nameFilter)) {
       return false;
     }
     return true;
@@ -187,7 +184,7 @@ export function filterDailyRows(
       return false;
     }
     if (dateFilter && row.date !== dateFilter) return false;
-    if (nameFilter && !row.employee.toLowerCase().includes(nameFilter)) {
+    if (nameFilter && !matchesSearchText(row.employee, nameFilter)) {
       return false;
     }
     return true;

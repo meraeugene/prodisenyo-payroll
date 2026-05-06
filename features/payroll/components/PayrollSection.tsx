@@ -511,10 +511,6 @@ export default function PayrollSection({
                       Payroll Period: {payrollPeriodLabel}
                     </div>
                   )}
-                  <div className="inline-flex w-full items-center rounded-[10px] border border-sky-200 bg-sky-50 px-3 py-1.5 text-sm font-semibold text-sky-800 sm:w-auto sm:whitespace-nowrap">
-                    Paid Holidays: {payroll.payableHolidayDays} day
-                    {payroll.payableHolidayDays === 1 ? "" : "s"}
-                  </div>
                 </div>
                 <div className="overflow-x-auto rounded-[14px] border border-[#e7ecef] bg-white shadow-[0_10px_24px_rgba(15,23,42,0.04)] [-webkit-overflow-scrolling:touch]">
                   <table className="w-full text-sm table-auto min-w-[1020px]">
@@ -524,8 +520,9 @@ export default function PayrollSection({
                           "Employee",
                           "Role",
                           "Site",
+                          "Total Hours",
                           "Days Worked",
-                          "Rate/Day",
+                          "Rate/Hour",
                           "Total Pay",
                           "Actions",
                         ].map((h) => (
@@ -533,8 +530,9 @@ export default function PayrollSection({
                             key={h}
                             className={`px-4 py-3.5 text-2xs font-semibold uppercase tracking-widest text-[#9babaf] ${
                               h === "#" ||
+                              h === "Total Hours" ||
                               h === "Days Worked" ||
-                              h === "Rate/Day" ||
+                              h === "Rate/Hour" ||
                               h === "Total Pay"
                                 ? "text-right"
                                 : h === "Actions"
@@ -582,17 +580,17 @@ export default function PayrollSection({
                           const employeeDaysWorked =
                             employeeMetrics.payableDays;
                           const employeeTotalPay = employeeMetrics.totalPay;
-                          const employeeDailyRateLabel =
+                          const employeeHourlyRateLabel =
                             employeeMetrics.dailyRates.length <= 1
                               ? formatPayrollNumber(
-                                  employeeMetrics.dailyRates[0] ??
-                                    FIXED_PAY_RATE_PER_DAY,
+                                  (employeeMetrics.dailyRates[0] ??
+                                    FIXED_PAY_RATE_PER_DAY) / 8,
                                 )
                               : "Mixed";
-                          const employeeDailyRateTitle =
+                          const employeeHourlyRateTitle =
                             employeeMetrics.dailyRates.length > 1
-                              ? `Branch rates: ${employeeMetrics.dailyRates
-                                  .map((rate) => formatPayrollNumber(rate))
+                              ? `Branch hourly rates: ${employeeMetrics.dailyRates
+                                  .map((rate) => formatPayrollNumber(rate / 8))
                                   .join(", ")}`
                               : undefined;
 
@@ -615,18 +613,21 @@ export default function PayrollSection({
                                 <p className="text-sm font-semibold text-apple-charcoal">
                                   {siteBreakdown
                                     .map((siteRow) => siteRow.site)
-                                    .join(", ")}
+                                  .join(", ")}
                                 </p>
                               </td>
 
+                              <td className="px-4 py-3 text-sm font-mono text-apple-charcoal text-right">
+                                {formatPayrollNumber(employeeMetrics.totalHours)} hrs
+                              </td>
                               <td className="px-4 py-3 text-sm font-mono text-apple-charcoal text-right">
                                 {formatDaysLabel(employeeDaysWorked)}
                               </td>
                               <td
                                 className="px-4 py-3 text-sm font-mono text-apple-ash text-right"
-                                title={employeeDailyRateTitle}
+                                title={employeeHourlyRateTitle}
                               >
-                                {employeeDailyRateLabel}
+                                {employeeHourlyRateLabel}
                               </td>
                               <td className="px-4 py-3 text-sm font-mono text-apple-charcoal font-semibold text-right">
                                 {formatPayrollNumber(employeeTotalPay)}
@@ -693,6 +694,7 @@ export default function PayrollSection({
                         <td className="px-4 py-3" />
                         <td className="px-4 py-3" />
                         <td className="px-4 py-3" />
+                        <td className="px-4 py-3" />
                         <td className="px-4 py-3 text-right text-sm font-mono font-semibold text-white">
                           {formatPayrollNumber(groupedPayrollTotals.pay)}
                         </td>
@@ -704,14 +706,22 @@ export default function PayrollSection({
               </>
             ) : (
               <div className="overflow-x-auto rounded-[14px] border border-[#e7ecef] bg-white shadow-[0_10px_24px_rgba(15,23,42,0.04)] [-webkit-overflow-scrolling:touch]">
-                <table className="w-full text-sm table-auto min-w-[760px]">
+                <table className="w-full text-sm table-auto min-w-[900px]">
                   <thead>
                     <tr className="border-b border-[#edf1f3] bg-[#fafbfc]">
-                      {["Worker", "Role", "Site", "Date", "Hours"].map((h) => (
+                      {[
+                        "Worker",
+                        "Role",
+                        "Site",
+                        "Date",
+                        "Regular Hours",
+                        "OT Hours",
+                        "Total Hours",
+                      ].map((h) => (
                         <th
                           key={h}
                           className={`px-4 py-3.5 text-2xs font-semibold uppercase tracking-widest text-[#9babaf] ${
-                            h === "Hours" ? "text-right" : "text-left"
+                            h.includes("Hours") ? "text-right" : "text-left"
                           }`}
                         >
                           {h}
@@ -723,7 +733,7 @@ export default function PayrollSection({
                     {payroll.payrollPreviewLogs.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={5}
+                          colSpan={7}
                           className="px-4 py-6 text-center text-sm text-apple-smoke"
                         >
                           No attendance logs match the selected filters.
@@ -749,6 +759,12 @@ export default function PayrollSection({
                           </td>
                           <td className="px-4 py-3 text-right text-sm font-mono text-apple-ash">
                             {formatPayrollNumber(record.hours)}
+                          </td>
+                          <td className="px-4 py-3 text-right text-sm font-mono text-apple-ash">
+                            {formatPayrollNumber(record.overtimeHours ?? 0)}
+                          </td>
+                          <td className="px-4 py-3 text-right text-sm font-mono text-apple-ash">
+                            {formatPayrollNumber(record.totalHours ?? record.hours)}
                           </td>
                         </tr>
                       ))

@@ -1,4 +1,5 @@
 import type { AttendanceRecord, Employee, LogSource } from "@/types";
+import { calculateDailyWorkMinutes } from "@/lib/utils";
 
 export interface ParseResult {
   employees: Employee[];
@@ -99,7 +100,7 @@ async function parseSpreadsheet(file: File): Promise<ParseResult> {
     });
 
     return {
-      employees: buildEmployeesFromAccumulators(stats),
+      employees: buildEmployeesFromRecords(records),
       records,
       period,
       site,
@@ -131,6 +132,90 @@ async function parseSpreadsheet(file: File): Promise<ParseResult> {
   };
 }
 
+function buildEmployeesFromRecords(records: AttendanceRecord[]): Employee[] {
+  const dailyRows = new Map<
+    string,
+    {
+      employee: string;
+      date: string;
+      time1In: string;
+      time1Out: string;
+      time2In: string;
+      time2Out: string;
+      otIn: string;
+      otOut: string;
+    }
+  >();
+
+  for (const record of records) {
+    const key = `${record.employee.trim().toLowerCase()}|||${record.date}`;
+    const row = dailyRows.get(key) ?? {
+      employee: record.employee,
+      date: record.date,
+      time1In: "",
+      time1Out: "",
+      time2In: "",
+      time2Out: "",
+      otIn: "",
+      otOut: "",
+    };
+
+    if (record.source === "Time1" && record.type === "IN") {
+      row.time1In = earlierTime(row.time1In, record.logTime);
+    } else if (record.source === "Time1" && record.type === "OUT") {
+      row.time1Out = laterTime(row.time1Out, record.logTime);
+    } else if (record.source === "Time2" && record.type === "IN") {
+      row.time2In = earlierTime(row.time2In, record.logTime);
+    } else if (record.source === "Time2" && record.type === "OUT") {
+      row.time2Out = laterTime(row.time2Out, record.logTime);
+    } else if (record.source === "OT" && record.type === "IN") {
+      row.otIn = earlierTime(row.otIn, record.logTime);
+    } else if (record.source === "OT" && record.type === "OUT") {
+      row.otOut = laterTime(row.otOut, record.logTime);
+    }
+
+    dailyRows.set(key, row);
+  }
+
+  const employees = new Map<
+    string,
+    {
+      name: string;
+      days: Set<string>;
+      regularHours: number;
+      otHours: number;
+    }
+  >();
+
+  for (const row of dailyRows.values()) {
+    const key = row.employee.trim().toLowerCase();
+    const current = employees.get(key) ?? {
+      name: row.employee,
+      days: new Set<string>(),
+      regularHours: 0,
+      otHours: 0,
+    };
+    const minutes = calculateDailyWorkMinutes(row);
+
+    current.days.add(row.date);
+    current.regularHours += minutes.regularMinutes / 60;
+    current.otHours += minutes.overtimeMinutes / 60;
+    employees.set(key, current);
+  }
+
+  return Array.from(employees.values())
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((employee, index) => ({
+      id: index + 1,
+      name: employee.name,
+      days: employee.days.size,
+      regularHours: roundTo(employee.regularHours, 2),
+      otHours: roundTo(employee.otHours, 2),
+      customRateDay: null,
+      customRateHour: null,
+    }));
+}
+
 async function parsePDF(_file: File): Promise<ParseResult> {
   throw new Error(
     "PDF parsing requires server-side processing. Please export your attendance report as XLS or CSV from your biometric system.",
@@ -141,6 +226,20 @@ function getFileBaseName(filename: string): string {
   const dot = filename.lastIndexOf(".");
   const base = dot > 0 ? filename.slice(0, dot) : filename;
   return base.trim() || "Unknown Site";
+}
+
+function compareTimeText(a: string, b: string): number {
+  return a.localeCompare(b);
+}
+
+function earlierTime(current: string, incoming: string): string {
+  if (!current) return incoming;
+  return compareTimeText(incoming, current) < 0 ? incoming : current;
+}
+
+function laterTime(current: string, incoming: string): string {
+  if (!current) return incoming;
+  return compareTimeText(incoming, current) > 0 ? incoming : current;
 }
 
 interface DateRange {
@@ -166,6 +265,11 @@ interface DetailParseResult {
   accumulators: Map<string, EmployeeAccumulator>;
   removedEntries: number;
   periodRange: DateRange | null;
+}
+
+interface AttendanceBlock {
+  start: number;
+  employee: string;
 }
 
 function extractEmployeesFromRows(
@@ -342,11 +446,10 @@ function extractAttendanceRecords(
   const accumulators = new Map<string, EmployeeAccumulator>();
   let removedEntries = 0;
 
-  const maxCols = rows.reduce((max, row) => Math.max(max, row.length), 0);
+  const blocks = findAttendanceBlocks(rows);
 
-  for (let start = 0; start < maxCols; start += 15) {
-    const employee = findEmployeeName(rows, start);
-    if (!employee) continue;
+  for (const block of blocks) {
+    const { start, employee } = block;
 
     for (const row of rows) {
       const dateValue = row[start];
@@ -392,8 +495,46 @@ function extractAttendanceRecords(
   return { records, accumulators, removedEntries, periodRange };
 }
 
+function findAttendanceBlocks(rows: unknown[][]): AttendanceBlock[] {
+  const blocks = new Map<number, AttendanceBlock>();
+
+  for (let r = 0; r < Math.min(30, rows.length); r++) {
+    const row = rows[r];
+    for (let c = 0; c < row.length; c++) {
+      if (!isDateWeekHeader(row[c])) continue;
+
+      const employee = findEmployeeName(rows, c);
+      if (employee && !blocks.has(c)) {
+        blocks.set(c, { start: c, employee });
+      }
+    }
+  }
+
+  if (blocks.size > 0) {
+    return Array.from(blocks.values()).sort((a, b) => a.start - b.start);
+  }
+
+  return findFixedWidthAttendanceBlocks(rows);
+}
+
+function findFixedWidthAttendanceBlocks(rows: unknown[][]): AttendanceBlock[] {
+  const blocks: AttendanceBlock[] = [];
+  const maxCols = rows.reduce((max, row) => Math.max(max, row.length), 0);
+
+  for (let start = 0; start < maxCols; start += 15) {
+    const employee = findEmployeeName(rows, start);
+    if (employee) blocks.push({ start, employee });
+  }
+
+  return blocks;
+}
+
+function isDateWeekHeader(value: unknown): boolean {
+  return /^date\s*\/\s*week(day)?$/i.test(String(value).trim());
+}
+
 function findEmployeeName(rows: unknown[][], start: number): string | null {
-  for (let r = 0; r < Math.min(8, rows.length); r++) {
+  for (let r = 0; r < Math.min(20, rows.length); r++) {
     const row = rows[r];
     for (let c = start; c < Math.min(start + 14, row.length - 1); c++) {
       if (String(row[c]).trim().toLowerCase() === "name") {

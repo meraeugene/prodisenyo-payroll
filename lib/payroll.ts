@@ -5,17 +5,28 @@ import type {
   PayrollConfig,
   PayrollSummary,
 } from "@/types";
+import { calculatePayroll, roundPayrollCalculation } from "@/lib/payrollEngine";
 
 export function calculateEmployee(
   emp: Employee,
   config: PayrollConfig,
 ): EmployeeCalculated {
   const rateDay = emp.customRateDay ?? config.defaultRateDay;
-  const rateHour = emp.customRateHour ?? config.defaultRateHour;
-  const dayPay = rateDay * emp.days;
-  const hourPay = rateHour * emp.regularHours;
-  const otPay = rateHour * config.otMultiplier * emp.otHours;
-  const grossPay = dayPay + otPay;
+  const calculated = roundPayrollCalculation(
+    calculatePayroll({
+      dailyRate: rateDay,
+      regularHours: emp.regularHours,
+      overtimeHours: emp.otHours,
+      overtimeMultiplier: config.otMultiplier,
+      allowance: 0,
+      deductions: 0,
+    }),
+  );
+  const rateHour = calculated.hourlyRate;
+  const dayPay = calculated.regularPay;
+  const hourPay = calculated.regularPay;
+  const otPay = calculated.overtimePay;
+  const grossPay = calculated.grossPay;
 
   return { ...emp, rateDay, rateHour, dayPay, hourPay, otPay, grossPay };
 }

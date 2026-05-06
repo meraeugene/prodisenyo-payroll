@@ -3,6 +3,8 @@
 import type { PayrollRunStatus } from "@/types/database";
 import type { Database } from "@/types/database";
 import type { AttendanceRecordInput, PayrollRow } from "@/lib/payrollEngine";
+import { calculatePayroll, roundPayrollCalculation } from "@/lib/payrollEngine";
+import { DEFAULT_OVERTIME_MULTIPLIER } from "@/lib/payrollConfig";
 import type {
   PayrollOvertimeEntry,
   PayrollRowOverride,
@@ -759,9 +761,6 @@ export async function savePayrollRunAction(input: SavePayrollRunInput) {
       allocatedBasePayByRowId.get(snapshot.row.id) ?? 0,
     );
     const holidayPay = round2(holidayPayByRowId.get(snapshot.row.id) ?? 0);
-    const regularPayExcludingHoliday = round2(
-      Math.max(0, allocatedBasePay + snapshot.leavePay),
-    );
 
     const approvedOvertime =
       approvedOvertimeByRowKey.get(
@@ -769,36 +768,37 @@ export async function savePayrollRunAction(input: SavePayrollRunInput) {
       ) ?? null;
 
     const approvedOvertimeHours = round2(approvedOvertime?.totalHours ?? 0);
-    const approvedOvertimePay = round2(approvedOvertime?.totalPay ?? 0);
-    const totalPay = round2(
-      Math.max(
-        0,
-        regularPayExcludingHoliday +
-          holidayPay +
-          approvedOvertimePay -
-          snapshot.cashAdvance,
-      ),
+    const allowance = round2(holidayPay + snapshot.leavePay);
+    const calculation = roundPayrollCalculation(
+      calculatePayroll({
+        dailyRate: snapshot.ratePerDay,
+        regularHours: snapshot.row.hoursWorked,
+        overtimeHours: approvedOvertimeHours,
+        overtimeMultiplier: DEFAULT_OVERTIME_MULTIPLIER,
+        allowance,
+        deductions: {
+          cashAdvance: snapshot.cashAdvance,
+        },
+      }),
     );
 
     return {
       ...snapshot,
       allocatedBasePay,
       holidayPay,
-      regularPayExcludingHoliday,
+      allowance,
+      regularPayExcludingHoliday: calculation.regularPay,
       approvedOvertimeHours,
-      approvedOvertimePay,
-      totalPay,
+      approvedOvertimePay: calculation.overtimePay,
+      totalDeductions: calculation.totalDeductions,
+      totalPay: calculation.netPay,
       approvedOvertimeAdjustmentIds: approvedOvertime?.adjustmentIds ?? [],
     };
   });
 
   const grossTotal = round2(
     normalizedRowSnapshots.reduce(
-      (sum, snapshot) =>
-        sum +
-        snapshot.regularPayExcludingHoliday +
-        snapshot.holidayPay +
-        snapshot.approvedOvertimePay,
+      (sum, snapshot) => sum + snapshot.totalPay + snapshot.totalDeductions,
       0,
     ),
   );
@@ -1016,8 +1016,8 @@ export async function savePayrollRunAction(input: SavePayrollRunInput) {
     rate_per_day: snapshot.ratePerDay,
     regular_pay: snapshot.regularPayExcludingHoliday,
     overtime_pay: snapshot.approvedOvertimePay,
-    holiday_pay: snapshot.holidayPay,
-    deductions_total: snapshot.cashAdvance,
+    holiday_pay: snapshot.allowance,
+    deductions_total: snapshot.totalDeductions,
     total_pay: snapshot.totalPay,
   }));
 
@@ -1348,7 +1348,9 @@ export async function approveOvertimeAdjustmentAction(adjustmentId: string) {
   ) {
     const { data: item, error: itemError } = await database
       .from("payroll_run_items")
-      .select("id, overtime_hours, overtime_pay, total_pay")
+      .select(
+        "id, hours_worked, overtime_hours, rate_per_day, regular_pay, overtime_pay, holiday_pay, deductions_total, total_pay",
+      )
       .eq("payroll_run_id", runId)
       .eq("employee_name", adjustment.employee_name)
       .eq("role_code", adjustment.role_code)
@@ -1363,21 +1365,27 @@ export async function approveOvertimeAdjustmentAction(adjustmentId: string) {
         .single();
 
       if (!runError && run) {
+        const previousTotalPay = item.total_pay ?? 0;
+        const previousOvertimePay = item.overtime_pay ?? 0;
         const overtimeHours = round2(
           (item.overtime_hours ?? 0) + (adjustment.quantity ?? 0),
         );
-        const overtimePay = round2(
-          (item.overtime_pay ?? 0) + (adjustment.amount ?? 0),
+        const calculation = roundPayrollCalculation(
+          calculatePayroll({
+            dailyRate: item.rate_per_day ?? 0,
+            regularHours: item.hours_worked ?? 0,
+            overtimeHours,
+            overtimeMultiplier: DEFAULT_OVERTIME_MULTIPLIER,
+            allowance: item.holiday_pay ?? 0,
+            deductions: item.deductions_total ?? 0,
+          }),
         );
-        const totalPay = round2(
-          (item.total_pay ?? 0) + (adjustment.amount ?? 0),
-        );
-        const grossTotal = round2(
-          (run.gross_total ?? 0) + (adjustment.amount ?? 0),
-        );
-        const netTotal = round2(
-          (run.net_total ?? 0) + (adjustment.amount ?? 0),
-        );
+        const overtimePay = calculation.overtimePay;
+        const totalPay = calculation.netPay;
+        const grossDelta = round2(overtimePay - previousOvertimePay);
+        const netDelta = round2(totalPay - previousTotalPay);
+        const grossTotal = round2((run.gross_total ?? 0) + grossDelta);
+        const netTotal = round2((run.net_total ?? 0) + netDelta);
 
         const { error: updateItemError } = await database
           .from("payroll_run_items")
@@ -1437,7 +1445,7 @@ export async function approveOvertimeAdjustmentAction(adjustmentId: string) {
             .from("payroll_run_daily_totals")
             .update({
               total_pay: round2(
-                (existingDailyTotal.total_pay ?? 0) + (adjustment.amount ?? 0),
+                (existingDailyTotal.total_pay ?? 0) + netDelta,
               ),
               hours_worked: round2(
                 (existingDailyTotal.hours_worked ?? 0) +
@@ -1461,7 +1469,7 @@ export async function approveOvertimeAdjustmentAction(adjustmentId: string) {
               site_name: adjustment.site_name,
               payout_date: payoutDate,
               hours_worked: round2(adjustment.quantity ?? 0),
-              total_pay: round2(adjustment.amount ?? 0),
+              total_pay: netDelta,
             });
 
           if (insertDailyTotalError) {

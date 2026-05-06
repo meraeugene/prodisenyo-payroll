@@ -66,6 +66,9 @@ export interface DailyLogRow {
   time2Out: string;
   otIn: string;
   otOut: string;
+  regularHours: number;
+  overtimeHours: number;
+  totalHours: number;
   hours: number;
   site: string;
 }

@@ -7,12 +7,39 @@ import {
   type RoleCode,
 } from "@/lib/payrollConfig";
 
+export type PayrollDeductionsInput =
+  | number
+  | Array<number | null | undefined>
+  | Record<string, number | null | undefined>
+  | null
+  | undefined;
+
+export interface CalculatePayrollInput {
+  dailyRate: number | null | undefined;
+  regularHours: number | null | undefined;
+  overtimeHours: number | null | undefined;
+  overtimeMultiplier?: number | null;
+  allowance?: number | null;
+  deductions?: PayrollDeductionsInput;
+}
+
+export interface PayrollCalculation {
+  hourlyRate: number;
+  regularPay: number;
+  overtimePay: number;
+  grossPay: number;
+  totalDeductions: number;
+  netPay: number;
+}
+
 export interface AttendanceRecordInput {
   name: string;
   role: string;
   site: string;
   date: string;
   hours: number;
+  overtimeHours?: number;
+  totalHours?: number;
 }
 
 export interface PayrollRow {
@@ -28,6 +55,9 @@ export interface PayrollRow {
   rate: number;
   regularPay: number;
   overtimePay: number;
+  allowance?: number;
+  grossPay?: number;
+  totalDeductions?: number;
   totalPay: number;
 }
 
@@ -96,21 +126,98 @@ function roundTo(value: number, decimals = 2): number {
   return Math.round(value * multiplier) / multiplier;
 }
 
+function toNonNegativeNumber(value: number | null | undefined): number {
+  const numericValue = Number(value ?? 0);
+  return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : 0;
+}
+
+function sumDeductions(deductions: PayrollDeductionsInput): number {
+  if (typeof deductions === "number") {
+    return toNonNegativeNumber(deductions);
+  }
+
+  if (Array.isArray(deductions)) {
+    return deductions.reduce<number>(
+      (sum, deduction) => sum + toNonNegativeNumber(deduction),
+      0,
+    );
+  }
+
+  if (deductions && typeof deductions === "object") {
+    return Object.values(deductions).reduce<number>(
+      (sum, deduction) => sum + toNonNegativeNumber(deduction),
+      0,
+    );
+  }
+
+  return 0;
+}
+
+export function calculatePayroll(input: CalculatePayrollInput): PayrollCalculation {
+  const dailyRate = toNonNegativeNumber(input.dailyRate);
+  const regularHours = toNonNegativeNumber(input.regularHours);
+  const overtimeHours = toNonNegativeNumber(input.overtimeHours);
+  const overtimeMultiplier =
+    Number.isFinite(Number(input.overtimeMultiplier)) &&
+    Number(input.overtimeMultiplier) >= 0
+      ? Number(input.overtimeMultiplier)
+      : DEFAULT_OVERTIME_MULTIPLIER;
+  const allowance = toNonNegativeNumber(input.allowance);
+  const totalDeductions = sumDeductions(input.deductions);
+  const hourlyRate = dailyRate / HOURS_PER_DAY;
+  const regularPay = regularHours * hourlyRate;
+  const overtimePay = overtimeHours * hourlyRate * overtimeMultiplier;
+  const grossPay = regularPay + overtimePay + allowance;
+  const netPay = grossPay - totalDeductions;
+
+  return {
+    hourlyRate,
+    regularPay,
+    overtimePay,
+    grossPay,
+    totalDeductions,
+    netPay,
+  };
+}
+
+export function roundPayrollCalculation(
+  calculation: PayrollCalculation,
+): PayrollCalculation {
+  return {
+    hourlyRate: roundTo(calculation.hourlyRate),
+    regularPay: roundTo(calculation.regularPay),
+    overtimePay: roundTo(calculation.overtimePay),
+    grossPay: roundTo(calculation.grossPay),
+    totalDeductions: roundTo(calculation.totalDeductions),
+    netPay: roundTo(calculation.netPay),
+  };
+}
+
 export function recalculatePayrollRow(
   row: PayrollRow,
   overtimeMultiplier = DEFAULT_OVERTIME_MULTIPLIER,
 ): PayrollRow {
-  const rate = row.customRate ?? row.defaultRate;
-  const regularPay = row.hoursWorked * rate;
-  const overtimePay = row.overtimeHours * rate * overtimeMultiplier;
-  const totalPay = regularPay + overtimePay;
+  const rate = toNonNegativeNumber(row.customRate ?? row.defaultRate);
+  const calculation = roundPayrollCalculation(
+    calculatePayroll({
+      dailyRate: rate * HOURS_PER_DAY,
+      regularHours: row.hoursWorked,
+      overtimeHours: row.overtimeHours,
+      overtimeMultiplier,
+      allowance: 0,
+      deductions: 0,
+    }),
+  );
 
   return {
     ...row,
     rate: roundTo(rate),
-    regularPay: roundTo(regularPay),
-    overtimePay: roundTo(overtimePay),
-    totalPay: roundTo(totalPay),
+    regularPay: calculation.regularPay,
+    overtimePay: calculation.overtimePay,
+    allowance: 0,
+    grossPay: calculation.grossPay,
+    totalDeductions: calculation.totalDeductions,
+    totalPay: calculation.netPay,
   };
 }
 
@@ -160,7 +267,8 @@ export function generatePayroll(
 
   const rows = Array.from(grouped.values()).map((group) => {
     const dailyRate = getDailyRateForRole(group.role, roleRates);
-    const defaultRate = roundTo(dailyRate / hoursPerDay);
+    const defaultRate =
+      Number.isFinite(dailyRate) && dailyRate > 0 ? dailyRate / hoursPerDay : 0;
 
     const baseRow: PayrollRow = {
       id: `${group.role}|||${group.worker}|||${group.site}`,
@@ -175,6 +283,9 @@ export function generatePayroll(
       rate: defaultRate,
       regularPay: 0,
       overtimePay: 0,
+      allowance: 0,
+      grossPay: 0,
+      totalDeductions: 0,
       totalPay: 0,
     };
 

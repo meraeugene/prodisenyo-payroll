@@ -1,12 +1,22 @@
 ﻿import type { AttendanceRecordInput, PayrollRow } from "@/lib/payrollEngine";
-import { generatePayroll, recalculatePayrollRow } from "@/lib/payrollEngine";
+import {
+  calculatePayroll,
+  generatePayroll,
+  recalculatePayrollRow,
+  roundPayrollCalculation,
+} from "@/lib/payrollEngine";
 import {
   DEFAULT_OVERTIME_MULTIPLIER,
   HOURS_PER_DAY,
   normalizeRoleCode,
   type RoleCode,
 } from "@/lib/payrollConfig";
-import { compareStep2Rows, earliestNonEmptyTime, pairMinutes } from "@/lib/utils";
+import {
+  calculateDailyWorkMinutes,
+  compareStep2Rows,
+  earliestNonEmptyTime,
+  matchesSearchText,
+} from "@/lib/utils";
 import type { DailyLogRow, Step2Sort } from "@/types";
 import {
   parseNonNegativeOrFallback,
@@ -87,15 +97,22 @@ export interface CombinedBranchPayResult {
 
 export function computeDaysWorked(totalHours: number): number {
   if (!Number.isFinite(totalHours) || totalHours <= 0) return 0;
-  return Math.floor(totalHours / FULL_WORKDAY_HOURS);
+  return round2(totalHours / FULL_WORKDAY_HOURS);
 }
 
 export function computeBasePay(
   totalHours: number,
   dailyRatePerDay = FIXED_PAY_RATE_PER_DAY,
 ): number {
-  const daysWorked = computeDaysWorked(totalHours);
-  return round2(daysWorked * dailyRatePerDay);
+  return roundPayrollCalculation(
+    calculatePayroll({
+      dailyRate: dailyRatePerDay,
+      regularHours: totalHours,
+      overtimeHours: 0,
+      allowance: 0,
+      deductions: 0,
+    }),
+  ).regularPay;
 }
 
 export function allocateCombinedBranchPay(
@@ -123,16 +140,12 @@ export function allocateCombinedBranchPay(
   );
 
   for (const entry of breakdown) {
-    const fullDayHours =
-      computeDaysWorked(entry.hoursWorked) * FULL_WORKDAY_HOURS;
-    entry.payableHours = round2(fullDayHours);
+    entry.payableHours = round2(entry.hoursWorked);
   }
 
   for (const entry of breakdown) {
     entry.payableDays = round2(entry.payableHours / FULL_WORKDAY_HOURS);
-    entry.basePay = round2(
-      (entry.payableHours / FULL_WORKDAY_HOURS) * entry.dailyRatePerDay,
-    );
+    entry.basePay = computeBasePay(entry.payableHours, entry.dailyRatePerDay);
   }
 
   const totalBasePay = round2(
@@ -237,13 +250,19 @@ export function mapDailyRowsToAttendanceInputs(
   return dailyRows
     .map((row) => {
       const identity = parsePayrollIdentity(row.employee);
+      const dailyMinutes = calculateDailyWorkMinutes(row);
+      const regularHours = round2(dailyMinutes.regularMinutes / 60);
+      const overtimeHours = round2(dailyMinutes.overtimeMinutes / 60);
+      const totalHours = round2(dailyMinutes.totalMinutes / 60);
 
       return {
         name: identity.name,
         role: identity.role,
         site: row.site,
         date: row.date,
-        hours: row.hours,
+        hours: regularHours,
+        overtimeHours,
+        totalHours,
       };
     })
     .filter(
@@ -400,7 +419,7 @@ export function filterPayrollRows(
 
     if (dateFilter && !row.date.includes(dateFilter)) return false;
 
-    if (nameFilter && !row.worker.toLowerCase().includes(nameFilter)) {
+    if (nameFilter && !matchesSearchText(row.worker, nameFilter)) {
       return false;
     }
 
@@ -434,7 +453,7 @@ export function filterPayrollLogs(
 
     if (dateFilter && record.date !== dateFilter) return false;
 
-    if (nameFilter && !record.name.toLowerCase().includes(nameFilter)) {
+    if (nameFilter && !matchesSearchText(record.name, nameFilter)) {
       return false;
     }
 
@@ -521,6 +540,9 @@ export function buildEditingPayrollLogs(
         time2Out: "",
         otIn: "",
         otOut: "",
+        regularHours: 0,
+        overtimeHours: 0,
+        totalHours: 0,
         hours: 0,
         site: "",
       },
@@ -541,13 +563,16 @@ export function buildEditingPayrollSummary(
     };
   }
 
-  const attendanceDays = editingPayrollLogs.filter((log) => log.hours > 0).length;
+  const attendanceDays = editingPayrollLogs.filter((log) => log.totalHours > 0).length;
   const absenceDays = Math.max(editingPayrollLogs.length - attendanceDays, 0);
-  const regularHours = attendanceDays * HOURS_PER_DAY;
-  const otNormalHours = editingPayrollLogs.reduce((sum, log) => {
-    if (!log.otIn || !log.otOut) return sum;
-    return sum + pairMinutes(log.otIn, log.otOut) / 60;
-  }, 0);
+  const regularHours = editingPayrollLogs.reduce(
+    (sum, log) => sum + log.regularHours,
+    0,
+  );
+  const otNormalHours = editingPayrollLogs.reduce(
+    (sum, log) => sum + log.overtimeHours,
+    0,
+  );
 
   return {
     attendanceDays,
@@ -564,9 +589,11 @@ export function applyLogHourOverrides(
 ): DailyLogRow[] {
   return editingPayrollLogs.map((log) => {
     const key = getLogKey(log);
+    const hours = logHourOverrides[key] ?? log.hours;
     return {
       ...log,
-      hours: logHourOverrides[key] ?? log.hours,
+      hours,
+      totalHours: hours,
     };
   });
 }
@@ -657,9 +684,15 @@ export function buildPayrollEditPreview(
   const effectiveHourlyRate = round2(
     nextCustomRate ?? editingPayrollRow.defaultRate,
   );
-  const regularPay = computeBasePay(
-    nextHours,
-    effectiveHourlyRate * FULL_WORKDAY_HOURS,
+  const calculation = roundPayrollCalculation(
+    calculatePayroll({
+      dailyRate: effectiveHourlyRate * FULL_WORKDAY_HOURS,
+      regularHours: nextHours,
+      overtimeHours: nextOvertime,
+      overtimeMultiplier: DEFAULT_OVERTIME_MULTIPLIER,
+      allowance: 0,
+      deductions: 0,
+    }),
   );
 
   return {
@@ -670,9 +703,12 @@ export function buildPayrollEditPreview(
     customRate: nextCustomRate,
     defaultRate: editingPayrollRow.defaultRate,
     rate: effectiveHourlyRate,
-    regularPay,
-    overtimePay: 0,
-    totalPay: regularPay,
+    regularPay: calculation.regularPay,
+    overtimePay: calculation.overtimePay,
+    allowance: 0,
+    grossPay: calculation.grossPay,
+    totalDeductions: calculation.totalDeductions,
+    totalPay: calculation.netPay,
   };
 }
 

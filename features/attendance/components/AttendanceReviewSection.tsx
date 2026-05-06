@@ -207,7 +207,7 @@ export default function AttendanceReviewSection({
           {records.length > 0 ? (
             step2View === "daily" ? (
               <div className="w-full overflow-x-auto overflow-y-visible rounded-[14px] border border-[#e7ecef] bg-white shadow-[0_10px_24px_rgba(15,23,42,0.04)] [-webkit-overflow-scrolling:touch]">
-                <table className="min-w-[1100px] w-full text-sm table-auto">
+                <table className="min-w-[1250px] w-full text-sm table-auto">
                   <thead>
                     <tr className="border-b border-[#edf1f3] bg-[#fafbfc]">
                       {[
@@ -220,7 +220,9 @@ export default function AttendanceReviewSection({
                         "Time2 Out",
                         "OT In",
                         "OT Out",
-                        "Hrs",
+                        "Regular Hours",
+                        "OT Hours",
+                        "Total Hours",
                       ].map((h) => (
                         <th
                           key={h}
@@ -234,7 +236,7 @@ export default function AttendanceReviewSection({
                   <tbody>
                     {previewDailyRows.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="py-10">
+                        <td colSpan={12} className="py-10">
                           <div className="flex flex-col items-center justify-center text-center gap-3 text-apple-steel">
                             <Search size={22} className="text-apple-silver" />
 
@@ -299,7 +301,13 @@ export default function AttendanceReviewSection({
                             {row.otOut ? formatLogTime(row.otOut) : "--:--"}
                           </td>
                           <td className="px-4 py-3 text-sm font-semibold text-apple-charcoal">
-                            {row.hours.toFixed(2)}
+                            {row.regularHours.toFixed(2)}
+                          </td>
+                          <td className="px-4 py-3 text-sm font-semibold text-apple-charcoal">
+                            {row.overtimeHours.toFixed(2)}
+                          </td>
+                          <td className="px-4 py-3 text-sm font-semibold text-apple-charcoal">
+                            {row.totalHours.toFixed(2)}
                           </td>
                         </tr>
                       ))

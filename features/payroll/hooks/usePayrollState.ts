@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { AttendanceRecordInput, PayrollRow } from "@/lib/payrollEngine";
+import { calculatePayroll, roundPayrollCalculation } from "@/lib/payrollEngine";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import {
   DEFAULT_DAILY_RATE_BY_ROLE,
+  DEFAULT_OVERTIME_MULTIPLIER,
   ROLE_CODES,
   type RoleCode,
 } from "@/lib/payrollConfig";
 import { exportPayrollToExcel } from "@/lib/payrollExport";
+import { calculateDailyWorkMinutes } from "@/lib/utils";
 import type { DailyLogRow, Step2Sort } from "@/types";
 import { buildVisiblePages } from "@/features/shared/pagination";
 import {
@@ -816,12 +819,18 @@ export function usePayrollState({
       }
 
       return preparedRows.map((entry) => {
-        const basePay = entry.basePay;
         const holidayPay = holidayPayByRowId.get(entry.row.id) ?? 0;
-        const regularPay = round2(basePay + holidayPay + entry.leavePay);
+        const allowance = round2(holidayPay + entry.leavePay);
         const overtimeHours = round2(entry.approvedOvertimeHours);
-        const totalPay = round2(
-          Math.max(0, regularPay + entry.approvedOvertimePay - entry.cashAdvance),
+        const calculation = roundPayrollCalculation(
+          calculatePayroll({
+            dailyRate: entry.ratePerDay,
+            regularHours: entry.row.hoursWorked,
+            overtimeHours,
+            overtimeMultiplier: DEFAULT_OVERTIME_MULTIPLIER,
+            allowance,
+            deductions: entry.cashAdvance,
+          }),
         );
 
         return {
@@ -830,9 +839,16 @@ export function usePayrollState({
           rate: entry.effectiveHourlyRate,
           customRate: entry.row.customRate,
           overtimeHours,
-          regularPay,
-          overtimePay: round2(entry.approvedOvertimePay),
-          totalPay,
+          regularPay: calculation.regularPay,
+          overtimePay: calculation.overtimePay,
+          allowance: round2(
+            calculation.grossPay -
+              calculation.regularPay -
+              calculation.overtimePay,
+          ),
+          grossPay: calculation.grossPay,
+          totalDeductions: calculation.totalDeductions,
+          totalPay: calculation.netPay,
         };
       });
     },
@@ -944,6 +960,16 @@ export function usePayrollState({
     () => calculateTotalEditedLogHours(editingPayrollLogsForAnalytics),
     [editingPayrollLogsForAnalytics],
   );
+  const regularEditedLogHours = useMemo(
+    () =>
+      round2(
+        editingPayrollLogsForAnalytics.reduce(
+          (sum, log) => sum + calculateDailyWorkMinutes(log).regularMinutes / 60,
+          0,
+        ),
+      ),
+    [editingPayrollLogsForAnalytics],
+  );
 
   const employeeDailyHoursTrend = useMemo(
     () => buildEmployeeDailyHoursTrend(editingPayrollLogsForAnalytics),
@@ -966,9 +992,9 @@ export function usePayrollState({
         editingPayrollRow,
         payrollEditDraft,
         hasLogHourOverrides,
-        totalEditedLogHours,
+        regularEditedLogHours,
       ),
-    [editingPayrollRow, payrollEditDraft, hasLogHourOverrides, totalEditedLogHours],
+    [editingPayrollRow, payrollEditDraft, hasLogHourOverrides, regularEditedLogHours],
   );
 
   const payrollPages = useMemo(
@@ -995,7 +1021,7 @@ export function usePayrollState({
       return;
     }
 
-    const nextHoursText = String(totalEditedLogHours);
+    const nextHoursText = String(regularEditedLogHours);
     if (payrollEditDraft.hoursWorked === nextHoursText) return;
 
     setPayrollEditDraft((prev) =>
@@ -1005,7 +1031,7 @@ export function usePayrollState({
     payrollEditDraft,
     editingPayrollRowId,
     hasLogHourOverrides,
-    totalEditedLogHours,
+    regularEditedLogHours,
   ]);
 
   useEffect(() => {
@@ -1225,7 +1251,7 @@ export function usePayrollState({
     const existingOverride = payrollOverrides[editingPayrollRow.id];
 
     const nextHours = hasLogHourOverrides
-      ? totalEditedLogHours
+      ? regularEditedLogHours
       : parseNonNegativeOrFallback(
           payrollEditDraft.hoursWorked,
           editingPayrollRow.hoursWorked,

@@ -27,6 +27,7 @@ import {
 } from "@/features/payroll/hooks/usePayrollState";
 import { buildDailyRows } from "@/features/attendance/utils/attendanceSelectors";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { calculateDailyWorkMinutes } from "@/lib/utils";
 
 const STORAGE_KEY = "prodisenyo-dashboard-ui-state-v2";
 const LEGACY_STORAGE_KEY = "prodisenyo-dashboard-state-v1";
@@ -158,9 +159,9 @@ function buildEmployeesFromRecords(records: AttendanceRecord[]): Employee[] {
 
     current.days.add(row.date);
 
-    const otHours =
-      (row.otIn && row.otOut ? Math.max(0, row.hours - 8) : 0) || 0;
-    const regularHours = Math.max(0, row.hours - otHours);
+    const dailyMinutes = calculateDailyWorkMinutes(row);
+    const regularHours = dailyMinutes.regularMinutes / 60;
+    const otHours = dailyMinutes.overtimeMinutes / 60;
 
     current.regularHours += regularHours;
     current.otHours += otHours;

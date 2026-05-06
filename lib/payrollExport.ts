@@ -20,7 +20,10 @@ export function exportPayrollToExcel(rows: PayrollRow[], filename?: string): voi
     "Overtime Hours": row.overtimeHours,
     "Regular Pay": row.regularPay,
     "Overtime Pay": row.overtimePay,
-    "Total Pay": row.totalPay,
+    Allowance: row.allowance ?? 0,
+    "Gross Pay": row.grossPay ?? row.regularPay + row.overtimePay + (row.allowance ?? 0),
+    Deductions: row.totalDeductions ?? 0,
+    "Net Pay": row.totalPay,
   }));
 
   const worksheet = XLSX.utils.json_to_sheet(records);
