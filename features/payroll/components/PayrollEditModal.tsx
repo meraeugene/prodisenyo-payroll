@@ -15,9 +15,11 @@ import type { DailyLogRow } from "@/types";
 import type { UsePayrollStateResult } from "@/features/payroll/hooks/usePayrollState";
 import type {
   PayrollCashAdvanceEntry,
+  PayrollDeductionEntry,
   PayrollOvertimeEntry,
   PayrollPaidLeaveEntry,
 } from "@/features/payroll/types";
+import type { AppRole } from "@/types/database";
 import {
   extractSiteName,
   formatLogTime,
@@ -53,11 +55,15 @@ import {
 
 interface PayrollEditModalProps {
   payroll: UsePayrollStateResult;
+  currentUserRole: AppRole | null;
 }
 
 const ALL_REPORT_LOGS_PAGE_SIZE = 7;
 
-export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
+export default function PayrollEditModal({
+  payroll,
+  currentUserRole,
+}: PayrollEditModalProps) {
   const { currentAttendanceImportId, attendancePeriod } = useAppState();
   const { editingPayrollRow, editingPayrollSourceRow, payrollEditDraft } =
     payroll;
@@ -71,6 +77,11 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
   const [overtimeNotes, setOvertimeNotes] = useState("");
   const [paidLeaveDaysInput, setPaidLeaveDaysInput] = useState("");
   const [paidLeaveNotes, setPaidLeaveNotes] = useState("");
+  const [sssGsisInput, setSssGsisInput] = useState("");
+  const [philHealthInput, setPhilHealthInput] = useState("");
+  const [pagIbigInput, setPagIbigInput] = useState("");
+  const [withholdingTaxInput, setWithholdingTaxInput] = useState("");
+  const [otherDeductionsInput, setOtherDeductionsInput] = useState("");
   const [cashAdvanceEntries, setCashAdvanceEntries] = useState<
     PayrollCashAdvanceEntry[]
   >([]);
@@ -80,11 +91,15 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
   const [paidLeaveEntries, setPaidLeaveEntries] = useState<
     PayrollPaidLeaveEntry[]
   >([]);
+  const [deductionEntries, setDeductionEntries] = useState<
+    PayrollDeductionEntry[]
+  >([]);
   const [isSavingChanges, setIsSavingChanges] = useState(false);
   const [overtimeValidationMessage, setOvertimeValidationMessage] = useState<
     string | null
   >(null);
   const [allReportLogsPage, setAllReportLogsPage] = useState(1);
+  const isPayrollManager = currentUserRole === "payroll_manager";
 
   useEffect(() => {
     setActiveAdjustmentForm(null);
@@ -95,12 +110,38 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
     setOvertimeNotes("");
     setPaidLeaveDaysInput("");
     setPaidLeaveNotes("");
+    const deductionEntry =
+      payroll.editingPayrollAdjustments.deductionEntries[0] ?? null;
+    setSssGsisInput(
+      deductionEntry ? normalizeNumericInput(String(deductionEntry.sssGsis)) : "",
+    );
+    setPhilHealthInput(
+      deductionEntry
+        ? normalizeNumericInput(String(deductionEntry.philHealth))
+        : "",
+    );
+    setPagIbigInput(
+      deductionEntry ? normalizeNumericInput(String(deductionEntry.pagIbig)) : "",
+    );
+    setWithholdingTaxInput(
+      deductionEntry
+        ? normalizeNumericInput(String(deductionEntry.withholdingTax))
+        : "",
+    );
+    setOtherDeductionsInput(
+      deductionEntry
+        ? normalizeNumericInput(String(deductionEntry.otherDeductions))
+        : "",
+    );
     setCashAdvanceEntries([
       ...payroll.editingPayrollAdjustments.cashAdvanceEntries,
     ]);
     setOvertimeEntries([...payroll.editingPayrollAdjustments.overtimeEntries]);
     setPaidLeaveEntries([
       ...payroll.editingPayrollAdjustments.paidLeaveEntries,
+    ]);
+    setDeductionEntries([
+      ...payroll.editingPayrollAdjustments.deductionEntries,
     ]);
     setAllReportLogsPage(1);
   }, [editingPayrollRow?.id, payroll.editingPayrollAdjustments]);
@@ -333,16 +374,48 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
     (sum, entry) => sum + entry.pay,
     0,
   );
-  const adjustedTotalPay = roundPayrollCalculation(
+  const deductionTotals = deductionEntries.reduce(
+    (totals, entry) => ({
+      sssGsis: totals.sssGsis + entry.sssGsis,
+      philHealth: totals.philHealth + entry.philHealth,
+      pagIbig: totals.pagIbig + entry.pagIbig,
+      withholdingTax: totals.withholdingTax + entry.withholdingTax,
+      otherDeductions: totals.otherDeductions + entry.otherDeductions,
+    }),
+    {
+      sssGsis: 0,
+      philHealth: 0,
+      pagIbig: 0,
+      withholdingTax: 0,
+      otherDeductions: 0,
+    },
+  );
+  const payrollDeductionsAmount = round2(
+    deductionTotals.sssGsis +
+      deductionTotals.philHealth +
+      deductionTotals.pagIbig +
+      deductionTotals.withholdingTax +
+      deductionTotals.otherDeductions,
+  );
+  const finalPayrollCalculation = roundPayrollCalculation(
     calculatePayroll({
       dailyRate: currentRatePerDay,
       regularHours: regularWorkedHours,
       overtimeHours: biometricOvertimeHours + approvedOvertimeHours,
       overtimeMultiplier: DEFAULT_OVERTIME_MULTIPLIER,
       allowance: paidHolidayPay + paidLeavePay,
-      deductions: cashAdvanceAmount,
+      deductions: {
+        cashAdvance: cashAdvanceAmount,
+        sssGsis: deductionTotals.sssGsis,
+        philHealth: deductionTotals.philHealth,
+        pagIbig: deductionTotals.pagIbig,
+        withholdingTax: deductionTotals.withholdingTax,
+        otherDeductions: deductionTotals.otherDeductions,
+      },
     }),
-  ).netPay;
+  );
+  const grossPay = finalPayrollCalculation.grossPay;
+  const adjustedTotalPay = finalPayrollCalculation.netPay;
 
   function addCashAdvance() {
     const amount = parseNonNegativeValue(cashAdvanceInput);
@@ -422,6 +495,40 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
     setActiveAdjustmentForm(null);
   }
 
+  function saveReductions() {
+    if (!isPayrollManager) return;
+
+    const entry: PayrollDeductionEntry = {
+      id: deductionEntries[0]?.id ?? createEntryId(),
+      sssGsis: round2(parseNonNegativeValue(sssGsisInput)),
+      philHealth: round2(parseNonNegativeValue(philHealthInput)),
+      pagIbig: round2(parseNonNegativeValue(pagIbigInput)),
+      withholdingTax: round2(parseNonNegativeValue(withholdingTaxInput)),
+      otherDeductions: round2(parseNonNegativeValue(otherDeductionsInput)),
+    };
+    const total =
+      entry.sssGsis +
+      entry.philHealth +
+      entry.pagIbig +
+      entry.withholdingTax +
+      entry.otherDeductions;
+
+    setDeductionEntries(total > 0 ? [entry] : []);
+    setActiveAdjustmentForm(null);
+  }
+
+  function clearReductions() {
+    if (!isPayrollManager) return;
+
+    setDeductionEntries([]);
+    setSssGsisInput("");
+    setPhilHealthInput("");
+    setPagIbigInput("");
+    setWithholdingTaxInput("");
+    setOtherDeductionsInput("");
+    setActiveAdjustmentForm(null);
+  }
+
   function removeCashAdvance(id: string) {
     setCashAdvanceEntries((prev) => prev.filter((entry) => entry.id !== id));
   }
@@ -462,6 +569,9 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
         cashAdvanceEntries,
         overtimeEntries: [...approvedEntries, ...result.entries],
         paidLeaveEntries,
+        deductionEntries: isPayrollManager
+          ? deductionEntries
+          : payroll.editingPayrollAdjustments.deductionEntries,
       });
 
       if (result.entries.length > 0) {
@@ -540,11 +650,14 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
               </div>
               <div className="max-w-[720px] space-y-4 p-4 sm:p-5">
                 {/* ─── BUTTONS (SAME WIDTH) ─── */}
-                <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-3">
+                <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-4">
                   {[
                     { key: "cashAdvance", label: "Cash Advance" },
                     { key: "overtime", label: "Overtime" },
                     { key: "paidLeave", label: "Paid Leave" },
+                    ...(isPayrollManager
+                      ? [{ key: "reductions", label: "Reductions" }]
+                      : []),
                   ].map((btn) => {
                     const active = activeAdjustmentForm === btn.key;
 
@@ -781,10 +894,96 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                   </form>
                 )}
 
+                {/* REDUCTIONS */}
+                {activeAdjustmentForm === "reductions" && isPayrollManager && (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      saveReductions();
+                    }}
+                    className="w-full rounded-xl border border-gray-200 bg-apple-snow/40 p-4 space-y-4"
+                  >
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                      Reductions are deducted from gross pay and can only be
+                      edited by the payroll manager.
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {[
+                        {
+                          label: "SSS / GSIS",
+                          value: sssGsisInput,
+                          setter: setSssGsisInput,
+                        },
+                        {
+                          label: "PhilHealth",
+                          value: philHealthInput,
+                          setter: setPhilHealthInput,
+                        },
+                        {
+                          label: "Pag-IBIG",
+                          value: pagIbigInput,
+                          setter: setPagIbigInput,
+                        },
+                        {
+                          label: "Withholding Tax",
+                          value: withholdingTaxInput,
+                          setter: setWithholdingTaxInput,
+                        },
+                        {
+                          label: "Other deductions",
+                          value: otherDeductionsInput,
+                          setter: setOtherDeductionsInput,
+                        },
+                      ].map((field) => (
+                        <div key={field.label} className="flex flex-col">
+                          <label className="text-xs text-gray-500 mb-1">
+                            {field.label}
+                          </label>
+                          <input
+                            type="number"
+                            placeholder="0"
+                            value={field.value}
+                            onChange={(e) =>
+                              field.setter(
+                                normalizeNumericInput(e.target.value),
+                              )
+                            }
+                            className="h-10 px-3 rounded-xl border border-apple-charcoal/40 hover:border-apple-charcoal focus:outline-none text-sm font-semibold focus:bg-white focus:border-black"
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setActiveAdjustmentForm(null)}
+                        className="h-9 w-full rounded-lg px-4 text-sm text-gray-500 hover:bg-gray-100 sm:w-auto"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={clearReductions}
+                        className="h-9 w-full rounded-lg border border-red-200 px-4 text-sm font-semibold text-red-600 hover:bg-red-50 sm:w-auto"
+                      >
+                        Clear Reductions
+                      </button>
+                      <button
+                        type="submit"
+                        className="h-9 w-full rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white hover:bg-emerald-800 sm:w-auto"
+                      >
+                        Save Reductions
+                      </button>
+                    </div>
+                  </form>
+                )}
+
                 {/* ─── ENTRIES ─── */}
                 {(cashAdvanceEntries.length > 0 ||
                   overtimeEntries.length > 0 ||
-                  paidLeaveEntries.length > 0) && (
+                  paidLeaveEntries.length > 0 ||
+                  deductionEntries.length > 0) && (
                   <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-2">
                     {cashAdvanceEntries.map((entry) => (
                       <div
@@ -883,6 +1082,29 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                         </button>
                       </div>
                     ))}
+
+                    {deductionEntries.length > 0 && (
+                      <div className="flex items-center gap-3 text-sm">
+                        <span className="font-semibold text-red-600">
+                          Reductions -{formatPeso(payrollDeductionsAmount)}
+                        </span>
+                        <span className="text-xs text-gray-500 truncate">
+                          SSS/GSIS {formatPeso(deductionTotals.sssGsis)},{" "}
+                          PhilHealth {formatPeso(deductionTotals.philHealth)},{" "}
+                          Pag-IBIG {formatPeso(deductionTotals.pagIbig)}, Tax{" "}
+                          {formatPeso(deductionTotals.withholdingTax)}, Other{" "}
+                          {formatPeso(deductionTotals.otherDeductions)}
+                        </span>
+                        {isPayrollManager ? (
+                          <button
+                            onClick={clearReductions}
+                            className="ml-auto p-1 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition"
+                          >
+                            <X size={14} />
+                          </button>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1329,12 +1551,37 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                     {formatPeso(paidLeavePay)}
                   </span>
                 </div>
+                <div className="border-t border-apple-mist pt-2 mt-2 flex items-center justify-between gap-3 text-sm">
+                  <span className="font-semibold text-apple-charcoal">
+                    Gross Pay
+                  </span>
+                  <span className="font-mono font-semibold text-apple-charcoal text-right">
+                    {formatPeso(grossPay)}
+                  </span>
+                </div>
                 <div className="flex items-center justify-between gap-3 text-sm">
                   <span className="text-apple-charcoal">- Cash Advance</span>
                   <span className="font-mono font-semibold text-red-600 text-right">
                     {formatPeso(cashAdvanceAmount)}
                   </span>
                 </div>
+                {[
+                  ["SSS / GSIS", deductionTotals.sssGsis],
+                  ["PhilHealth", deductionTotals.philHealth],
+                  ["Pag-IBIG", deductionTotals.pagIbig],
+                  ["Withholding Tax", deductionTotals.withholdingTax],
+                  ["Other deductions", deductionTotals.otherDeductions],
+                ].map(([label, amount]) => (
+                  <div
+                    key={label}
+                    className="flex items-center justify-between gap-3 text-sm"
+                  >
+                    <span className="text-apple-charcoal">- {label}</span>
+                    <span className="font-mono font-semibold text-red-600 text-right">
+                      {formatPeso(Number(amount))}
+                    </span>
+                  </div>
+                ))}
                 {belowFullDayThreshold && (
                   <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
                     Worked hours are below 8.00, so no full paid day is counted

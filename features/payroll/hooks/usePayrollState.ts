@@ -44,6 +44,7 @@ import {
 import type {
   PayrollAdjustmentSet,
   PayrollCashAdvanceEntry,
+  PayrollDeductionEntry,
   LogHourOverride,
   LogHourOverrideMap,
   LogHourOverrideValue,
@@ -61,6 +62,7 @@ const EMPTY_ADJUSTMENTS: PayrollAdjustmentSet = {
   cashAdvanceEntries: [],
   overtimeEntries: [],
   paidLeaveEntries: [],
+  deductionEntries: [],
 };
 
 function sanitizeEditableHours(
@@ -93,6 +95,42 @@ function normalizeLogHourOverrideValue(
         ? fallback.overtimeHours
         : sanitizeEditableHours(value.overtimeHours),
   };
+}
+
+function sumDeductionEntries(entries?: PayrollDeductionEntry[]): number {
+  return round2(
+    (entries ?? []).reduce(
+      (sum, entry) =>
+        sum +
+        entry.sssGsis +
+        entry.philHealth +
+        entry.pagIbig +
+        entry.withholdingTax +
+        entry.otherDeductions,
+      0,
+    ),
+  );
+}
+
+function sanitizeDeductionEntries(
+  entries?: PayrollDeductionEntry[],
+): PayrollDeductionEntry[] {
+  return (entries ?? [])
+    .map((entry) => ({
+      id: entry.id || `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`,
+      sssGsis: sanitizeEditableHours(entry.sssGsis, Number.POSITIVE_INFINITY),
+      philHealth: sanitizeEditableHours(entry.philHealth, Number.POSITIVE_INFINITY),
+      pagIbig: sanitizeEditableHours(entry.pagIbig, Number.POSITIVE_INFINITY),
+      withholdingTax: sanitizeEditableHours(
+        entry.withholdingTax,
+        Number.POSITIVE_INFINITY,
+      ),
+      otherDeductions: sanitizeEditableHours(
+        entry.otherDeductions,
+        Number.POSITIVE_INFINITY,
+      ),
+    }))
+    .filter((entry) => sumDeductionEntries([entry]) > 0);
 }
 
 function toIsoDate(year: number, month: number, day: number): string {
@@ -672,9 +710,11 @@ export function usePayrollState({
               logHours: existingOverride?.logHours,
               cashAdvanceEntries: existingOverride?.cashAdvanceEntries ?? [],
               paidLeaveEntries: existingOverride?.paidLeaveEntries ?? [],
+              deductionEntries: existingOverride?.deductionEntries ?? [],
               cashAdvanceTotal: existingOverride?.cashAdvanceTotal ?? 0,
               paidLeaveEntriesPayTotal:
                 existingOverride?.paidLeaveEntriesPayTotal ?? 0,
+              deductionsTotal: existingOverride?.deductionsTotal ?? 0,
               overtimeEntries: mergedEntries,
               overtimeEntriesPayTotal: sumOvertimePay(
                 mergedEntries,
@@ -787,6 +827,7 @@ export function usePayrollState({
       cashAdvanceEntries: override?.cashAdvanceEntries ?? [],
       overtimeEntries: override?.overtimeEntries ?? [],
       paidLeaveEntries: override?.paidLeaveEntries ?? [],
+      deductionEntries: override?.deductionEntries ?? [],
     };
   }, [editingPayrollRowId, payrollOverrides]);
 
@@ -814,6 +855,10 @@ export function usePayrollState({
           Number.isFinite(override?.cashAdvanceTotal)
             ? round2(override?.cashAdvanceTotal ?? 0)
             : sumCashAdvance(override?.cashAdvanceEntries);
+        const deductions =
+          Number.isFinite(override?.deductionsTotal)
+            ? round2(override?.deductionsTotal ?? 0)
+            : sumDeductionEntries(override?.deductionEntries);
         const effectiveHourlyRate = round2(ratePerDay / FULL_WORKDAY_HOURS);
 
         return {
@@ -823,6 +868,7 @@ export function usePayrollState({
           approvedOvertimePay,
           approvedOvertimeHours,
           cashAdvance,
+          deductions,
           ratePerDay,
           effectiveHourlyRate,
         };
@@ -866,7 +912,10 @@ export function usePayrollState({
             overtimeHours,
             overtimeMultiplier: DEFAULT_OVERTIME_MULTIPLIER,
             allowance,
-            deductions: entry.cashAdvance,
+            deductions: {
+              cashAdvance: entry.cashAdvance,
+              payrollDeductions: entry.deductions,
+            },
           }),
         );
 
@@ -1342,6 +1391,9 @@ export function usePayrollState({
     const nextPaidLeaveEntries = sanitizePaidLeaveEntries(
       adjustments?.paidLeaveEntries ?? existingOverride?.paidLeaveEntries,
     );
+    const nextDeductionEntries = sanitizeDeductionEntries(
+      adjustments?.deductionEntries ?? existingOverride?.deductionEntries,
+    );
     const nextCashAdvanceTotal = sumCashAdvance(nextCashAdvanceEntries);
     const nextOvertimeEntriesPayTotal = sumOvertimePay(
       nextOvertimeEntries,
@@ -1352,6 +1404,7 @@ export function usePayrollState({
       "approved",
     );
     const nextPaidLeaveEntriesPayTotal = sumPaidLeavePay(nextPaidLeaveEntries);
+    const nextDeductionsTotal = sumDeductionEntries(nextDeductionEntries);
 
     setPayrollOverrides((prev) => ({
       ...prev,
@@ -1364,10 +1417,12 @@ export function usePayrollState({
         cashAdvanceEntries: nextCashAdvanceEntries,
         overtimeEntries: nextOvertimeEntries,
         paidLeaveEntries: nextPaidLeaveEntries,
+        deductionEntries: nextDeductionEntries,
         cashAdvanceTotal: nextCashAdvanceTotal,
         overtimeEntriesPayTotal: nextOvertimeEntriesPayTotal,
         overtimeEntriesHoursTotal: nextOvertimeEntriesHoursTotal,
         paidLeaveEntriesPayTotal: nextPaidLeaveEntriesPayTotal,
+        deductionsTotal: nextDeductionsTotal,
       },
     }));
 

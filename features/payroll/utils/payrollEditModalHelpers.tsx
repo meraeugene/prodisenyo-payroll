@@ -6,6 +6,7 @@ export type AdjustmentFormType =
   | "cashAdvance"
   | "overtime"
   | "paidLeave"
+  | "reductions"
   | null;
 
 export function parseNonNegativeValue(value: string): number {

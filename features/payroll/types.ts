@@ -29,10 +29,20 @@ export interface PayrollPaidLeaveEntry {
   notes: string;
 }
 
+export interface PayrollDeductionEntry {
+  id: string;
+  sssGsis: number;
+  philHealth: number;
+  pagIbig: number;
+  withholdingTax: number;
+  otherDeductions: number;
+}
+
 export interface PayrollAdjustmentSet {
   cashAdvanceEntries: PayrollCashAdvanceEntry[];
   overtimeEntries: PayrollOvertimeEntry[];
   paidLeaveEntries: PayrollPaidLeaveEntry[];
+  deductionEntries: PayrollDeductionEntry[];
 }
 
 export interface PayrollRowOverride {
@@ -44,10 +54,12 @@ export interface PayrollRowOverride {
   cashAdvanceEntries?: PayrollCashAdvanceEntry[];
   overtimeEntries?: PayrollOvertimeEntry[];
   paidLeaveEntries?: PayrollPaidLeaveEntry[];
+  deductionEntries?: PayrollDeductionEntry[];
   cashAdvanceTotal?: number;
   overtimeEntriesPayTotal?: number;
   overtimeEntriesHoursTotal?: number;
   paidLeaveEntriesPayTotal?: number;
+  deductionsTotal?: number;
 }
 
 export interface PayrollEditSummary {

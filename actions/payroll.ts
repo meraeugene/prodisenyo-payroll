@@ -331,12 +331,27 @@ function computeRowAdjustmentTotals(override: PayrollRowOverride | undefined) {
           0,
         ),
   );
+  const deductions = round2(
+    Number.isFinite(override?.deductionsTotal)
+      ? (override?.deductionsTotal ?? 0)
+      : (override?.deductionEntries ?? []).reduce(
+          (sum, entry) =>
+            sum +
+            entry.sssGsis +
+            entry.philHealth +
+            entry.pagIbig +
+            entry.withholdingTax +
+            entry.otherDeductions,
+          0,
+        ),
+  );
 
   return {
     cashAdvance,
     overtimePay,
     overtimeHours,
     leavePay,
+    deductions,
   };
 }
 
@@ -582,7 +597,7 @@ export async function savePayrollRunAction(input: SavePayrollRunInput) {
 
   const rowSnapshots = input.payrollRows.map((row) => {
     const override = input.payrollOverrides[row.id];
-    const { cashAdvance, overtimePay, overtimeHours, leavePay } =
+    const { cashAdvance, overtimePay, overtimeHours, leavePay, deductions } =
       computeRowAdjustmentTotals(override);
     const branchRateKey = buildEmployeeBranchRateKey(
       row.worker,
@@ -598,6 +613,7 @@ export async function savePayrollRunAction(input: SavePayrollRunInput) {
       row,
       override,
       cashAdvance,
+      deductions,
       overtimePay,
       overtimeHours,
       leavePay,
@@ -778,6 +794,7 @@ export async function savePayrollRunAction(input: SavePayrollRunInput) {
         allowance,
         deductions: {
           cashAdvance: snapshot.cashAdvance,
+          payrollDeductions: snapshot.deductions,
         },
       }),
     );
