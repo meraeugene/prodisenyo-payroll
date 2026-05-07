@@ -7,11 +7,12 @@ import type {
 import BudgetTrackerPageClient from "@/features/budget-tracker/components/BudgetTrackerPageClient";
 
 export default async function BudgetTrackerPage() {
-  await requireRole([
+  const { profile } = await requireRole([
     APP_ROLES.CEO,
     APP_ROLES.PAYROLL_MANAGER,
     APP_ROLES.ENGINEER,
   ]);
+  const canManageProjects = profile.role !== APP_ROLES.PAYROLL_MANAGER;
 
   const supabase = createSupabaseAdminClient() as any;
   let projects: BudgetProjectRow[] = [];
@@ -55,6 +56,7 @@ export default async function BudgetTrackerPage() {
       items={items}
       schemaReady={schemaReady}
       loadError={loadError}
+      canManageProjects={canManageProjects}
     />
   );
 }

@@ -20,13 +20,20 @@ export default function BudgetTrackerPageClient({
   items,
   schemaReady,
   loadError,
+  canManageProjects,
 }: {
   projects: BudgetProjectRow[];
   items: BudgetItemRow[];
   schemaReady: boolean;
   loadError: string | null;
+  canManageProjects: boolean;
 }) {
-  const state = useBudgetTrackerPage({ projects, items, schemaReady });
+  const state = useBudgetTrackerPage({
+    projects,
+    items,
+    schemaReady,
+    canManageProjects,
+  });
   const [showSaveDraftFirstConfirm, setShowSaveDraftFirstConfirm] =
     useState(false);
   const [saveDraftNextAction, setSaveDraftNextAction] = useState<
@@ -36,7 +43,7 @@ export default function BudgetTrackerPageClient({
     string | null
   >(null);
   const [showProjectOverview, setShowProjectOverview] = useState(
-    projects.length > 0 && schemaReady,
+    schemaReady && (!canManageProjects || projects.length > 0),
   );
 
   function handleOpenProject(projectId: string) {
@@ -45,6 +52,8 @@ export default function BudgetTrackerPageClient({
   }
 
   function handleCreateProject() {
+    if (!canManageProjects) return;
+
     state.resetProjectForm();
     state.setProjectSetupOpen(true);
     setShowProjectOverview(false);
@@ -89,7 +98,6 @@ export default function BudgetTrackerPageClient({
   const showOverview =
     schemaReady &&
     showProjectOverview &&
-    state.localProjects.length > 0 &&
     !state.projectSetupOpen;
 
   return (
@@ -101,6 +109,7 @@ export default function BudgetTrackerPageClient({
           pending={state.isPending}
           onOpenProject={handleOpenProject}
           onCreateProject={handleRequestCreateProject}
+          canManageProjects={state.canManageProjects}
         />
       ) : null}
 
@@ -118,6 +127,7 @@ export default function BudgetTrackerPageClient({
           onNewProject={handleRequestCreateProject}
           onAddCost={() => state.openNewItemModal()}
           onDeleteProject={() => state.setDeleteProjectModalOpen(true)}
+          canManageProjects={state.canManageProjects}
         />
       ) : null}
 
@@ -139,7 +149,7 @@ export default function BudgetTrackerPageClient({
         </section>
       ) : null}
 
-      {state.projectSetupOpen ? (
+      {state.projectSetupOpen && state.canManageProjects ? (
         <BudgetTrackerSetupForm
           projects={state.localProjects}
           projectForm={state.projectForm}
@@ -169,6 +179,7 @@ export default function BudgetTrackerPageClient({
             onDragOver={state.handleDragOver}
             onDragEnd={state.handleDragEnd}
             onEditItem={state.openEditItemModal}
+            canManageProjects={state.canManageProjects}
           />
           <BudgetTrackerSummaryPanel
             selectedProject={state.selectedProject}
@@ -178,32 +189,36 @@ export default function BudgetTrackerPageClient({
         </section>
       ) : null}
 
-      <BudgetTrackerItemModal
-        open={state.itemModalOpen}
-        itemPanelVisible={state.itemPanelVisible}
-        itemForm={state.itemForm}
-        estimatedCostInput={state.estimatedCostInput}
-        actualSpentInput={state.actualSpentInput}
-        itemError={state.itemError}
-        itemFieldErrors={state.itemFieldErrors}
-        isPending={state.isPending}
-        pendingAction={state.pendingAction}
-        onClose={state.closeItemModal}
-        onSubmit={state.submitItem}
-        onRemove={state.removeItem}
-        onItemFormChange={state.setItemForm}
-        onEstimatedCostChange={state.updateFormattedEstimatedCost}
-        onActualSpentChange={state.updateFormattedActualSpent}
-      />
+      {state.canManageProjects ? (
+        <BudgetTrackerItemModal
+          open={state.itemModalOpen}
+          itemPanelVisible={state.itemPanelVisible}
+          itemForm={state.itemForm}
+          estimatedCostInput={state.estimatedCostInput}
+          actualSpentInput={state.actualSpentInput}
+          itemError={state.itemError}
+          itemFieldErrors={state.itemFieldErrors}
+          isPending={state.isPending}
+          pendingAction={state.pendingAction}
+          onClose={state.closeItemModal}
+          onSubmit={state.submitItem}
+          onRemove={state.removeItem}
+          onItemFormChange={state.setItemForm}
+          onEstimatedCostChange={state.updateFormattedEstimatedCost}
+          onActualSpentChange={state.updateFormattedActualSpent}
+        />
+      ) : null}
 
-      <BudgetTrackerDeleteProjectModal
-        open={state.deleteProjectModalOpen}
-        selectedProject={state.selectedProject}
-        isPending={state.isPending}
-        pendingAction={state.pendingAction}
-        onClose={() => state.setDeleteProjectModalOpen(false)}
-        onDelete={state.removeProject}
-      />
+      {state.canManageProjects ? (
+        <BudgetTrackerDeleteProjectModal
+          open={state.deleteProjectModalOpen}
+          selectedProject={state.selectedProject}
+          isPending={state.isPending}
+          pendingAction={state.pendingAction}
+          onClose={() => state.setDeleteProjectModalOpen(false)}
+          onDelete={state.removeProject}
+        />
+      ) : null}
 
       <CostEstimatorConfirmModal
         open={showSaveDraftFirstConfirm}

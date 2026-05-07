@@ -2,21 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, Loader2, X } from "lucide-react";
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Line,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { toast } from "sonner";
 import { requestOvertimeApprovalAction } from "@/actions/payroll";
 import { useAppState } from "@/features/app/AppStateProvider";
@@ -59,18 +44,8 @@ import {
 
 import {
   AdjustmentFormType,
-  AnalyticsTooltip,
-  chartTickFormatter,
-  CLOCK_IN_BAR_BOTTOM_COLOR,
-  CLOCK_IN_BAR_TOP_COLOR,
-  CLOCK_IN_GRID_COLOR,
   createEntryId,
-  DAILY_HOURS_AREA_COLOR,
-  DAILY_HOURS_GRID_COLOR,
-  DAILY_HOURS_LINE_COLOR,
   formatPeso,
-  getAttendanceBreakdownColor,
-  isExpandedPlaceholderLog,
   OVERTIME_ALERT_HOURS,
   parseNonNegativeValue,
   round2,
@@ -141,17 +116,26 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
 
   if (!editingPayrollRow || !payrollEditDraft) return null;
 
-  function getHoursValue(log: DailyLogRow): string {
+  function getEditableRegularHours(log: DailyLogRow): number {
     const key = getLogOverrideKey(log);
-    const value = payroll.logHourOverrides[key] ?? log.hours;
-    return normalizeNumericInput(String(value));
+    return payroll.logHourOverrides[key]?.regularHours ?? log.regularHours;
   }
 
-  function getHoursNumber(log: DailyLogRow): number {
+  function getEditableOvertimeHours(log: DailyLogRow): number {
     const key = getLogOverrideKey(log);
-    const value = payroll.logHourOverrides[key] ?? log.hours;
-    if (!Number.isFinite(value)) return 0;
-    return value;
+    return payroll.logHourOverrides[key]?.overtimeHours ?? log.overtimeHours;
+  }
+
+  function getEditableTotalHours(log: DailyLogRow): number {
+    return round2(getEditableRegularHours(log) + getEditableOvertimeHours(log));
+  }
+
+  function getEditableRegularHoursValue(log: DailyLogRow): string {
+    return normalizeNumericInput(String(getEditableRegularHours(log)));
+  }
+
+  function getEditableOvertimeHoursValue(log: DailyLogRow): string {
+    return normalizeNumericInput(String(getEditableOvertimeHours(log)));
   }
 
   const loggedSites = Array.from(
@@ -217,13 +201,12 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
       ratePerDay: siteRatePerDay,
     };
   });
-  const branchPayAllocation = allocateCombinedBranchPay(
-    sitePayBreakdown.map((entry) => ({
-      site: entry.site,
-      hoursWorked: entry.hours,
-      dailyRatePerDay: entry.ratePerDay,
-    })),
-  );
+  const branchPayInputs = sitePayBreakdown.map((entry) => ({
+    site: entry.site,
+    hoursWorked: entry.hours,
+    dailyRatePerDay: entry.ratePerDay,
+  }));
+  const branchPayAllocation = allocateCombinedBranchPay(branchPayInputs);
   const sitePayBreakdownWithAllocation = sitePayBreakdown.map((entry) => {
     const allocation =
       branchPayAllocation.breakdown.find((item) => item.site === entry.site) ??
@@ -297,6 +280,23 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
     (sum, entry) => sum + entry.hours,
     0,
   );
+  const biometricOvertimeHours = round2(
+    currentLogsForPay.reduce(
+      (sum, log) =>
+        holidayLogDateSet.has(log.date) ? sum : sum + log.overtimeHours,
+      0,
+    ),
+  );
+  const biometricOvertimePay = roundPayrollCalculation(
+    calculatePayroll({
+      dailyRate: currentRatePerDay,
+      regularHours: 0,
+      overtimeHours: biometricOvertimeHours,
+      overtimeMultiplier: DEFAULT_OVERTIME_MULTIPLIER,
+      allowance: 0,
+      deductions: 0,
+    }),
+  ).overtimePay;
   const approvedOvertimePay = roundPayrollCalculation(
     calculatePayroll({
       dailyRate: currentRatePerDay,
@@ -307,6 +307,12 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
       deductions: 0,
     }),
   ).overtimePay;
+  const payableOvertimeHours = round2(
+    biometricOvertimeHours + approvedOvertimeHours,
+  );
+  const payableOvertimePay = round2(
+    biometricOvertimePay + approvedOvertimePay,
+  );
   const pendingOvertimePay = pendingOvertimeEntries.reduce(
     (sum, entry) => sum + entry.pay,
     0,
@@ -331,7 +337,7 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
     calculatePayroll({
       dailyRate: currentRatePerDay,
       regularHours: regularWorkedHours,
-      overtimeHours: approvedOvertimeHours,
+      overtimeHours: biometricOvertimeHours + approvedOvertimeHours,
       overtimeMultiplier: DEFAULT_OVERTIME_MULTIPLIER,
       allowance: paidHolidayPay + paidLeavePay,
       deductions: cashAdvanceAmount,
@@ -954,11 +960,18 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                     ) : (
                       visibleAllReportLogs.map((log, index) => {
                         const isPaidHoliday = holidayLogDateSet.has(log.date);
+                        const editableRegularHours =
+                          getEditableRegularHours(log);
+                        const editableOvertimeHours =
+                          getEditableOvertimeHours(log);
+                        const editableTotalHours = round2(
+                          editableRegularHours + editableOvertimeHours,
+                        );
                         const isUnderRequiredHours =
-                          getHoursNumber(log) > 0 &&
-                          getHoursNumber(log) < FULL_WORKDAY_HOURS;
+                          editableRegularHours > 0 &&
+                          editableRegularHours < FULL_WORKDAY_HOURS;
                         const isHighOvertimeHours =
-                          getHoursNumber(log) >= OVERTIME_ALERT_HOURS &&
+                          editableTotalHours >= OVERTIME_ALERT_HOURS &&
                           !isPaidHoliday;
                         const isOvertimeDay =
                           computeSameDayOvertimeMinutes(log.otIn, log.otOut) >
@@ -1046,11 +1059,23 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                             <td className="px-3 py-2.5 text-sm text-apple-charcoal">
                               {formatLogTime(log.otOut)}
                             </td>
-                            <td className="px-3 py-2.5 text-right text-sm font-mono text-apple-charcoal">
-                              {formatPayrollNumber(log.regularHours)}
-                            </td>
-                            <td className="px-3 py-2.5 text-right text-sm font-mono text-apple-charcoal">
-                              {formatPayrollNumber(log.overtimeHours)}
+                            <td className="px-3 py-2.5 text-right">
+                              <input
+                                type="number"
+                                min={0}
+                                max={FULL_WORKDAY_HOURS}
+                                step="0.01"
+                                onFocus={(e) => e.currentTarget.select()}
+                                value={getEditableRegularHoursValue(log)}
+                                onChange={(e) =>
+                                  payroll.updateLogHour(
+                                    log,
+                                    "regularHours",
+                                    e.target.value,
+                                  )
+                                }
+                                className="w-20 hover:border-apple-charcoal text-right px-2 py-1 rounded-lg border border-apple-charcoal/40 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-apple-charcoal/20"
+                              />
                             </td>
                             <td className="px-3 py-2.5 text-right">
                               <input
@@ -1058,12 +1083,19 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                                 min={0}
                                 step="0.01"
                                 onFocus={(e) => e.currentTarget.select()}
-                                value={getHoursValue(log)}
+                                value={getEditableOvertimeHoursValue(log)}
                                 onChange={(e) =>
-                                  payroll.updateLogHour(log, e.target.value)
+                                  payroll.updateLogHour(
+                                    log,
+                                    "overtimeHours",
+                                    e.target.value,
+                                  )
                                 }
                                 className="w-20 hover:border-apple-charcoal text-right px-2 py-1 rounded-lg border border-apple-charcoal/40 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-apple-charcoal/20"
                               />
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-sm font-mono font-semibold text-apple-charcoal">
+                              {formatPayrollNumber(getEditableTotalHours(log))}
                             </td>
                           </tr>
                         );
@@ -1142,16 +1174,20 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                     value: formatPayrollNumber(daysWorked),
                   },
                   {
-                    label: "Total Worked Hours",
-                    value: `${formatPayrollNumber(totalWorkedHours)} hrs`,
+                    label: "Service Hours",
+                    value: `${formatPayrollNumber(regularWorkedHours)} hrs`,
                   },
                   {
-                    label: "Approved Overtime",
-                    value: `${formatPayrollNumber(approvedOvertimeHours)} hrs`,
+                    label: "Total OT Hours",
+                    value: `${formatPayrollNumber(payableOvertimeHours)} hrs`,
                   },
                   {
-                    label: "Paid Leave",
-                    value: formatPeso(paidLeavePay),
+                    label: "Service Pay",
+                    value: formatPeso(baseWorkedPay),
+                  },
+                  {
+                    label: "OT Pay",
+                    value: formatPeso(payableOvertimePay),
                   },
                 ].map((item) => (
                   <div
@@ -1178,10 +1214,10 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
               <div className="p-4 space-y-2">
                 <div className="flex items-center justify-between gap-3 text-sm">
                   <span className="text-apple-charcoal">
-                    Total Worked Hours
+                    Total Service Hours
                   </span>
                   <span className="font-mono font-semibold text-apple-charcoal text-right">
-                    {formatPayrollNumber(totalWorkedHours)} hrs
+                    {formatPayrollNumber(regularWorkedHours)} hrs
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3 text-sm">
@@ -1193,9 +1229,32 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-apple-charcoal">Base Pay</span>
+                  <span className="text-apple-charcoal">Service Pay</span>
                   <span className="font-mono font-semibold text-apple-charcoal text-right">
                     {formatPeso(baseWorkedPay)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-apple-charcoal">Total OT Hours</span>
+                  <span className="font-mono font-semibold text-apple-charcoal text-right">
+                    {formatPayrollNumber(payableOvertimeHours)} hrs
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-apple-charcoal">Total OT Pay</span>
+                  <span className="font-mono font-semibold text-emerald-700 text-right">
+                    {formatPeso(payableOvertimePay)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-apple-charcoal">
+                    + Biometric Overtime
+                    <span className="ml-1 text-xs text-apple-smoke">
+                      ({formatPayrollNumber(biometricOvertimeHours)} hrs)
+                    </span>
+                  </span>
+                  <span className="font-mono font-semibold text-emerald-700 text-right">
+                    {formatPeso(biometricOvertimePay)}
                   </span>
                 </div>
                 {sitePayBreakdownWithAllocation.length > 1 && (
@@ -1300,292 +1359,6 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
               </div>
             </div>
 
-            <div className="overflow-hidden rounded-2xl border border-[#E7ECF3] ">
-              <div className="border-b border-[#EEF2F7] px-4 py-3.5">
-                <h4 className="text-sm font-semibold tracking-tight text-apple-charcoal">
-                  Employee Analytics
-                </h4>
-                <p className="mt-1 text-xs text-apple-smoke">
-                  Visual insights into the employee&apos;s attendance and work
-                  patterns.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-5 p-4 md:grid-cols-3">
-                <div className="rounded-2xl border border-[#E8EDF5] bg-gradient-to-b from-white to-[#FAFCFF] p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-                  <p className="mb-2 text-xs font-semibold tracking-wide text-apple-charcoal">
-                    Daily Hours Worked Trend
-                  </p>
-                  <div className="h-[230px]">
-                    {payroll.employeeDailyHoursTrend.length === 0 ? (
-                      <p className="text-sm text-apple-smoke">
-                        No attendance logs yet.
-                      </p>
-                    ) : (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart
-                          data={payroll.employeeDailyHoursTrend}
-                          margin={{ top: 12, right: 10, left: -14, bottom: 0 }}
-                        >
-                          <defs>
-                            <linearGradient
-                              id="employeeHoursArea"
-                              x1="0"
-                              y1="0"
-                              x2="0"
-                              y2="1"
-                            >
-                              <stop
-                                offset="5%"
-                                stopColor={DAILY_HOURS_AREA_COLOR}
-                                stopOpacity={0.5}
-                              />
-                              <stop
-                                offset="95%"
-                                stopColor={DAILY_HOURS_AREA_COLOR}
-                                stopOpacity={0.1}
-                              />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid
-                            strokeDasharray="4 4"
-                            vertical={false}
-                            stroke={DAILY_HOURS_GRID_COLOR}
-                          />
-                          <XAxis
-                            dataKey="date"
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{
-                              fill: "rgb(var(--theme-chart-axis))",
-                              fontSize: 11,
-                            }}
-                            tickFormatter={chartTickFormatter}
-                            minTickGap={16}
-                            tickMargin={10}
-                          />
-                          <YAxis
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{
-                              fill: "rgb(var(--theme-chart-axis))",
-                              fontSize: 11,
-                            }}
-                            domain={[
-                              0,
-                              (dataMax: number) =>
-                                Math.max(8, Math.ceil(dataMax + 1)),
-                            ]}
-                            tickCount={5}
-                            tickMargin={8}
-                          />
-                          <Tooltip
-                            cursor={{
-                              stroke: DAILY_HOURS_LINE_COLOR,
-                              strokeWidth: 2,
-                              strokeDasharray: "5 5",
-                            }}
-                            content={
-                              <AnalyticsTooltip
-                                valueFormatter={(value) =>
-                                  `${formatPayrollNumber(value)} hrs`
-                                }
-                              />
-                            }
-                          />
-                          <Area
-                            type="monotone"
-                            dataKey="hoursWorked"
-                            fill="url(#employeeHoursArea)"
-                            stroke="none"
-                            isAnimationActive={false}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="hoursWorked"
-                            stroke={DAILY_HOURS_LINE_COLOR}
-                            strokeWidth={3}
-                            dot={{
-                              r: 3,
-                              fill: "#fff",
-                              stroke: DAILY_HOURS_LINE_COLOR,
-                              strokeWidth: 2,
-                            }}
-                            activeDot={{
-                              r: 5,
-                              fill: DAILY_HOURS_LINE_COLOR,
-                              stroke: "#fff",
-                              strokeWidth: 2,
-                            }}
-                            isAnimationActive={false}
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    )}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-[#E8EDF5] bg-gradient-to-b from-white to-[#FAFCFF] p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-                  <p className="mb-2 text-xs font-semibold tracking-wide text-apple-charcoal">
-                    Attendance Breakdown
-                  </p>
-                  <div className="h-[230px]">
-                    {payroll.employeeAttendanceBreakdown.every(
-                      (item) => item.value === 0,
-                    ) ? (
-                      <p className="text-sm text-apple-smoke">
-                        No attendance distribution yet.
-                      </p>
-                    ) : (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={payroll.employeeAttendanceBreakdown}
-                            dataKey="value"
-                            nameKey="name"
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={42}
-                            outerRadius={72}
-                            paddingAngle={3}
-                            stroke="none"
-                            isAnimationActive={false}
-                          >
-                            {payroll.employeeAttendanceBreakdown.map(
-                              (entry, index) => (
-                                <Cell
-                                  key={`${entry.name}-${index}`}
-                                  fill={getAttendanceBreakdownColor(
-                                    entry.name,
-                                    index,
-                                  )}
-                                />
-                              ),
-                            )}
-                          </Pie>
-                          <Tooltip
-                            content={
-                              <AnalyticsTooltip
-                                valueFormatter={(value) =>
-                                  `${formatPayrollNumber(value)} day(s)`
-                                }
-                              />
-                            }
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    )}
-                  </div>
-                  <div className="mt-2 grid grid-cols-2 gap-1.5">
-                    {payroll.employeeAttendanceBreakdown.map((item, index) => (
-                      <div
-                        key={`attendance-legend-${item.name}`}
-                        className="flex items-center gap-2"
-                      >
-                        <span
-                          className="h-2.5 w-2.5 rounded-full"
-                          style={{
-                            backgroundColor: getAttendanceBreakdownColor(
-                              item.name,
-                              index,
-                            ),
-                          }}
-                        />
-                        <span className="truncate text-[11px] text-apple-smoke">
-                          {item.name}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-[#E8EDF5] bg-gradient-to-b from-white to-[#FAFCFF] p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-                  <p className="mb-2 text-xs font-semibold tracking-wide text-apple-charcoal">
-                    Clock-in Time Consistency
-                  </p>
-                  <div className="h-[230px]">
-                    {payroll.employeeClockInConsistency.length === 0 ? (
-                      <p className="text-sm text-apple-smoke">
-                        No clock-in data yet.
-                      </p>
-                    ) : (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={payroll.employeeClockInConsistency}
-                          margin={{ top: 12, right: 10, left: -14, bottom: 0 }}
-                        >
-                          <defs>
-                            <linearGradient
-                              id="clockInBar"
-                              x1="0"
-                              y1="0"
-                              x2="0"
-                              y2="1"
-                            >
-                              <stop
-                                offset="5%"
-                                stopColor={CLOCK_IN_BAR_TOP_COLOR}
-                                stopOpacity={0.95}
-                              />
-                              <stop
-                                offset="95%"
-                                stopColor={CLOCK_IN_BAR_BOTTOM_COLOR}
-                                stopOpacity={0.85}
-                              />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid
-                            strokeDasharray="4 4"
-                            vertical={false}
-                            stroke={CLOCK_IN_GRID_COLOR}
-                          />
-                          <XAxis
-                            dataKey="date"
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{
-                              fill: "rgb(var(--theme-chart-axis))",
-                              fontSize: 11,
-                            }}
-                            tickFormatter={chartTickFormatter}
-                            minTickGap={16}
-                            tickMargin={10}
-                          />
-                          <YAxis
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{
-                              fill: "rgb(var(--theme-chart-axis))",
-                              fontSize: 11,
-                            }}
-                            domain={[0, 24]}
-                            tickMargin={8}
-                          />
-                          <Tooltip
-                            cursor={{ fill: "rgb(var(--theme-chart-cursor))" }}
-                            content={
-                              <AnalyticsTooltip
-                                valueFormatter={(_value, _name, item) =>
-                                  item?.timeInLabel ?? "-"
-                                }
-                              />
-                            }
-                          />
-                          <Bar
-                            dataKey="timeIn"
-                            name="Time In"
-                            fill="url(#clockInBar)"
-                            radius={[4, 4, 0, 0]}
-                            maxBarSize={26}
-                            isAnimationActive={false}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
         <div className="sticky bottom-0 z-10 border-t border-apple-mist bg-white/95 px-4 py-4 backdrop-blur sm:px-7">

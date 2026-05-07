@@ -25,6 +25,7 @@ export default function BudgetTrackerHeader({
   onNewProject,
   onAddCost,
   onDeleteProject,
+  canManageProjects,
 }: {
   projects: BudgetProjectRow[];
   selectedProject: BudgetProjectRow | null;
@@ -38,6 +39,7 @@ export default function BudgetTrackerHeader({
   onNewProject: () => void;
   onAddCost: () => void;
   onDeleteProject: () => void;
+  canManageProjects: boolean;
 }) {
   const [showMobileActions, setShowMobileActions] = useState(false);
 
@@ -71,6 +73,7 @@ export default function BudgetTrackerHeader({
         )}
 
         <div className="flex items-center gap-2">
+          {canManageProjects ? (
           <button
             type="button"
             onClick={onSaveDraft}
@@ -93,6 +96,7 @@ export default function BudgetTrackerHeader({
             )}
             <span>{mobileSaveLabel}</span>
           </button>
+          ) : null}
 
           <div className="relative">
             <button
@@ -121,33 +125,37 @@ export default function BudgetTrackerHeader({
                   </button>
                 ) : null}
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    onNewProject();
-                    setShowMobileActions(false);
-                  }}
-                  disabled={!schemaReady || isPending}
-                  className="flex h-10 w-full items-center gap-2 rounded-[10px] px-3 text-sm font-medium text-apple-charcoal transition hover:bg-apple-mist/40 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <FolderPlus size={16} />
-                  New project
-                </button>
+                {canManageProjects ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onNewProject();
+                        setShowMobileActions(false);
+                      }}
+                      disabled={!schemaReady || isPending}
+                      className="flex h-10 w-full items-center gap-2 rounded-[10px] px-3 text-sm font-medium text-apple-charcoal transition hover:bg-apple-mist/40 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <FolderPlus size={16} />
+                      New project
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    onAddCost();
-                    setShowMobileActions(false);
-                  }}
-                  disabled={!selectedProject || !schemaReady || isPending}
-                  className="flex h-10 w-full items-center gap-2 rounded-[10px] px-3 text-sm font-semibold text-[#1f6a37] transition hover:bg-[#eaf7ef] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <Plus size={16} />
-                  Add cost
-                </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onAddCost();
+                        setShowMobileActions(false);
+                      }}
+                      disabled={!selectedProject || !schemaReady || isPending}
+                      className="flex h-10 w-full items-center gap-2 rounded-[10px] px-3 text-sm font-semibold text-[#1f6a37] transition hover:bg-[#eaf7ef] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Plus size={16} />
+                      Add cost
+                    </button>
+                  </>
+                ) : null}
 
-                {selectedProject ? (
+                {canManageProjects && selectedProject ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -199,7 +207,8 @@ export default function BudgetTrackerHeader({
             </div>
           )}
 
-          <div
+          {canManageProjects ? (
+            <div
             className={cn(
               "inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium",
               saveState === "saving"
@@ -217,17 +226,22 @@ export default function BudgetTrackerHeader({
               <CheckCircle2 className="h-3.5 w-3.5" />
             )}
             <span>{saveMessage}</span>
-          </div>
+            </div>
+          ) : (
+            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">
+              View only
+            </span>
+          )}
 
           {selectedProject ? (
             <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
-              Draft
+              {canManageProjects ? "Draft" : "Centralized tracking"}
             </span>
           ) : null}
         </div>
 
         <div className="flex flex-wrap items-center gap-3 xl:justify-end">
-          {selectedProject ? (
+          {canManageProjects && selectedProject ? (
             <button
               type="button"
               onClick={onSaveDraft}
@@ -243,25 +257,29 @@ export default function BudgetTrackerHeader({
             </button>
           ) : null}
 
-          <button
-            type="button"
-            onClick={onNewProject}
-            disabled={!schemaReady || isPending}
-            className="inline-flex h-11 items-center gap-2 rounded-[10px] border border-apple-mist bg-white px-4 text-sm font-medium text-apple-charcoal transition hover:bg-apple-mist/40 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <FolderPlus size={16} />
-            New project
-          </button>
-          <button
-            type="button"
-            onClick={onAddCost}
-            disabled={!selectedProject || !schemaReady || isPending}
-            className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-[#1f6a37] px-5 text-sm font-semibold text-white transition hover:bg-[#18552b] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Plus size={16} />
-            Add cost
-          </button>
-          {selectedProject ? (
+          {canManageProjects ? (
+            <>
+              <button
+                type="button"
+                onClick={onNewProject}
+                disabled={!schemaReady || isPending}
+                className="inline-flex h-11 items-center gap-2 rounded-[10px] border border-apple-mist bg-white px-4 text-sm font-medium text-apple-charcoal transition hover:bg-apple-mist/40 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <FolderPlus size={16} />
+                New project
+              </button>
+              <button
+                type="button"
+                onClick={onAddCost}
+                disabled={!selectedProject || !schemaReady || isPending}
+                className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-[#1f6a37] px-5 text-sm font-semibold text-white transition hover:bg-[#18552b] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Plus size={16} />
+                Add cost
+              </button>
+            </>
+          ) : null}
+          {canManageProjects && selectedProject ? (
             <button
               type="button"
               onClick={onDeleteProject}

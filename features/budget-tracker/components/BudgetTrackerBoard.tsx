@@ -107,6 +107,7 @@ function SortableBudgetItem({
   isDragging,
   isBoardDragging,
   onEditItem,
+  canManageProjects,
 }: {
   item: BudgetItemRow;
   groupLabel: string;
@@ -114,6 +115,7 @@ function SortableBudgetItem({
   isDragging: boolean;
   isBoardDragging: boolean;
   onEditItem: (item: BudgetItemRow) => void;
+  canManageProjects: boolean;
 }) {
   const categoryColors = getBudgetCategoryColorClasses(item.category);
 
@@ -140,7 +142,7 @@ function SortableBudgetItem({
       transition={{ type: "spring", stiffness: 420, damping: 34 }}
       type="button"
       onClick={() => {
-        if (!sortableDragging) {
+        if (canManageProjects && !sortableDragging) {
           onEditItem(item);
         }
       }}
@@ -149,7 +151,10 @@ function SortableBudgetItem({
         transition,
       }}
       className={cn(
-        "group w-full cursor-grab rounded-[12px] border border-apple-mist p-4 text-left shadow-[0_8px_20px_rgba(24,83,43,0.06)] transition-[border-color,box-shadow,background-color] duration-200 hover:shadow-[0_16px_36px_rgba(24,83,43,0.12)] focus-visible:shadow-[0_16px_36px_rgba(24,83,43,0.14)] focus-visible:outline-none active:cursor-grabbing",
+        "group w-full rounded-[12px] border border-apple-mist p-4 text-left shadow-[0_8px_20px_rgba(24,83,43,0.06)] transition-[border-color,box-shadow,background-color] duration-200 focus-visible:shadow-[0_16px_36px_rgba(24,83,43,0.14)] focus-visible:outline-none",
+        canManageProjects
+          ? "cursor-grab hover:shadow-[0_16px_36px_rgba(24,83,43,0.12)] active:cursor-grabbing"
+          : "cursor-default",
         categoryColors.cardBg,
         categoryColors.cardHoverBorder,
         isBoardDragging &&
@@ -160,8 +165,8 @@ function SortableBudgetItem({
             categoryColors.cardActiveBg,
           ),
       )}
-      {...attributes}
-      {...listeners}
+      {...(canManageProjects ? attributes : {})}
+      {...(canManageProjects ? listeners : {})}
     >
       <BudgetTrackerCardContent
         item={item}
@@ -179,6 +184,7 @@ function BudgetTrackerColumn({
   draggedItemId,
   onAddItem,
   onEditItem,
+  canManageProjects,
 }: {
   group: BudgetItemGroup;
   selectedProject: BudgetProjectRow;
@@ -186,6 +192,7 @@ function BudgetTrackerColumn({
   draggedItemId: string | null;
   onAddItem: (status: BudgetItemStatus) => void;
   onEditItem: (item: BudgetItemRow) => void;
+  canManageProjects: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: group.value,
@@ -218,13 +225,15 @@ function BudgetTrackerColumn({
             )}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => onAddItem(group.value)}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-apple-mist text-apple-smoke hover:bg-apple-mist/40 hover:text-apple-charcoal"
-        >
-          <Plus size={18} />
-        </button>
+        {canManageProjects ? (
+          <button
+            type="button"
+            onClick={() => onAddItem(group.value)}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-apple-mist text-apple-smoke hover:bg-apple-mist/40 hover:text-apple-charcoal"
+          >
+            <Plus size={18} />
+          </button>
+        ) : null}
       </div>
 
       <div
@@ -259,6 +268,7 @@ function BudgetTrackerColumn({
                   isDragging={draggedItemId === item.id}
                   isBoardDragging={draggedItemId !== null}
                   onEditItem={onEditItem}
+                  canManageProjects={canManageProjects}
                 />
               ))}
             </motion.div>
@@ -279,6 +289,7 @@ export default function BudgetTrackerBoard({
   onDragOver,
   onDragEnd,
   onEditItem,
+  canManageProjects,
 }: {
   groups: BudgetItemGroup[];
   selectedProject: BudgetProjectRow;
@@ -289,6 +300,7 @@ export default function BudgetTrackerBoard({
   onDragOver: (event: DragOverEvent) => void;
   onDragEnd: (event: DragEndEvent) => void;
   onEditItem: (item: BudgetItemRow) => void;
+  canManageProjects: boolean;
 }) {
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -322,9 +334,9 @@ export default function BudgetTrackerBoard({
     <DndContext
       sensors={sensors}
       collisionDetection={closestCorners}
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDragEnd={onDragEnd}
+      onDragStart={canManageProjects ? onDragStart : undefined}
+      onDragOver={canManageProjects ? onDragOver : undefined}
+      onDragEnd={canManageProjects ? onDragEnd : undefined}
     >
       <div className="grid gap-5 p-4 xl:grid-cols-3">
         {groups.map((group) => (
@@ -336,6 +348,7 @@ export default function BudgetTrackerBoard({
             draggedItemId={draggedItemId}
             onAddItem={onAddItem}
             onEditItem={onEditItem}
+            canManageProjects={canManageProjects}
           />
         ))}
       </div>

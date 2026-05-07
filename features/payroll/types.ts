@@ -40,7 +40,7 @@ export interface PayrollRowOverride {
   hoursWorked: number;
   overtimeHours: number;
   customRate: number | null;
-  logHours?: Record<string, number>;
+  logHours?: LogHourOverrideMap;
   cashAdvanceEntries?: PayrollCashAdvanceEntry[];
   overtimeEntries?: PayrollOvertimeEntry[];
   paidLeaveEntries?: PayrollPaidLeaveEntry[];
@@ -57,24 +57,6 @@ export interface PayrollEditSummary {
   otNormalHours: number;
 }
 
-export interface PayrollEmployeeDailyHoursTrend {
-  date: string;
-  isoDate: string;
-  hoursWorked: number;
-}
-
-export interface PayrollAttendanceBreakdownItem {
-  name: "Attendance" | "Absences" | "Leave" | "Business Trip";
-  value: number;
-}
-
-export interface PayrollClockInConsistencyItem {
-  date: string;
-  isoDate: string;
-  timeIn: number;
-  timeInLabel: string;
-}
-
 export interface PaidHolidayItem {
   date: string;
   name: string;
@@ -87,7 +69,14 @@ export interface PayrollDateRange {
   year: number;
 }
 
-export type LogHourOverrideMap = Record<string, number>;
+export interface LogHourOverride {
+  regularHours: number;
+  overtimeHours: number;
+}
+
+export type LogHourOverrideValue = number | Partial<LogHourOverride>;
+
+export type LogHourOverrideMap = Record<string, LogHourOverride>;
 
 export interface PayrollEditContext {
   editingPayrollLogs: DailyLogRow[];

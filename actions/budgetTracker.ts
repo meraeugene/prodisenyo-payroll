@@ -77,7 +77,6 @@ export async function createBudgetProjectAction(
 ) {
   const { user } = await requireRole([
     APP_ROLES.CEO,
-    APP_ROLES.PAYROLL_MANAGER,
     APP_ROLES.ENGINEER,
   ]);
   const name = normalizeText(input.name);
@@ -116,7 +115,6 @@ export async function createBudgetProjectAction(
 export async function saveBudgetItemAction(input: SaveBudgetItemInput) {
   const { user } = await requireRole([
     APP_ROLES.CEO,
-    APP_ROLES.PAYROLL_MANAGER,
     APP_ROLES.ENGINEER,
   ]);
   const database = createSupabaseAdminClient() as any;
@@ -205,7 +203,6 @@ export async function saveBudgetItemAction(input: SaveBudgetItemInput) {
 export async function deleteBudgetItemAction(itemId: string) {
   await requireRole([
     APP_ROLES.CEO,
-    APP_ROLES.PAYROLL_MANAGER,
     APP_ROLES.ENGINEER,
   ]);
   const database = createSupabaseAdminClient() as any;
@@ -230,7 +227,6 @@ export async function deleteBudgetItemAction(itemId: string) {
 export async function deleteBudgetProjectAction(projectId: string) {
   await requireRole([
     APP_ROLES.CEO,
-    APP_ROLES.PAYROLL_MANAGER,
     APP_ROLES.ENGINEER,
   ]);
   const database = createSupabaseAdminClient() as any;
@@ -255,7 +251,6 @@ export async function deleteBudgetProjectAction(projectId: string) {
 export async function reorderBudgetItemsAction(input: ReorderBudgetItemsInput) {
   const { user } = await requireRole([
     APP_ROLES.CEO,
-    APP_ROLES.PAYROLL_MANAGER,
     APP_ROLES.ENGINEER,
   ]);
   const database = createSupabaseAdminClient() as any;

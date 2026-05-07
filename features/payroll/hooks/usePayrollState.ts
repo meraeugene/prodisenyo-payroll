@@ -9,8 +9,6 @@ import {
   ROLE_CODES,
   type RoleCode,
 } from "@/lib/payrollConfig";
-import { exportPayrollToExcel } from "@/lib/payrollExport";
-import { calculateDailyWorkMinutes } from "@/lib/utils";
 import type { DailyLogRow, Step2Sort } from "@/types";
 import { buildVisiblePages } from "@/features/shared/pagination";
 import {
@@ -32,14 +30,9 @@ import {
   applyLogHourOverrides,
   buildEditingPayrollLogs,
   buildEditingPayrollSummary,
-  buildEmployeeAttendanceBreakdown,
-  buildEmployeeClockInConsistency,
-  buildEmployeeDailyHoursTrend,
   buildPayrollBaseRows,
-  buildPayrollEditPreview,
   buildPayrollRows,
   coalescePayrollAttendanceInputs,
-  calculateTotalEditedLogHours,
   computeBasePay,
   filterPayrollLogs,
   filterPayrollRows,
@@ -51,6 +44,9 @@ import {
 import type {
   PayrollAdjustmentSet,
   PayrollCashAdvanceEntry,
+  LogHourOverride,
+  LogHourOverrideMap,
+  LogHourOverrideValue,
   PaidHolidayItem,
   PayrollDateRange,
   PayrollEditDraft,
@@ -66,6 +62,38 @@ const EMPTY_ADJUSTMENTS: PayrollAdjustmentSet = {
   overtimeEntries: [],
   paidLeaveEntries: [],
 };
+
+function sanitizeEditableHours(
+  value: unknown,
+  maxHours = MAX_LOG_HOURS_PER_DAY,
+): number {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue) || numericValue < 0) return 0;
+  return Math.round(Math.min(numericValue, maxHours) * 100) / 100;
+}
+
+function normalizeLogHourOverrideValue(
+  value: LogHourOverrideValue | undefined,
+  fallback: LogHourOverride,
+): LogHourOverride {
+  if (typeof value === "number") {
+    return {
+      regularHours: sanitizeEditableHours(value),
+      overtimeHours: fallback.overtimeHours,
+    };
+  }
+
+  return {
+    regularHours:
+      value?.regularHours === undefined
+        ? fallback.regularHours
+        : sanitizeEditableHours(value.regularHours),
+    overtimeHours:
+      value?.overtimeHours === undefined
+        ? fallback.overtimeHours
+        : sanitizeEditableHours(value.overtimeHours),
+  };
+}
 
 function toIsoDate(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -286,7 +314,6 @@ export interface UsePayrollStateResult {
   setPayrollSort: (value: Step2Sort) => void;
   payrollRoleFilter: RoleCode | "ALL";
   setPayrollRoleFilter: (value: RoleCode | "ALL") => void;
-  payrollSaveNotice: string | null;
   showPayrollRateModal: boolean;
   payrollRateDraft: Record<string, number>;
   setPayrollRateDraft: (
@@ -344,27 +371,16 @@ export interface UsePayrollStateResult {
   setPayrollEditDraft: (
     value: PayrollEditDraft | null | ((prev: PayrollEditDraft | null) => PayrollEditDraft | null),
   ) => void;
-  payrollEditPreview: PayrollRow | null;
-  logHourOverrides: Record<string, number>;
+  logHourOverrides: LogHourOverrideMap;
   setLogHourOverrides: (
     value:
-      | Record<string, number>
-      | ((prev: Record<string, number>) => Record<string, number>),
+      | LogHourOverrideMap
+      | ((prev: LogHourOverrideMap) => LogHourOverrideMap),
   ) => void;
   hasLogHourOverrides: boolean;
-  totalEditedLogHours: number;
-  employeeDailyHoursTrend: { date: string; isoDate: string; hoursWorked: number }[];
-  employeeAttendanceBreakdown: { name: string; value: number }[];
-  employeeClockInConsistency: {
-    date: string;
-    isoDate: string;
-    timeIn: number;
-    timeInLabel: string;
-  }[];
   clearPayrollFilters: () => void;
   resetPayrollState: () => void;
   handleGeneratePayroll: () => boolean;
-  handleExportPayroll: () => void;
   openPayrollRateModal: () => void;
   closePayrollRateModal: () => void;
   applyPayrollRates: () => void;
@@ -375,7 +391,11 @@ export interface UsePayrollStateResult {
   openPayrollEditModal: (row: PayrollRow, displayRow?: PayrollRow) => void;
   closePayrollEditModal: () => void;
   savePayrollEdit: (adjustments?: PayrollAdjustmentSet) => void;
-  updateLogHour: (log: DailyLogRow, valueText: string) => void;
+  updateLogHour: (
+    log: DailyLogRow,
+    field: keyof LogHourOverride,
+    valueText: string,
+  ) => void;
   normalizeNumericInput: (value: string) => string;
   roleCodes: RoleCode[];
 }
@@ -412,8 +432,7 @@ export function usePayrollState({
   const [payrollRoleFilter, setPayrollRoleFilter] = useState<RoleCode | "ALL">(
     "ALL",
   );
-  const [logHourOverrides, setLogHourOverrides] = useState<Record<string, number>>({});
-  const [payrollSaveNotice, setPayrollSaveNotice] = useState<string | null>(null);
+  const [logHourOverrides, setLogHourOverrides] = useState<LogHourOverrideMap>({});
   const [paidHolidays, setPaidHolidays] = useState<PaidHolidayItem[]>([]);
 
   useEffect(() => {
@@ -457,20 +476,21 @@ export function usePayrollState({
   }, []);
 
   const persistedLogHourOverrides = useMemo(() => {
-    const merged: Record<string, number> = {};
+    const merged: Record<string, LogHourOverrideValue> = {};
 
     for (const override of Object.values(payrollOverrides)) {
       if (!override.logHours) continue;
 
       for (const [key, value] of Object.entries(override.logHours)) {
-        if (
-          !Number.isFinite(value) ||
-          value < 0 ||
-          value > MAX_LOG_HOURS_PER_DAY
-        ) {
+        if (typeof value === "number") {
+          merged[key] = sanitizeEditableHours(value);
           continue;
         }
-        merged[key] = round2(value);
+
+        merged[key] = {
+          regularHours: sanitizeEditableHours(value.regularHours),
+          overtimeHours: sanitizeEditableHours(value.overtimeHours),
+        };
       }
     }
 
@@ -482,19 +502,25 @@ export function usePayrollState({
       .map((row) => {
         const identity = parsePayrollIdentity(row.employee);
         const key = getLogOverrideKey(row);
-        const overrideHours = persistedLogHourOverrides[key];
+        const overrideHours = normalizeLogHourOverrideValue(
+          persistedLogHourOverrides[key],
+          {
+            regularHours:
+              row.regularHours > 0 || row.overtimeHours > 0
+                ? row.regularHours
+                : row.hours,
+            overtimeHours:
+              Number.isFinite(row.overtimeHours) && row.overtimeHours > 0
+                ? row.overtimeHours
+                : 0,
+          },
+        );
         const baseRegularHours =
           row.regularHours > 0 || row.overtimeHours > 0
             ? row.regularHours
             : row.hours;
-        const regularHours =
-          Number.isFinite(overrideHours) && overrideHours >= 0
-            ? overrideHours
-            : baseRegularHours;
-        const overtimeHours =
-          Number.isFinite(row.overtimeHours) && row.overtimeHours > 0
-            ? row.overtimeHours
-            : 0;
+        const regularHours = overrideHours.regularHours ?? baseRegularHours;
+        const overtimeHours = overrideHours.overtimeHours ?? 0;
 
         return {
           name: identity.name,
@@ -967,45 +993,25 @@ export function usePayrollState({
     [logHourOverrides],
   );
 
-  const totalEditedLogHours = useMemo(
-    () => calculateTotalEditedLogHours(editingPayrollLogsForAnalytics),
-    [editingPayrollLogsForAnalytics],
-  );
   const regularEditedLogHours = useMemo(
     () =>
       round2(
         editingPayrollLogsForAnalytics.reduce(
-          (sum, log) => sum + calculateDailyWorkMinutes(log).regularMinutes / 60,
+          (sum, log) => sum + log.regularHours,
           0,
         ),
       ),
     [editingPayrollLogsForAnalytics],
   );
-
-  const employeeDailyHoursTrend = useMemo(
-    () => buildEmployeeDailyHoursTrend(editingPayrollLogsForAnalytics),
-    [editingPayrollLogsForAnalytics],
-  );
-
-  const employeeAttendanceBreakdown = useMemo(
-    () => buildEmployeeAttendanceBreakdown(editingPayrollLogsForAnalytics),
-    [editingPayrollLogsForAnalytics],
-  );
-
-  const employeeClockInConsistency = useMemo(
-    () => buildEmployeeClockInConsistency(editingPayrollLogsForAnalytics),
-    [editingPayrollLogsForAnalytics],
-  );
-
-  const payrollEditPreview = useMemo(
+  const overtimeEditedLogHours = useMemo(
     () =>
-      buildPayrollEditPreview(
-        editingPayrollRow,
-        payrollEditDraft,
-        hasLogHourOverrides,
-        regularEditedLogHours,
+      round2(
+        editingPayrollLogsForAnalytics.reduce(
+          (sum, log) => sum + log.overtimeHours,
+          0,
+        ),
       ),
-    [editingPayrollRow, payrollEditDraft, hasLogHourOverrides, regularEditedLogHours],
+    [editingPayrollLogsForAnalytics],
   );
 
   const payrollPages = useMemo(
@@ -1033,16 +1039,29 @@ export function usePayrollState({
     }
 
     const nextHoursText = String(regularEditedLogHours);
-    if (payrollEditDraft.hoursWorked === nextHoursText) return;
+    const nextOvertimeText = String(overtimeEditedLogHours);
+    if (
+      payrollEditDraft.hoursWorked === nextHoursText &&
+      payrollEditDraft.overtimeHours === nextOvertimeText
+    ) {
+      return;
+    }
 
     setPayrollEditDraft((prev) =>
-      prev ? { ...prev, hoursWorked: nextHoursText } : prev,
+      prev
+        ? {
+            ...prev,
+            hoursWorked: nextHoursText,
+            overtimeHours: nextOvertimeText,
+          }
+        : prev,
     );
   }, [
     payrollEditDraft,
     editingPayrollRowId,
     hasLogHourOverrides,
     regularEditedLogHours,
+    overtimeEditedLogHours,
   ]);
 
   useEffect(() => {
@@ -1086,7 +1105,6 @@ export function usePayrollState({
     setPayrollOverrides({});
     setPayrollRoleFilter("ALL");
     setLogHourOverrides({});
-    setPayrollSaveNotice(null);
     setPaidHolidays([]);
     document.body.style.overflow = "auto";
   }
@@ -1094,7 +1112,6 @@ export function usePayrollState({
   function handleGeneratePayroll(): boolean {
     if (payrollRows.length === 0) return false;
 
-    setPayrollSaveNotice(null);
     setPayrollGenerated(true);
     setPayrollTab("payroll");
     setPayrollPage(1);
@@ -1104,11 +1121,6 @@ export function usePayrollState({
     setPayrollSort("name-asc");
 
     return true;
-  }
-
-  function handleExportPayroll() {
-    if (filteredPayrollRows.length === 0) return;
-    exportPayrollToExcel(filteredPayrollRows);
   }
 
   function openPayrollRateModal() {
@@ -1222,18 +1234,25 @@ export function usePayrollState({
       payrollBaseComputedRows.find((candidate) => candidate.id === row.id) ?? row;
     const normalizedPeriod = normalizePeriodLabel(attendancePeriod);
 
-    setPayrollSaveNotice(null);
     setEditingPayrollRowId(row.id);
     setEditingPayrollDisplayRow(displayRow ?? baseRow);
+    const baseLogs = buildEditingPayrollLogs(
+      dailyRows,
+      baseRow,
+      attendancePeriod,
+    );
     const sanitizedLogHours = Object.fromEntries(
       Object.entries(existingOverride?.logHours ?? {})
-        .filter(([, value]) => Number.isFinite(value))
-        .map(([key, value]) => [
-          key,
-          Math.round(
-            Math.max(0, Math.min(Number(value), MAX_LOG_HOURS_PER_DAY)) * 100,
-          ) / 100,
-        ]),
+        .map(([key, value]) => {
+          const baseLog = baseLogs.find(
+            (log) => getLogOverrideKey(log) === key,
+          );
+          const fallback = {
+            regularHours: baseLog?.regularHours ?? 0,
+            overtimeHours: baseLog?.overtimeHours ?? 0,
+          };
+          return [key, normalizeLogHourOverrideValue(value, fallback)] as const;
+        }),
     );
     setLogHourOverrides(sanitizedLogHours);
     setPayrollEditDraft({
@@ -1268,10 +1287,12 @@ export function usePayrollState({
           editingPayrollRow.hoursWorked,
         );
 
-    const nextOvertime = parseNonNegativeOrFallback(
-      payrollEditDraft.overtimeHours,
-      editingPayrollRow.overtimeHours,
-    );
+    const nextOvertime = hasLogHourOverrides
+      ? overtimeEditedLogHours
+      : parseNonNegativeOrFallback(
+          payrollEditDraft.overtimeHours,
+          editingPayrollRow.overtimeHours,
+        );
 
     const nextCustomRate =
       payrollEditDraft.rate.trim() === ""
@@ -1287,16 +1308,25 @@ export function usePayrollState({
             editingPayrollLogs
               .map((log) => {
               const key = getLogOverrideKey(log);
-              const value = logHourOverrides[key] ?? log.hours;
-              const normalized =
-                Number.isFinite(value) && value >= 0
-                  ? Math.round(Math.min(value, MAX_LOG_HOURS_PER_DAY) * 100) / 100
-                  : 0;
-              const baseValue = Math.round(Math.max(0, log.hours) * 100) / 100;
-              return [key, normalized, baseValue] as const;
+              const normalized = normalizeLogHourOverrideValue(
+                logHourOverrides[key],
+                {
+                  regularHours: log.regularHours,
+                  overtimeHours: log.overtimeHours,
+                },
+              );
+              const baseRegularHours = sanitizeEditableHours(log.regularHours);
+              const baseOvertimeHours = sanitizeEditableHours(log.overtimeHours);
+              return [
+                key,
+                normalized,
+                baseRegularHours,
+                baseOvertimeHours,
+              ] as const;
             })
-              .filter(([, normalized, baseValue]) =>
-                Math.abs(normalized - baseValue) > 0.001,
+              .filter(([, normalized, baseRegularHours, baseOvertimeHours]) =>
+                Math.abs(normalized.regularHours - baseRegularHours) > 0.001 ||
+                Math.abs(normalized.overtimeHours - baseOvertimeHours) > 0.001,
               )
               .map(([key, normalized]) => [key, normalized]),
           )
@@ -1341,29 +1371,38 @@ export function usePayrollState({
       },
     }));
 
-    setPayrollSaveNotice(
-      `Saved ${editingPayrollRow.worker}: ${nextHours.toLocaleString("en-PH", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })} hours`,
-    );
     toast.success("Payroll edit saved", {
       description: `${editingPayrollRow.worker} updated successfully.`,
     });
 
     closePayrollEditModal();
   }
-  function updateLogHour(log: DailyLogRow, valueText: string) {
+  function updateLogHour(
+    log: DailyLogRow,
+    field: keyof LogHourOverride,
+    valueText: string,
+  ) {
     const normalized = normalizeNumericInput(valueText);
-    const value = Number.parseFloat(normalized);
+    const value = sanitizeEditableHours(
+      Number.parseFloat(normalized),
+      field === "regularHours" ? FULL_WORKDAY_HOURS : MAX_LOG_HOURS_PER_DAY,
+    );
 
-    setLogHourOverrides((prev) => ({
-      ...prev,
-      [getLogOverrideKey(log)]:
-        Number.isFinite(value) && value >= 0
-          ? Math.round(Math.min(value, MAX_LOG_HOURS_PER_DAY) * 100) / 100
-          : 0,
-    }));
+    setLogHourOverrides((prev) => {
+      const key = getLogOverrideKey(log);
+      const current = normalizeLogHourOverrideValue(prev[key], {
+        regularHours: log.regularHours,
+        overtimeHours: log.overtimeHours,
+      });
+
+      return {
+        ...prev,
+        [key]: {
+          ...current,
+          [field]: value,
+        },
+      };
+    });
   }
 
   return {
@@ -1386,7 +1425,6 @@ export function usePayrollState({
     setPayrollSort,
     payrollRoleFilter,
     setPayrollRoleFilter,
-    payrollSaveNotice,
     showPayrollRateModal,
     payrollRateDraft,
     setPayrollRateDraft,
@@ -1419,18 +1457,12 @@ export function usePayrollState({
     editingPayrollLogsForAnalytics,
     payrollEditDraft,
     setPayrollEditDraft,
-    payrollEditPreview,
     logHourOverrides,
     setLogHourOverrides,
     hasLogHourOverrides,
-    totalEditedLogHours,
-    employeeDailyHoursTrend,
-    employeeAttendanceBreakdown,
-    employeeClockInConsistency,
     clearPayrollFilters,
     resetPayrollState,
     handleGeneratePayroll,
-    handleExportPayroll,
     openPayrollRateModal,
     closePayrollRateModal,
     applyPayrollRates,

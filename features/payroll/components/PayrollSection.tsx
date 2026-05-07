@@ -288,11 +288,6 @@ export default function PayrollSection({
               Generate a preview after reviewing attendance logs, then submit
               the payroll record for CEO review.
             </p>
-            {/* {payroll.payrollSaveNotice && (
-              <p className="mt-2 text-xs font-semibold text-green-700">
-                {payroll.payrollSaveNotice}
-              </p>
-            )} */}
           </div>
 
           {!payroll.payrollGenerated && (

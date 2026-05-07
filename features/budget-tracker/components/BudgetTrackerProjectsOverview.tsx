@@ -32,20 +32,27 @@ export default function BudgetTrackerProjectsOverview({
   pending,
   onOpenProject,
   onCreateProject,
+  canManageProjects,
 }: {
   projects: BudgetProjectRow[];
   items: BudgetItemRow[];
   pending: boolean;
   onOpenProject: (projectId: string) => void;
   onCreateProject: () => void;
+  canManageProjects: boolean;
 }) {
   return (
     <div className="space-y-4 p-0 sm:p-6">
       <DashboardPageHero
         eyebrow="Budget Workflow"
         title="Overall Projects"
-        description="Select a project to open its budget board, or create a new one for another client request."
+        description={
+          canManageProjects
+            ? "Select a project to open its budget board, or create a new one for another client request."
+            : "Centralized view of ongoing Prodisenyo projects and budget progress."
+        }
         actions={
+          canManageProjects ? (
           <button
             type="button"
             onClick={onCreateProject}
@@ -55,6 +62,7 @@ export default function BudgetTrackerProjectsOverview({
             <PlusCircle size={14} />
             New project
           </button>
+          ) : null
         }
       />
 
@@ -73,8 +81,19 @@ export default function BudgetTrackerProjectsOverview({
           </span>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {projects.map((project) => {
+        {projects.length === 0 ? (
+          <div className="rounded-[14px] border border-dashed border-apple-mist bg-[rgb(var(--apple-snow))] p-8 text-center">
+            <p className="text-sm font-semibold text-apple-charcoal">
+              No projects to display yet.
+            </p>
+            <p className="mt-2 text-sm text-apple-smoke">
+              Project tracking will show new Prodisenyo projects here once they
+              are created.
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {projects.map((project) => {
             const projectItems = items.filter(
               (item) => item.project_id === project.id,
             );
@@ -144,8 +163,9 @@ export default function BudgetTrackerProjectsOverview({
                 </button>
               </article>
             );
-          })}
-        </div>
+            })}
+          </div>
+        )}
       </section>
     </div>
   );

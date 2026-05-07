@@ -8,6 +8,7 @@ import {
 } from "@/lib/payrollConfig";
 import type { Step2Sort } from "@/types";
 import type { UsePayrollStateResult } from "@/features/payroll/hooks/usePayrollState";
+import type { LogHourOverrideValue } from "@/features/payroll/types";
 import {
   allocateCombinedBranchPay,
   buildEditingPayrollLogs,
@@ -332,7 +333,7 @@ export function buildPayslipRecord(
     totalPay: metrics.totalPay,
   };
   const mergedLogOverrides = Object.values(payroll.payrollOverrides).reduce<
-    Record<string, number>
+    Record<string, LogHourOverrideValue>
   >((acc, override) => {
     if (!override.logHours) return acc;
     Object.assign(acc, override.logHours);
@@ -362,9 +363,12 @@ export function buildPayslipRecord(
     attendanceLogs: employeeLogs.map((log) => {
       const overrideHours = mergedLogOverrides[getLogOverrideKey(log)];
       const nextHours =
-        Number.isFinite(overrideHours) && overrideHours >= 0
+        typeof overrideHours === "number"
           ? overrideHours
-          : log.hours;
+          : overrideHours
+            ? (overrideHours.regularHours ?? log.regularHours) +
+              (overrideHours.overtimeHours ?? log.overtimeHours)
+            : log.totalHours;
 
       return {
         dateLabel: toWeekLabel(log.date),

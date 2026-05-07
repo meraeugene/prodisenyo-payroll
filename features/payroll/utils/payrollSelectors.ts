@@ -14,14 +14,9 @@ import {
 import {
   calculateDailyWorkMinutes,
   compareStep2Rows,
-  earliestNonEmptyTime,
   matchesSearchText,
 } from "@/lib/utils";
 import type { DailyLogRow, Step2Sort } from "@/types";
-import {
-  parseNonNegativeOrFallback,
-  toShortDateLabel,
-} from "@/features/payroll/utils/payrollFormatters";
 import { expandDateSummary, normalizePeriodLabel } from "@/features/payroll/utils/payrollDateHelpers";
 import {
   areLikelySameEmployeeName,
@@ -32,11 +27,8 @@ import {
   pickPreferredRoleCode,
 } from "@/features/payroll/utils/payrollMappers";
 import type {
-  PayrollAttendanceBreakdownItem,
-  PayrollClockInConsistencyItem,
-  PayrollEditDraft,
+  LogHourOverrideValue,
   PayrollEditSummary,
-  PayrollEmployeeDailyHoursTrend,
   PayrollRowOverride,
 } from "@/features/payroll/types";
 
@@ -584,131 +576,52 @@ export function buildEditingPayrollSummary(
 
 export function applyLogHourOverrides(
   editingPayrollLogs: DailyLogRow[],
-  logHourOverrides: Record<string, number>,
+  logHourOverrides: Record<string, LogHourOverrideValue>,
   getLogKey: (log: DailyLogRow) => string,
 ): DailyLogRow[] {
   return editingPayrollLogs.map((log) => {
     const key = getLogKey(log);
-    const hours = logHourOverrides[key] ?? log.hours;
+    const override = logHourOverrides[key];
+    const regularHours =
+      typeof override === "number"
+        ? override
+        : typeof override?.regularHours === "number"
+          ? override.regularHours
+          : log.regularHours;
+    const overtimeHours =
+      typeof override === "number"
+        ? log.overtimeHours
+        : typeof override?.overtimeHours === "number"
+          ? override.overtimeHours
+          : log.overtimeHours;
+    const normalizedRegularHours =
+      Number.isFinite(regularHours) && regularHours >= 0
+        ? round2(regularHours)
+        : 0;
+    const normalizedOvertimeHours =
+      Number.isFinite(overtimeHours) && overtimeHours >= 0
+        ? round2(overtimeHours)
+        : 0;
+
     return {
       ...log,
-      hours,
-      totalHours: hours,
+      hours: normalizedRegularHours,
+      regularHours: normalizedRegularHours,
+      overtimeHours: normalizedOvertimeHours,
+      totalHours: round2(normalizedRegularHours + normalizedOvertimeHours),
     };
   });
 }
 
 export function hasAnyLogHourOverrides(
-  logHourOverrides: Record<string, number>,
+  logHourOverrides: Record<string, LogHourOverrideValue>,
 ): boolean {
-  return Object.values(logHourOverrides).some(
-    (value) => Number.isFinite(value) && value >= 0,
-  );
-}
-
-export function calculateTotalEditedLogHours(logs: DailyLogRow[]): number {
-  const hours = logs.reduce((sum, log) => sum + log.hours, 0);
-  return round2(hours);
-}
-
-export function buildEmployeeDailyHoursTrend(
-  logs: DailyLogRow[],
-): PayrollEmployeeDailyHoursTrend[] {
-  return logs.map((log) => ({
-    date: toShortDateLabel(log.date),
-    isoDate: log.date,
-    hoursWorked: Math.round(log.hours * 100) / 100,
-  }));
-}
-
-export function buildEmployeeAttendanceBreakdown(
-  logs: DailyLogRow[],
-): PayrollAttendanceBreakdownItem[] {
-  const attendanceDays = logs.filter((log) => log.hours > 0).length;
-  const absences = Math.max(logs.length - attendanceDays, 0);
-  const leaveDays = 0;
-  const businessTripDays = 0;
-
-  return [
-    { name: "Attendance", value: attendanceDays },
-    { name: "Absences", value: absences },
-    { name: "Leave", value: leaveDays },
-    { name: "Business Trip", value: businessTripDays },
-  ];
-}
-
-export function buildEmployeeClockInConsistency(
-  logs: DailyLogRow[],
-): PayrollClockInConsistencyItem[] {
-  return logs.map((log) => {
-    const firstIn = earliestNonEmptyTime(log.time1In, log.time2In);
-    const parsed = firstIn ? parseTimeToDecimal(firstIn) : null;
-
-    return {
-      date: toShortDateLabel(log.date),
-      isoDate: log.date,
-      timeIn: parsed ?? 0,
-      timeInLabel: firstIn || "Missed",
-    };
+  return Object.values(logHourOverrides).some((value) => {
+    if (typeof value === "number") return Number.isFinite(value) && value >= 0;
+    return (
+      (Number.isFinite(value.regularHours) && Number(value.regularHours) >= 0) ||
+      (Number.isFinite(value.overtimeHours) && Number(value.overtimeHours) >= 0)
+    );
   });
-}
-
-export function buildPayrollEditPreview(
-  editingPayrollRow: PayrollRow | null,
-  payrollEditDraft: PayrollEditDraft | null,
-  hasLogHourOverrides: boolean,
-  totalEditedLogHours: number,
-): PayrollRow | null {
-  if (!editingPayrollRow || !payrollEditDraft) return null;
-
-  const nextHours = hasLogHourOverrides
-    ? totalEditedLogHours
-    : parseNonNegativeOrFallback(
-        payrollEditDraft.hoursWorked,
-        editingPayrollRow.hoursWorked,
-      );
-
-  const nextOvertime = parseNonNegativeOrFallback(
-    payrollEditDraft.overtimeHours,
-    editingPayrollRow.overtimeHours,
-  );
-
-  const nextCustomRate =
-    payrollEditDraft.rate.trim() === ""
-      ? null
-      : parseNonNegativeOrFallback(
-          payrollEditDraft.rate,
-          editingPayrollRow.customRate ?? editingPayrollRow.defaultRate,
-        );
-
-  const effectiveHourlyRate = round2(
-    nextCustomRate ?? editingPayrollRow.defaultRate,
-  );
-  const calculation = roundPayrollCalculation(
-    calculatePayroll({
-      dailyRate: effectiveHourlyRate * FULL_WORKDAY_HOURS,
-      regularHours: nextHours,
-      overtimeHours: nextOvertime,
-      overtimeMultiplier: DEFAULT_OVERTIME_MULTIPLIER,
-      allowance: 0,
-      deductions: 0,
-    }),
-  );
-
-  return {
-    ...editingPayrollRow,
-    date: payrollEditDraft.date.trim(),
-    hoursWorked: round2(nextHours),
-    overtimeHours: round2(nextOvertime),
-    customRate: nextCustomRate,
-    defaultRate: editingPayrollRow.defaultRate,
-    rate: effectiveHourlyRate,
-    regularPay: calculation.regularPay,
-    overtimePay: calculation.overtimePay,
-    allowance: 0,
-    grossPay: calculation.grossPay,
-    totalDeductions: calculation.totalDeductions,
-    totalPay: calculation.netPay,
-  };
 }
 

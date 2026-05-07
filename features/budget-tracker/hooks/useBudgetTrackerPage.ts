@@ -62,10 +62,12 @@ export function useBudgetTrackerPage({
   projects,
   items,
   schemaReady,
+  canManageProjects = true,
 }: {
   projects: BudgetProjectRow[];
   items: BudgetItemRow[];
   schemaReady: boolean;
+  canManageProjects?: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
   const [localProjects, setLocalProjects] = useState(projects);
@@ -74,7 +76,7 @@ export function useBudgetTrackerPage({
     projects[0]?.id ?? "",
   );
   const [projectSetupOpen, setProjectSetupOpen] = useState(
-    projects.length === 0 && schemaReady,
+    canManageProjects && projects.length === 0 && schemaReady,
   );
   const [itemModalOpen, setItemModalOpen] = useState(false);
   const [itemPanelVisible, setItemPanelVisible] = useState(false);
@@ -200,6 +202,8 @@ export function useBudgetTrackerPage({
       : `This project is over budget by ${formatBudgetMoney(Math.abs(summary.remainingBudget), selectedProject?.currency_code ?? "PHP")}.`;
 
   function queueReorderSave(nextProjectId: string, nextItems: BudgetItemRow[]) {
+    if (!canManageProjects) return;
+
     pendingReordersRef.current[nextProjectId] = {
       projectId: nextProjectId,
       items: nextItems.map((entry) => ({
@@ -214,6 +218,13 @@ export function useBudgetTrackerPage({
   }
 
   function handleSaveDraft(onSuccess?: () => void) {
+    if (!canManageProjects) {
+      if (typeof onSuccess === "function") {
+        onSuccess();
+      }
+      return;
+    }
+
     const pendingPayloads = Object.values(pendingReordersRef.current);
     if (pendingPayloads.length === 0) {
       setSaveState("saved");
@@ -305,11 +316,15 @@ export function useBudgetTrackerPage({
   }
 
   function openNewItemModal(status: BudgetItemStatus = "upcoming") {
+    if (!canManageProjects) return;
+
     resetItemForm(status);
     setItemModalOpen(true);
   }
 
   function openEditItemModal(item: BudgetItemRow) {
+    if (!canManageProjects) return;
+
     setItemForm({
       id: item.id,
       projectId: item.project_id,
@@ -354,6 +369,11 @@ export function useBudgetTrackerPage({
 
   function submitProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canManageProjects) {
+      setProjectError("Payroll managers can view project tracking only.");
+      return;
+    }
+
     setProjectError(null);
     setPendingAction("project");
 
@@ -378,6 +398,11 @@ export function useBudgetTrackerPage({
 
   function submitItem(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canManageProjects) {
+      setItemError("Payroll managers can view project tracking only.");
+      return;
+    }
+
     setItemError(null);
     const nextErrors = validateItemForm(itemForm);
     if (Object.keys(nextErrors).length > 0) {
@@ -416,6 +441,8 @@ export function useBudgetTrackerPage({
   }
 
   function removeItem() {
+    if (!canManageProjects) return;
+
     const itemId = itemForm.id;
     if (!itemId) return;
 
@@ -439,6 +466,8 @@ export function useBudgetTrackerPage({
   }
 
   function removeProject() {
+    if (!canManageProjects) return;
+
     if (!selectedProject) return;
 
     setPendingAction("delete-project");
@@ -594,10 +623,14 @@ export function useBudgetTrackerPage({
   }
 
   function handleDragStart(event: DragStartEvent) {
+    if (!canManageProjects) return;
+
     setDraggedItemId(String(event.active.id));
   }
 
   function handleDragOver(event: DragOverEvent) {
+    if (!canManageProjects) return;
+
     const activeId = String(event.active.id);
     const overId = event.over ? String(event.over.id) : null;
     const overStatus =
@@ -612,6 +645,8 @@ export function useBudgetTrackerPage({
   }
 
   function handleDragEnd(event: DragEndEvent) {
+    if (!canManageProjects) return;
+
     const overStatus =
       (event.over?.data.current?.sortable?.containerId as
         | BudgetItemStatus
@@ -654,7 +689,8 @@ export function useBudgetTrackerPage({
     pendingAction,
     saveState,
     saveMessage,
-    hasUnsavedChanges: saveState === "dirty",
+    canManageProjects,
+    hasUnsavedChanges: canManageProjects && saveState === "dirty",
     handleSaveDraft,
     setSelectedProjectId,
     setProjectSetupOpen,
