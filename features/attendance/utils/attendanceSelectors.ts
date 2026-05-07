@@ -5,6 +5,7 @@ import {
   earlierTime,
   laterTime,
   matchesSearchText,
+  normalizeBiometricDailyTimes,
 } from "@/lib/utils";
 
 export interface AttendanceFilters {
@@ -99,17 +100,19 @@ export function buildDailyRows(records: AttendanceRecord[]): DailyLogRow[] {
   }
 
   return Array.from(grouped.values()).map((row) => {
-    const dailyMinutes = calculateDailyWorkMinutes(row);
+    const normalizedTimes = normalizeBiometricDailyTimes(row);
+    const displayRow = { ...row, ...normalizedTimes };
+    const dailyMinutes = calculateDailyWorkMinutes(displayRow);
     const strictMinutes = dailyMinutes.totalMinutes;
     const inferredMinutes =
       strictMinutes === 0
         ? inferMinutesFromPunches([
-            row.time1In,
-            row.time1Out,
-            row.time2In,
-            row.time2Out,
-            row.otIn,
-            row.otOut,
+            displayRow.time1In,
+            displayRow.time1Out,
+            displayRow.time2In,
+            displayRow.time2Out,
+            displayRow.otIn,
+            displayRow.otOut,
           ])
         : 0;
 
@@ -117,7 +120,7 @@ export function buildDailyRows(records: AttendanceRecord[]): DailyLogRow[] {
     const totalHours = Math.round((minutes / 60) * 100) / 100;
 
     return {
-      ...row,
+      ...displayRow,
       regularHours: Math.round((dailyMinutes.regularMinutes / 60) * 100) / 100,
       overtimeHours:
         Math.round((dailyMinutes.overtimeMinutes / 60) * 100) / 100,

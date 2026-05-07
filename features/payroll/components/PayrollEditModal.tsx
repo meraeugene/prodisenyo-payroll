@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, X } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -80,6 +80,8 @@ interface PayrollEditModalProps {
   payroll: UsePayrollStateResult;
 }
 
+const ALL_REPORT_LOGS_PAGE_SIZE = 7;
+
 export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
   const { currentAttendanceImportId, attendancePeriod } = useAppState();
   const { editingPayrollRow, editingPayrollSourceRow, payrollEditDraft } =
@@ -107,6 +109,7 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
   const [overtimeValidationMessage, setOvertimeValidationMessage] = useState<
     string | null
   >(null);
+  const [allReportLogsPage, setAllReportLogsPage] = useState(1);
 
   useEffect(() => {
     setActiveAdjustmentForm(null);
@@ -124,7 +127,17 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
     setPaidLeaveEntries([
       ...payroll.editingPayrollAdjustments.paidLeaveEntries,
     ]);
+    setAllReportLogsPage(1);
   }, [editingPayrollRow?.id, payroll.editingPayrollAdjustments]);
+
+  useEffect(() => {
+    const totalPages = Math.max(
+      1,
+      Math.ceil(payroll.editingPayrollLogs.length / ALL_REPORT_LOGS_PAGE_SIZE),
+    );
+
+    setAllReportLogsPage((page) => Math.min(page, totalPages));
+  }, [payroll.editingPayrollLogs.length]);
 
   if (!editingPayrollRow || !payrollEditDraft) return null;
 
@@ -247,6 +260,19 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
   );
   const hasHoursReviewWarning =
     underHoursLogs.length > 0 || highOvertimeHoursLogs.length > 0;
+  const allReportLogsCount = payroll.editingPayrollLogs.length;
+  const allReportLogsTotalPages = Math.max(
+    1,
+    Math.ceil(allReportLogsCount / ALL_REPORT_LOGS_PAGE_SIZE),
+  );
+  const allReportLogsPreviewStart =
+    (allReportLogsPage - 1) * ALL_REPORT_LOGS_PAGE_SIZE;
+  const allReportLogsPreviewEnd =
+    allReportLogsPreviewStart + ALL_REPORT_LOGS_PAGE_SIZE;
+  const visibleAllReportLogs = payroll.editingPayrollLogs.slice(
+    allReportLogsPreviewStart,
+    allReportLogsPreviewEnd,
+  );
   const baseWorkedPay =
     sitePayBreakdownWithAllocation.length > 0
       ? branchPayAllocation.totalBasePay
@@ -888,7 +914,7 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                 )}
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1120px] text-sm">
+                <table className="w-full min-w-[980px] text-sm">
                   <thead>
                     <tr className="border-b border-apple-mist">
                       {[
@@ -916,7 +942,7 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {payroll.editingPayrollLogs.length === 0 ? (
+                    {allReportLogsCount === 0 ? (
                       <tr>
                         <td
                           colSpan={11}
@@ -926,7 +952,7 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                         </td>
                       </tr>
                     ) : (
-                      payroll.editingPayrollLogs.map((log, index) => {
+                      visibleAllReportLogs.map((log, index) => {
                         const isPaidHoliday = holidayLogDateSet.has(log.date);
                         const isUnderRequiredHours =
                           getHoursNumber(log) > 0 &&
@@ -943,7 +969,7 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
 
                         return (
                           <tr
-                            key={`${log.date}-${log.employee}-${log.site}-${index}`}
+                            key={`${log.date}-${log.employee}-${log.site}-${allReportLogsPreviewStart + index}`}
                             className={`border-b border-apple-mist/60 last:border-0 ${
                               isPaidHoliday
                                 ? "bg-sky-50/50"
@@ -955,30 +981,32 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                             }`}
                           >
                             <td className="px-3 py-2.5 text-sm text-apple-charcoal">
-                              <div className="flex items-center gap-2">
-                                <span className="inline-block min-w-[3rem]">
+                              <div className="flex min-w-[4.5rem] flex-col items-start gap-1">
+                                <span className="font-medium leading-tight">
                                   {toWeekLabel(log.date)}
                                 </span>
-                                {isPaidHoliday && (
-                                  <span className="w-fit rounded-full border border-sky-200 bg-sky-100 px-2 py-0.5 text-2xs font-semibold text-sky-700">
-                                    Paid Holiday
-                                  </span>
-                                )}
-                                {isUnderRequiredHours && !isPaidHoliday && (
-                                  <span className="w-fit rounded-full border border-yellow-300 bg-yellow-100 px-2 py-0.5 text-2xs font-semibold text-yellow-800">
-                                    Under 8h
-                                  </span>
-                                )}
-                                {isHighOvertimeHours && (
-                                  <span className="w-fit rounded-full border border-rose-300 bg-rose-100 px-2 py-0.5 text-2xs font-semibold text-rose-800">
-                                    10h+ Overtime
-                                  </span>
-                                )}
-                                {isOvertimeDay && !isHighOvertimeHours && (
-                                  <span className="w-fit rounded-full border border-emerald-300 bg-emerald-100 px-2 py-0.5 text-2xs font-semibold text-emerald-800">
-                                    Overtime
-                                  </span>
-                                )}
+                                <div className="flex flex-col items-start gap-1">
+                                  {isPaidHoliday && (
+                                    <span className="w-fit whitespace-nowrap rounded-full border border-sky-200 bg-sky-100 px-2 py-0.5 text-2xs font-semibold text-sky-700">
+                                      Paid Holiday
+                                    </span>
+                                  )}
+                                  {isUnderRequiredHours && !isPaidHoliday && (
+                                    <span className="w-fit whitespace-nowrap rounded-full border border-yellow-300 bg-yellow-100 px-2 py-0.5 text-2xs font-semibold text-yellow-800">
+                                      Under 8h
+                                    </span>
+                                  )}
+                                  {isHighOvertimeHours && (
+                                    <span className="w-fit whitespace-nowrap rounded-full border border-rose-300 bg-rose-100 px-2 py-0.5 text-2xs font-semibold text-rose-800">
+                                      10h+ Overtime
+                                    </span>
+                                  )}
+                                  {isOvertimeDay && !isHighOvertimeHours && (
+                                    <span className="w-fit whitespace-nowrap rounded-full border border-emerald-300 bg-emerald-100 px-2 py-0.5 text-2xs font-semibold text-emerald-800">
+                                      Overtime
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </td>
                             <td className="px-3 py-2.5 text-xs text-apple-smoke">
@@ -1044,6 +1072,53 @@ export default function PayrollEditModal({ payroll }: PayrollEditModalProps) {
                   </tbody>
                 </table>
               </div>
+              {allReportLogsCount > ALL_REPORT_LOGS_PAGE_SIZE && (
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-apple-mist px-4 py-3">
+                  <p className="text-xs font-medium text-apple-steel">
+                    Showing {allReportLogsPreviewStart + 1}-
+                    {Math.min(allReportLogsPreviewEnd, allReportLogsCount)} of{" "}
+                    {allReportLogsCount} log days
+                  </p>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAllReportLogsPage((page) => Math.max(1, page - 1))
+                      }
+                      disabled={allReportLogsPage === 1}
+                      className={`flex h-8 items-center gap-1 rounded-[10px] border px-3 text-xs font-semibold transition ${
+                        allReportLogsPage === 1
+                          ? "cursor-not-allowed border-apple-mist text-apple-silver"
+                          : "border-apple-silver text-apple-charcoal hover:border-[#7ebd8b]"
+                      }`}
+                    >
+                      <ArrowLeft size={14} />
+                      Previous
+                    </button>
+                    <span className="min-w-[4.5rem] text-center text-xs font-semibold text-apple-steel">
+                      {allReportLogsPage} / {allReportLogsTotalPages}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAllReportLogsPage((page) =>
+                          Math.min(allReportLogsTotalPages, page + 1),
+                        )
+                      }
+                      disabled={allReportLogsPage === allReportLogsTotalPages}
+                      className={`flex h-8 items-center gap-1 rounded-[10px] border px-3 text-xs font-semibold transition ${
+                        allReportLogsPage === allReportLogsTotalPages
+                          ? "cursor-not-allowed border-apple-mist text-apple-silver"
+                          : "border-apple-silver text-apple-charcoal hover:border-[#7ebd8b]"
+                      }`}
+                    >
+                      Next
+                      <ArrowRight size={14} />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="rounded-2xl border border-apple-mist bg-white">

@@ -38,6 +38,17 @@ function timeToMinutes(time: string): number {
 
 const EVENING_OVERTIME_START_MINUTES = 18 * 60;
 const END_OF_DAY_MINUTES = 24 * 60;
+const MISFILED_TIME1_OUT_IN_START_MINUTES = 10 * 60;
+const MISFILED_TIME1_OUT_IN_END_MINUTES = 12 * 60 + 59;
+
+interface DailyWorkTimeFields {
+  time1In?: string | null;
+  time1Out?: string | null;
+  time2In?: string | null;
+  time2Out?: string | null;
+  otIn?: string | null;
+  otOut?: string | null;
+}
 
 function earlierTime(current: string, incoming: string): string {
   if (!current) return incoming;
@@ -75,6 +86,44 @@ function boundedForwardPairMinutes(inTime: string, outTime: string): number {
   return minutes <= 16 * 60 ? minutes : 0;
 }
 
+function normalizeBiometricDailyTimes(times: DailyWorkTimeFields): {
+  time1In: string;
+  time1Out: string;
+  time2In: string;
+  time2Out: string;
+  otIn: string;
+  otOut: string;
+} {
+  const normalized = {
+    time1In: times.time1In ?? "",
+    time1Out: times.time1Out ?? "",
+    time2In: times.time2In ?? "",
+    time2Out: times.time2Out ?? "",
+    otIn: times.otIn ?? "",
+    otOut: times.otOut ?? "",
+  };
+
+  const time1OutMinutes = timeToMinutes(normalized.time1Out);
+  const time2OutMinutes = timeToMinutes(normalized.time2Out);
+  const time1OutLooksLikeLateMorningIn =
+    time1OutMinutes >= MISFILED_TIME1_OUT_IN_START_MINUTES &&
+    time1OutMinutes <= MISFILED_TIME1_OUT_IN_END_MINUTES;
+
+  if (
+    !normalized.time1In &&
+    !normalized.time2In &&
+    normalized.time1Out &&
+    normalized.time2Out &&
+    time1OutLooksLikeLateMorningIn &&
+    time2OutMinutes > time1OutMinutes
+  ) {
+    normalized.time1In = normalized.time1Out;
+    normalized.time1Out = "";
+  }
+
+  return normalized;
+}
+
 function earliestValidMinutes(...times: string[]): number | null {
   const values = times
     .map((time) => timeToMinutes(time))
@@ -99,12 +148,8 @@ function calculateDailyWorkMinutes(times: {
   otIn?: string | null;
   otOut?: string | null;
 }): { regularMinutes: number; overtimeMinutes: number; totalMinutes: number } {
-  const time1In = times.time1In ?? "";
-  const time1Out = times.time1Out ?? "";
-  const time2In = times.time2In ?? "";
-  const time2Out = times.time2Out ?? "";
-  const otIn = times.otIn ?? "";
-  const otOut = times.otOut ?? "";
+  const { time1In, time1Out, time2In, time2Out, otIn, otOut } =
+    normalizeBiometricDailyTimes(times);
 
   const regularInMinutes = earliestValidMinutes(time1In, time2In);
   const regularOutMinutes = latestValidMinutes(time1Out, time2Out);
@@ -210,6 +255,7 @@ export {
   laterTime,
   pairMinutes,
   calculateDailyWorkMinutes,
+  normalizeBiometricDailyTimes,
   computeSameDayOvertimeMinutes,
   computeNextDayCarryMinutes,
   earliestNonEmptyTime,

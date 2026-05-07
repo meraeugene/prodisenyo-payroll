@@ -57,6 +57,7 @@ async function parseSpreadsheet(file: File): Promise<ParseResult> {
   let period = filenamePeriodRange
     ? formatPeriodLabel(filenamePeriodRange)
     : "Current Period";
+  let spreadsheetPeriodRange = filenamePeriodRange;
   let removedEntries = 0;
   const records: AttendanceRecord[] = [];
   const stats = new Map<string, EmployeeAccumulator>();
@@ -66,11 +67,16 @@ async function parseSpreadsheet(file: File): Promise<ParseResult> {
     const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, {
       header: 1,
       defval: "",
+      raw: false,
     }) as unknown[][];
 
     rawRows += rows.length;
 
     const detectedPeriod = detectPeriodRange(rows) ?? filenamePeriodRange;
+    spreadsheetPeriodRange = mergeDateRanges(
+      spreadsheetPeriodRange,
+      detectedPeriod,
+    );
     if (period === "Current Period" && detectedPeriod) {
       period = formatPeriodLabel(detectedPeriod);
     }
@@ -83,6 +89,10 @@ async function parseSpreadsheet(file: File): Promise<ParseResult> {
     records.push(...detail.records);
     removedEntries += detail.removedEntries;
     mergeAccumulators(stats, detail.accumulators);
+    spreadsheetPeriodRange = mergeDateRanges(
+      spreadsheetPeriodRange,
+      detail.periodRange,
+    );
 
     if (period === "Current Period" && detail.periodRange) {
       period = formatPeriodLabel(detail.periodRange);
@@ -90,6 +100,10 @@ async function parseSpreadsheet(file: File): Promise<ParseResult> {
   }
 
   if (records.length > 0) {
+    if (spreadsheetPeriodRange) {
+      period = formatPeriodLabel(spreadsheetPeriodRange);
+    }
+
     records.sort((a, b) => {
       if (a.date !== b.date) return a.date.localeCompare(b.date);
       if (a.employee !== b.employee)
@@ -118,7 +132,7 @@ async function parseSpreadsheet(file: File): Promise<ParseResult> {
 
   const fallbackRows: unknown[][] = XLSX.utils.sheet_to_json(
     workbook.Sheets[fallbackSheet],
-    { header: 1, defval: "" },
+    { header: 1, defval: "", raw: false },
   ) as unknown[][];
 
   const fallback = extractEmployeesFromRows(fallbackRows);
@@ -270,6 +284,7 @@ interface DetailParseResult {
 interface AttendanceBlock {
   start: number;
   employee: string;
+  periodRange: DateRange | null;
 }
 
 function extractEmployeesFromRows(
@@ -432,6 +447,19 @@ function normalizeDateRange(start: Date, end: Date): DateRange {
   return { start: end, end: start };
 }
 
+function mergeDateRanges(
+  first: DateRange | null,
+  second: DateRange | null,
+): DateRange | null {
+  if (!first) return second;
+  if (!second) return first;
+
+  return {
+    start: first.start <= second.start ? first.start : second.start,
+    end: first.end >= second.end ? first.end : second.end,
+  };
+}
+
 function formatPeriodLabel(range: DateRange): string {
   return `${formatDate(range.start)} to ${formatDate(range.end)}`;
 }
@@ -442,6 +470,7 @@ function extractAttendanceRecords(
   fallbackPeriodRange: DateRange | null,
 ): DetailParseResult {
   const periodRange = detectPeriodRange(rows) ?? fallbackPeriodRange;
+  let resolvedPeriodRange = periodRange;
   const records: AttendanceRecord[] = [];
   const accumulators = new Map<string, EmployeeAccumulator>();
   let removedEntries = 0;
@@ -450,10 +479,15 @@ function extractAttendanceRecords(
 
   for (const block of blocks) {
     const { start, employee } = block;
+    const blockPeriodRange = block.periodRange ?? periodRange;
+    resolvedPeriodRange = mergeDateRanges(
+      resolvedPeriodRange,
+      blockPeriodRange,
+    );
 
     for (const row of rows) {
       const dateValue = row[start];
-      const isoDate = parseRowDate(dateValue, periodRange);
+      const isoDate = parseRowDate(dateValue, blockPeriodRange);
       if (!isoDate) continue;
 
       removedEntries += processSlot(
@@ -492,7 +526,12 @@ function extractAttendanceRecords(
     }
   }
 
-  return { records, accumulators, removedEntries, periodRange };
+  return {
+    records,
+    accumulators,
+    removedEntries,
+    periodRange: resolvedPeriodRange,
+  };
 }
 
 function findAttendanceBlocks(rows: unknown[][]): AttendanceBlock[] {
@@ -505,7 +544,11 @@ function findAttendanceBlocks(rows: unknown[][]): AttendanceBlock[] {
 
       const employee = findEmployeeName(rows, c);
       if (employee && !blocks.has(c)) {
-        blocks.set(c, { start: c, employee });
+        blocks.set(c, {
+          start: c,
+          employee,
+          periodRange: findBlockPeriodRange(rows, c),
+        });
       }
     }
   }
@@ -523,7 +566,13 @@ function findFixedWidthAttendanceBlocks(rows: unknown[][]): AttendanceBlock[] {
 
   for (let start = 0; start < maxCols; start += 15) {
     const employee = findEmployeeName(rows, start);
-    if (employee) blocks.push({ start, employee });
+    if (employee) {
+      blocks.push({
+        start,
+        employee,
+        periodRange: findBlockPeriodRange(rows, start),
+      });
+    }
   }
 
   return blocks;
@@ -544,6 +593,13 @@ function findEmployeeName(rows: unknown[][], start: number): string | null {
     }
   }
   return null;
+}
+
+function findBlockPeriodRange(rows: unknown[][], start: number): DateRange | null {
+  const windowRows = rows.slice(0, 20).map((row) =>
+    row.slice(start, Math.min(start + 15, row.length)),
+  );
+  return detectPeriodRange(windowRows);
 }
 
 function processSlot(

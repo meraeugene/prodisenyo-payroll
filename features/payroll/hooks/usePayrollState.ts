@@ -483,16 +483,27 @@ export function usePayrollState({
         const identity = parsePayrollIdentity(row.employee);
         const key = getLogOverrideKey(row);
         const overrideHours = persistedLogHourOverrides[key];
+        const baseRegularHours =
+          row.regularHours > 0 || row.overtimeHours > 0
+            ? row.regularHours
+            : row.hours;
+        const regularHours =
+          Number.isFinite(overrideHours) && overrideHours >= 0
+            ? overrideHours
+            : baseRegularHours;
+        const overtimeHours =
+          Number.isFinite(row.overtimeHours) && row.overtimeHours > 0
+            ? row.overtimeHours
+            : 0;
 
         return {
           name: identity.name,
           role: identity.role,
           site: row.site,
           date: row.date,
-          hours:
-            Number.isFinite(overrideHours) && overrideHours >= 0
-              ? overrideHours
-              : row.hours,
+          hours: round2(regularHours),
+          overtimeHours: round2(overtimeHours),
+          totalHours: round2(regularHours + overtimeHours),
         };
       })
       .filter(
