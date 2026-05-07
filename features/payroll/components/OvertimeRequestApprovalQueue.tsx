@@ -205,6 +205,20 @@ export default function OvertimeRequestApprovalQueue({
                     </div>
                     <div className="hidden h-3 w-px bg-apple-mist lg:block" />
                     <div className="font-medium">{request.request_date}</div>
+                    <div className="hidden h-3 w-px bg-apple-mist lg:block" />
+                    <div className="font-medium">
+                      {request.approval_mode === "auto_on_date"
+                        ? request.auto_approved_at
+                          ? "Auto-approved"
+                          : "Auto on date"
+                        : "CEO manual"}
+                    </div>
+                    {request.role_code ? (
+                      <>
+                        <div className="hidden h-3 w-px bg-apple-mist lg:block" />
+                        <div className="font-medium">{request.role_code}</div>
+                      </>
+                    ) : null}
                   </div>
 
                   {request.period_label ? (
@@ -262,7 +276,9 @@ export default function OvertimeRequestApprovalQueue({
                 {request.status === "pending" ? (
                   <div className="mt-auto flex flex-wrap items-center justify-between gap-4 pt-6">
                     <div className="text-[11px] italic text-apple-steel">
-                      Review required before payroll cutoff
+                      {request.approval_mode === "auto_on_date"
+                        ? "Scheduled for payroll auto-approval on the work date"
+                        : "Review required before payroll cutoff"}
                     </div>
                     <div className="flex items-center gap-2">
                       <button
@@ -277,25 +293,27 @@ export default function OvertimeRequestApprovalQueue({
                         <XCircle size={16} />
                         Return
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => handleApprove(request.id)}
-                        disabled={isPending}
-                        className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#1f6a37] px-5 text-xs font-bold text-white shadow-md shadow-emerald-900/10 transition-all hover:bg-[#18552d] hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-60"
-                      >
-                        {pendingActionId === request.id &&
-                        pendingActionType === "approve" ? (
-                          <>
-                            <Loader2 size={14} className="animate-spin" />
-                            Approving...
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle2 size={16} />
-                            Approve Request
-                          </>
-                        )}
-                      </button>
+                      {request.approval_mode === "auto_on_date" ? null : (
+                        <button
+                          type="button"
+                          onClick={() => handleApprove(request.id)}
+                          disabled={isPending}
+                          className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#1f6a37] px-5 text-xs font-bold text-white shadow-md shadow-emerald-900/10 transition-all hover:bg-[#18552d] hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-60"
+                        >
+                          {pendingActionId === request.id &&
+                          pendingActionType === "approve" ? (
+                            <>
+                              <Loader2 size={14} className="animate-spin" />
+                              Approving...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 size={16} />
+                              Approve Request
+                            </>
+                          )}
+                        </button>
+                      )}
                     </div>
                   </div>
                 ) : null}

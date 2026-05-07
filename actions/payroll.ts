@@ -1,6 +1,6 @@
 "use server";
 
-import type { PayrollRunStatus } from "@/types/database";
+import type { OvertimeApprovalMode, PayrollRunStatus } from "@/types/database";
 import type { Database } from "@/types/database";
 import type { AttendanceRecordInput, PayrollRow } from "@/lib/payrollEngine";
 import { calculatePayroll, roundPayrollCalculation } from "@/lib/payrollEngine";
@@ -25,12 +25,14 @@ import type { OvertimeRequestRecord } from "@/features/overtime-requests/types";
 
 interface SubmitOvertimeRequestInput {
   employeeName: string;
+  roleCode?: string | null;
   siteName: string;
   periodLabel?: string | null;
   requestDate: string;
   overtimeHours: number;
   amount?: number;
   reason?: string | null;
+  approvalMode?: OvertimeApprovalMode;
 }
 
 interface RejectOvertimeRequestFormInput {
@@ -355,6 +357,274 @@ function computeRowAdjustmentTotals(override: PayrollRowOverride | undefined) {
   };
 }
 
+function getPhilippineTodayIso(): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Manila",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+
+  if (year && month && day) return `${year}-${month}-${day}`;
+  return toIsoDate(new Date());
+}
+
+function buildAdvanceOvertimeCandidateKey(
+  employeeName: string | null,
+  roleCode: string | null,
+  siteName: string | null,
+): string {
+  return [
+    normalizeLookupKey(employeeName ?? ""),
+    (roleCode ?? "").trim().toUpperCase(),
+    normalizeLookupKey(siteName ?? ""),
+  ].join("|||");
+}
+
+function buildPayrollCandidatesFromRows(
+  rows: SyncAdvanceOvertimeRequestsInput["payrollRows"],
+): AdvanceOvertimePayrollCandidate[] {
+  return rows.map((row) => ({
+    employeeName: row.worker,
+    roleCode: row.role.trim().toUpperCase() || "UNKNOWN",
+    siteName: normalizeSiteName(row.site),
+    ratePerDay: round2((row.customRate ?? row.defaultRate ?? 0) * FULL_WORKDAY_HOURS),
+  }));
+}
+
+async function syncAdvanceOvertimeRequestsForPayroll(
+  database: any,
+  input: {
+    userId: string;
+    attendanceImportId: string | null;
+    attendancePeriod: string;
+    candidates: AdvanceOvertimePayrollCandidate[];
+  },
+) {
+  const periodRange = parsePeriodRange(input.attendancePeriod);
+  if (!periodRange.start || !periodRange.end || input.candidates.length === 0) {
+    return { approvedCount: 0, unmatchedCount: 0 };
+  }
+
+  const today = getPhilippineTodayIso();
+  const candidateLookup = new Map<string, AdvanceOvertimePayrollCandidate>();
+  input.candidates.forEach((candidate) => {
+    candidateLookup.set(
+      buildAdvanceOvertimeCandidateKey(
+        candidate.employeeName,
+        candidate.roleCode,
+        candidate.siteName,
+      ),
+      candidate,
+    );
+  });
+
+  const { data: requests, error } = await database
+    .from("overtime_requests")
+    .select(
+      "id, requested_by, employee_name, role_code, site_name, period_label, request_date, overtime_hours, amount, reason, status, approval_mode, payroll_adjustment_id",
+    )
+    .eq("approval_mode", "auto_on_date")
+    .eq("status", "pending")
+    .gte("request_date", periodRange.start)
+    .lte("request_date", periodRange.end)
+    .lte("request_date", today);
+
+  if (error) {
+    throw new Error(`Failed to load advance overtime requests. ${error.message}`);
+  }
+
+  let approvedCount = 0;
+  let unmatchedCount = 0;
+  const approvedAt = new Date().toISOString();
+
+  for (const request of (requests ?? []) as Array<{
+    id: string;
+    requested_by: string;
+    employee_name: string;
+    role_code: string | null;
+    site_name: string;
+    period_label: string | null;
+    request_date: string;
+    overtime_hours: number;
+    amount: number;
+    reason: string | null;
+    status: "pending" | "approved" | "rejected";
+    approval_mode: OvertimeApprovalMode;
+    payroll_adjustment_id: string | null;
+  }>) {
+    if (
+      request.period_label &&
+      request.period_label.trim() !== input.attendancePeriod
+    ) {
+      continue;
+    }
+
+    const candidate = candidateLookup.get(
+      buildAdvanceOvertimeCandidateKey(
+        request.employee_name,
+        request.role_code,
+        request.site_name,
+      ),
+    );
+
+    if (!candidate) {
+      unmatchedCount += 1;
+      continue;
+    }
+
+    const overtimeHours = round2(Number(request.overtime_hours ?? 0));
+    if (!Number.isFinite(overtimeHours) || overtimeHours <= 0) {
+      unmatchedCount += 1;
+      continue;
+    }
+
+    const calculated = roundPayrollCalculation(
+      calculatePayroll({
+        dailyRate: candidate.ratePerDay,
+        regularHours: 0,
+        overtimeHours,
+        overtimeMultiplier: DEFAULT_OVERTIME_MULTIPLIER,
+        allowance: 0,
+        deductions: 0,
+      }),
+    );
+    const amount = round2(calculated.overtimePay);
+    const notes = [
+      request.reason?.trim() || "Advance overtime request",
+      `Auto-approved on ${today} for requested date ${request.request_date}.`,
+    ].join("\n");
+
+    const adjustmentPayload = {
+      payroll_run_id: null,
+      payroll_run_item_id: null,
+      attendance_import_id: input.attendanceImportId,
+      employee_name: candidate.employeeName,
+      employee_name_key: normalizeLookupKey(candidate.employeeName),
+      role_code: candidate.roleCode,
+      site_name: candidate.siteName,
+      site_name_key: normalizeLookupKey(candidate.siteName),
+      period_label: input.attendancePeriod,
+      period_start: periodRange.start,
+      period_end: periodRange.end,
+      source_overtime_request_id: request.id,
+      adjustment_type: "overtime",
+      status: "approved",
+      requested_by: request.requested_by,
+      approved_by: input.userId,
+      effective_date: request.request_date,
+      quantity: overtimeHours,
+      amount,
+      notes,
+    };
+
+    let adjustmentId = request.payroll_adjustment_id;
+
+    if (adjustmentId) {
+      const { error: updateAdjustmentError } = await database
+        .from("payroll_adjustments")
+        .update(adjustmentPayload)
+        .eq("id", adjustmentId);
+
+      if (updateAdjustmentError) {
+        throw new Error(
+          `Failed to update auto-approved overtime adjustment. ${updateAdjustmentError.message}`,
+        );
+      }
+    } else {
+      const { data: existingAdjustment, error: existingAdjustmentError } =
+        await database
+          .from("payroll_adjustments")
+          .select("id")
+          .eq("source_overtime_request_id", request.id)
+          .maybeSingle();
+
+      if (existingAdjustmentError) {
+        throw new Error(
+          `Failed to check auto-approved overtime adjustment. ${existingAdjustmentError.message}`,
+        );
+      }
+
+      if (existingAdjustment?.id) {
+        adjustmentId = existingAdjustment.id;
+        const { error: updateExistingError } = await database
+          .from("payroll_adjustments")
+          .update(adjustmentPayload)
+          .eq("id", adjustmentId);
+
+        if (updateExistingError) {
+          throw new Error(
+            `Failed to refresh auto-approved overtime adjustment. ${updateExistingError.message}`,
+          );
+        }
+      } else {
+        const { data: createdAdjustment, error: createAdjustmentError } =
+          await database
+            .from("payroll_adjustments")
+            .insert(adjustmentPayload)
+            .select("id")
+            .single();
+
+        if (createAdjustmentError || !createdAdjustment) {
+          throw new Error(
+            `Failed to create auto-approved overtime adjustment. ${createAdjustmentError?.message ?? ""}`,
+          );
+        }
+
+        adjustmentId = createdAdjustment.id;
+      }
+    }
+
+    const { error: updateRequestError } = await database
+      .from("overtime_requests")
+      .update({
+        status: "approved",
+        approved_by: input.userId,
+        approved_at: approvedAt,
+        auto_approved_at: approvedAt,
+        payroll_adjustment_id: adjustmentId,
+        amount,
+        period_label: input.attendancePeriod,
+        rejected_at: null,
+        rejection_reason: null,
+      })
+      .eq("id", request.id)
+      .eq("status", "pending");
+
+    if (updateRequestError) {
+      throw new Error(
+        `Failed to mark advance overtime request approved. ${updateRequestError.message}`,
+      );
+    }
+
+    approvedCount += 1;
+  }
+
+  return { approvedCount, unmatchedCount };
+}
+
+interface AdvanceOvertimePayrollCandidate {
+  employeeName: string;
+  roleCode: string;
+  siteName: string;
+  ratePerDay: number;
+}
+
+interface SyncAdvanceOvertimeRequestsInput {
+  attendanceImportId: string | null;
+  attendancePeriod: string;
+  payrollRows: Array<{
+    worker: string;
+    role: string;
+    site: string;
+    defaultRate: number;
+    customRate: number | null;
+  }>;
+}
+
 interface DailyPayAllocationPoint {
   date: string;
   hoursWorked: number;
@@ -564,6 +834,20 @@ export async function requestOvertimeApprovalAction(
   };
 }
 
+export async function syncAdvanceOvertimeRequestsForPayrollAction(
+  input: SyncAdvanceOvertimeRequestsInput,
+) {
+  const { user } = await requireRole(["ceo", "payroll_manager"]);
+  const database = createSupabaseAdminClient() as any;
+
+  return syncAdvanceOvertimeRequestsForPayroll(database, {
+    userId: user.id,
+    attendanceImportId: input.attendanceImportId,
+    attendancePeriod: input.attendancePeriod,
+    candidates: buildPayrollCandidatesFromRows(input.payrollRows),
+  });
+}
+
 export async function savePayrollRunAction(input: SavePayrollRunInput) {
   const { user } = await requireRole(["ceo", "payroll_manager"]);
   const database = createSupabaseAdminClient() as any;
@@ -627,6 +911,18 @@ export async function savePayrollRunAction(input: SavePayrollRunInput) {
         `${normalizeLookupKey(snapshot.row.worker)}|||${snapshot.row.role.trim().toUpperCase()}|||${normalizeLookupKey(snapshot.row.site)}`,
     ),
   );
+
+  await syncAdvanceOvertimeRequestsForPayroll(database, {
+    userId: user.id,
+    attendanceImportId: input.attendanceImportId,
+    attendancePeriod: input.attendancePeriod,
+    candidates: rowSnapshots.map((snapshot) => ({
+      employeeName: snapshot.row.worker,
+      roleCode: snapshot.row.role.trim().toUpperCase() || "UNKNOWN",
+      siteName: normalizeSiteName(snapshot.row.site),
+      ratePerDay: snapshot.ratePerDay,
+    })),
+  });
 
   let approvedOvertimeQuery = database
     .from("payroll_adjustments")
@@ -1514,7 +1810,7 @@ export async function getOvertimeRequestsApprovalDataAction() {
   const { data, error } = await database
     .from("overtime_requests")
     .select(
-      "id, requester_role, requested_by, approved_by, employee_name, site_name, period_label, request_date, overtime_hours, amount, reason, status, approved_at, rejected_at, rejection_reason, created_at, updated_at",
+      "id, requester_role, requested_by, approved_by, payroll_adjustment_id, employee_name, role_code, site_name, period_label, request_date, overtime_hours, amount, reason, approval_mode, status, approved_at, auto_approved_at, rejected_at, rejection_reason, created_at, updated_at",
     )
     .in("status", ["pending", "approved", "rejected"])
     .order("created_at", { ascending: false });
@@ -1539,7 +1835,7 @@ export async function getMyOvertimeRequestsAction() {
   const { data, error } = await database
     .from("overtime_requests")
     .select(
-      "id, requester_role, requested_by, approved_by, employee_name, site_name, period_label, request_date, overtime_hours, amount, reason, status, approved_at, rejected_at, rejection_reason, created_at, updated_at",
+      "id, requester_role, requested_by, approved_by, payroll_adjustment_id, employee_name, role_code, site_name, period_label, request_date, overtime_hours, amount, reason, approval_mode, status, approved_at, auto_approved_at, rejected_at, rejection_reason, created_at, updated_at",
     )
     .eq("requested_by", user.id)
     .order("created_at", { ascending: false });
@@ -1564,12 +1860,15 @@ export async function submitOvertimeRequestAction(
   const database = createSupabaseAdminClient() as any;
 
   const employeeName = (input.employeeName ?? "").trim();
+  const roleCode = (input.roleCode ?? "").trim().toUpperCase() || null;
   const siteName = (input.siteName ?? "").trim();
   const periodLabel = (input.periodLabel ?? "").trim() || null;
   const requestDate = (input.requestDate ?? "").trim();
   const overtimeHours = round2(Number(input.overtimeHours ?? 0));
   const amount = round2(Number(input.amount ?? 0));
   const reason = (input.reason ?? "").trim() || null;
+  const approvalMode =
+    input.approvalMode === "auto_on_date" ? "auto_on_date" : "manual";
 
   if (!employeeName) {
     throw new Error("Employee name is required.");
@@ -1577,6 +1876,10 @@ export async function submitOvertimeRequestAction(
 
   if (!siteName) {
     throw new Error("Site name is required.");
+  }
+
+  if (approvalMode === "auto_on_date" && !roleCode) {
+    throw new Error("Role / occupation is required for advance overtime.");
   }
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(requestDate)) {
@@ -1596,17 +1899,20 @@ export async function submitOvertimeRequestAction(
     .insert({
       requester_role: profile.role,
       requested_by: user.id,
+      payroll_adjustment_id: null,
       employee_name: employeeName,
+      role_code: roleCode,
       site_name: siteName,
       period_label: periodLabel,
       request_date: requestDate,
       overtime_hours: overtimeHours,
       amount,
       reason,
+      approval_mode: approvalMode,
       status: "pending",
     })
     .select(
-      "id, requester_role, requested_by, approved_by, employee_name, site_name, period_label, request_date, overtime_hours, amount, reason, status, approved_at, rejected_at, rejection_reason, created_at, updated_at",
+      "id, requester_role, requested_by, approved_by, payroll_adjustment_id, employee_name, role_code, site_name, period_label, request_date, overtime_hours, amount, reason, approval_mode, status, approved_at, auto_approved_at, rejected_at, rejection_reason, created_at, updated_at",
     )
     .single();
 
@@ -1628,6 +1934,29 @@ export async function approveOvertimeRequestFormAction(requestId: string) {
 
   if (!id) {
     throw new Error("Overtime request ID is required.");
+  }
+
+  const { data: request, error: requestError } = await database
+    .from("overtime_requests")
+    .select("id, approval_mode")
+    .eq("id", id)
+    .eq("status", "pending")
+    .maybeSingle();
+
+  if (requestError) {
+    throw new Error(
+      `Failed to load overtime request form. ${requestError.message}`,
+    );
+  }
+
+  if (!request) {
+    throw new Error("This overtime request can no longer be updated.");
+  }
+
+  if (request.approval_mode === "auto_on_date") {
+    throw new Error(
+      "Advance overtime requests are auto-approved by payroll on the requested date.",
+    );
   }
 
   const approvedAt = new Date().toISOString();

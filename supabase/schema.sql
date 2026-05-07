@@ -262,15 +262,19 @@ create table if not exists public.overtime_requests (
   requester_role public.app_role not null,
   requested_by uuid not null references public.profiles(id) on delete restrict,
   approved_by uuid references public.profiles(id) on delete set null,
+  payroll_adjustment_id uuid references public.payroll_adjustments(id) on delete set null,
   employee_name text not null,
+  role_code text,
   site_name text not null,
   period_label text,
   request_date date not null,
   overtime_hours numeric(10,2) not null default 0,
   amount numeric(14,2) not null default 0,
   reason text,
+  approval_mode text not null default 'manual' check (approval_mode in ('manual', 'auto_on_date')),
   status public.adjustment_status not null default 'pending',
   approved_at timestamptz,
+  auto_approved_at timestamptz,
   rejected_at timestamptz,
   rejection_reason text,
   created_at timestamptz not null default timezone('utc', now()),
@@ -287,6 +291,13 @@ alter table public.payroll_adjustments add column if not exists site_name_key te
 alter table public.payroll_adjustments add column if not exists period_label text;
 alter table public.payroll_adjustments add column if not exists period_start date;
 alter table public.payroll_adjustments add column if not exists period_end date;
+alter table public.payroll_adjustments add column if not exists source_overtime_request_id uuid references public.overtime_requests(id) on delete set null;
+alter table public.overtime_requests add column if not exists payroll_adjustment_id uuid references public.payroll_adjustments(id) on delete set null;
+alter table public.overtime_requests add column if not exists role_code text;
+alter table public.overtime_requests add column if not exists approval_mode text not null default 'manual';
+alter table public.overtime_requests add column if not exists auto_approved_at timestamptz;
+alter table public.overtime_requests drop constraint if exists overtime_requests_approval_mode_check;
+alter table public.overtime_requests add constraint overtime_requests_approval_mode_check check (approval_mode in ('manual', 'auto_on_date'));
 
 create table if not exists public.audit_logs (
   id uuid primary key default gen_random_uuid(),
@@ -313,9 +324,11 @@ create index if not exists payroll_adjustments_payroll_run_id_idx on public.payr
 create index if not exists payroll_adjustments_status_idx on public.payroll_adjustments(status);
 create index if not exists payroll_adjustments_attendance_import_id_idx on public.payroll_adjustments(attendance_import_id);
 create index if not exists payroll_adjustments_lookup_idx on public.payroll_adjustments(adjustment_type, status, employee_name_key, role_code, site_name_key, period_label);
+create unique index if not exists payroll_adjustments_source_overtime_request_id_idx on public.payroll_adjustments(source_overtime_request_id) where source_overtime_request_id is not null;
 create index if not exists overtime_requests_status_idx on public.overtime_requests(status);
 create index if not exists overtime_requests_requested_by_idx on public.overtime_requests(requested_by);
 create index if not exists overtime_requests_request_date_idx on public.overtime_requests(request_date);
+create index if not exists overtime_requests_auto_lookup_idx on public.overtime_requests(approval_mode, status, request_date, period_label);
 
 drop trigger if exists profiles_set_updated_at on public.profiles;
 create trigger profiles_set_updated_at before update on public.profiles for each row execute function public.set_updated_at();

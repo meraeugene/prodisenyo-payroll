@@ -9,6 +9,7 @@ export type Json =
 export type AppRole = "ceo" | "payroll_manager" | "engineer" | "employee";
 export type PayrollRunStatus = "draft" | "submitted" | "approved" | "rejected";
 export type AdjustmentStatus = "pending" | "approved" | "rejected";
+export type OvertimeApprovalMode = "manual" | "auto_on_date";
 export type EstimateStatus = "draft" | "submitted" | "approved" | "rejected";
 export type AdjustmentType =
   | "overtime"
@@ -415,6 +416,7 @@ export interface Database {
           period_label: string | null;
           period_start: string | null;
           period_end: string | null;
+          source_overtime_request_id: string | null;
           adjustment_type: AdjustmentType;
           status: AdjustmentStatus;
           requested_by: string;
@@ -439,6 +441,7 @@ export interface Database {
           period_label?: string | null;
           period_start?: string | null;
           period_end?: string | null;
+          source_overtime_request_id?: string | null;
           adjustment_type: AdjustmentType;
           status?: AdjustmentStatus;
           requested_by: string;
@@ -462,6 +465,7 @@ export interface Database {
           period_label?: string | null;
           period_start?: string | null;
           period_end?: string | null;
+          source_overtime_request_id?: string | null;
           adjustment_type?: AdjustmentType;
           status?: AdjustmentStatus;
           approved_by?: string | null;
@@ -478,15 +482,19 @@ export interface Database {
           requester_role: AppRole;
           requested_by: string;
           approved_by: string | null;
+          payroll_adjustment_id: string | null;
           employee_name: string;
+          role_code: string | null;
           site_name: string;
           period_label: string | null;
           request_date: string;
           overtime_hours: number;
           amount: number;
           reason: string | null;
+          approval_mode: OvertimeApprovalMode;
           status: AdjustmentStatus;
           approved_at: string | null;
+          auto_approved_at: string | null;
           rejected_at: string | null;
           rejection_reason: string | null;
           created_at: string;
@@ -497,15 +505,19 @@ export interface Database {
           requester_role: AppRole;
           requested_by: string;
           approved_by?: string | null;
+          payroll_adjustment_id?: string | null;
           employee_name: string;
+          role_code?: string | null;
           site_name: string;
           period_label?: string | null;
           request_date: string;
           overtime_hours?: number;
           amount?: number;
           reason?: string | null;
+          approval_mode?: OvertimeApprovalMode;
           status?: AdjustmentStatus;
           approved_at?: string | null;
+          auto_approved_at?: string | null;
           rejected_at?: string | null;
           rejection_reason?: string | null;
           created_at?: string;
@@ -515,15 +527,19 @@ export interface Database {
           requester_role?: AppRole;
           requested_by?: string;
           approved_by?: string | null;
+          payroll_adjustment_id?: string | null;
           employee_name?: string;
+          role_code?: string | null;
           site_name?: string;
           period_label?: string | null;
           request_date?: string;
           overtime_hours?: number;
           amount?: number;
           reason?: string | null;
+          approval_mode?: OvertimeApprovalMode;
           status?: AdjustmentStatus;
           approved_at?: string | null;
+          auto_approved_at?: string | null;
           rejected_at?: string | null;
           rejection_reason?: string | null;
           updated_at?: string;

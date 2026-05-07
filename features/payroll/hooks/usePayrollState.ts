@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { syncAdvanceOvertimeRequestsForPayrollAction } from "@/actions/payroll";
 import type { AttendanceRecordInput, PayrollRow } from "@/lib/payrollEngine";
 import { calculatePayroll, roundPayrollCalculation } from "@/lib/payrollEngine";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
@@ -619,6 +620,24 @@ export function usePayrollState({
 
     async function loadStandaloneOvertimeRequests() {
       if (!attendancePeriod.trim()) return;
+
+      try {
+        if (payrollBaseComputedRows.length > 0) {
+          await syncAdvanceOvertimeRequestsForPayrollAction({
+            attendanceImportId: currentAttendanceImportId,
+            attendancePeriod,
+            payrollRows: payrollBaseComputedRows.map((row) => ({
+              worker: row.worker,
+              role: row.role,
+              site: row.site,
+              defaultRate: row.defaultRate,
+              customRate: row.customRate,
+            })),
+          });
+        }
+      } catch {
+        // Keep payroll usable if auto-approval cannot run; save performs a second server-side check.
+      }
 
       try {
         const supabase = createSupabaseBrowserClient();
