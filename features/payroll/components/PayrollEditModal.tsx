@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, Loader2, X } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Loader2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { requestOvertimeApprovalAction } from "@/actions/payroll";
 import { useAppState } from "@/features/app/AppStateProvider";
@@ -14,6 +21,7 @@ import { calculatePayroll, roundPayrollCalculation } from "@/lib/payrollEngine";
 import type { DailyLogRow } from "@/types";
 import type { UsePayrollStateResult } from "@/features/payroll/hooks/usePayrollState";
 import type {
+  PayrollAllowanceEntry,
   PayrollCashAdvanceEntry,
   PayrollDeductionEntry,
   PayrollOvertimeEntry,
@@ -77,6 +85,8 @@ export default function PayrollEditModal({
   const [overtimeNotes, setOvertimeNotes] = useState("");
   const [paidLeaveDaysInput, setPaidLeaveDaysInput] = useState("");
   const [paidLeaveNotes, setPaidLeaveNotes] = useState("");
+  const [allowanceAmountInput, setAllowanceAmountInput] = useState("");
+  const [allowanceNotes, setAllowanceNotes] = useState("");
   const [sssGsisInput, setSssGsisInput] = useState("");
   const [philHealthInput, setPhilHealthInput] = useState("");
   const [pagIbigInput, setPagIbigInput] = useState("");
@@ -91,6 +101,9 @@ export default function PayrollEditModal({
   const [paidLeaveEntries, setPaidLeaveEntries] = useState<
     PayrollPaidLeaveEntry[]
   >([]);
+  const [allowanceEntries, setAllowanceEntries] = useState<
+    PayrollAllowanceEntry[]
+  >([]);
   const [deductionEntries, setDeductionEntries] = useState<
     PayrollDeductionEntry[]
   >([]);
@@ -98,6 +111,11 @@ export default function PayrollEditModal({
   const [overtimeValidationMessage, setOvertimeValidationMessage] = useState<
     string | null
   >(null);
+  const [biometricOvertimeStatus, setBiometricOvertimeStatus] = useState<
+    "approved" | "rejected" | null
+  >(null);
+  const [confirmBiometricOvertimeStatus, setConfirmBiometricOvertimeStatus] =
+    useState<"approved" | "rejected" | null>(null);
   const [allReportLogsPage, setAllReportLogsPage] = useState(1);
   const isPayrollManager = currentUserRole === "payroll_manager";
 
@@ -110,6 +128,8 @@ export default function PayrollEditModal({
     setOvertimeNotes("");
     setPaidLeaveDaysInput("");
     setPaidLeaveNotes("");
+    setAllowanceAmountInput("");
+    setAllowanceNotes("");
     const deductionEntry =
       payroll.editingPayrollAdjustments.deductionEntries[0] ?? null;
     setSssGsisInput(
@@ -140,9 +160,16 @@ export default function PayrollEditModal({
     setPaidLeaveEntries([
       ...payroll.editingPayrollAdjustments.paidLeaveEntries,
     ]);
+    setAllowanceEntries([
+      ...payroll.editingPayrollAdjustments.allowanceEntries,
+    ]);
     setDeductionEntries([
       ...payroll.editingPayrollAdjustments.deductionEntries,
     ]);
+    setBiometricOvertimeStatus(
+      payroll.editingPayrollAdjustments.biometricOvertimeStatus,
+    );
+    setConfirmBiometricOvertimeStatus(null);
     setAllReportLogsPage(1);
   }, [editingPayrollRow?.id, payroll.editingPayrollAdjustments]);
 
@@ -177,6 +204,28 @@ export default function PayrollEditModal({
 
   function getEditableOvertimeHoursValue(log: DailyLogRow): string {
     return normalizeNumericInput(String(getEditableOvertimeHours(log)));
+  }
+
+  function renderBiometricTimeCell(params: {
+    value: string;
+    isPaidHoliday: boolean;
+    showMissedWhenEmpty?: boolean;
+  }) {
+    const { value, isPaidHoliday, showMissedWhenEmpty = true } = params;
+
+    if (value) {
+      return formatLogTime(value);
+    }
+
+    if (isPaidHoliday) {
+      return "-";
+    }
+
+    if (!showMissedWhenEmpty) {
+      return "--";
+    }
+
+    return <span className="text-red-500">Missed</span>;
   }
 
   const loggedSites = Array.from(
@@ -328,6 +377,9 @@ export default function PayrollEditModal({
       0,
     ),
   );
+  const hasBiometricOvertime = biometricOvertimeHours > 0;
+  const confirmedBiometricOvertimeHours =
+    biometricOvertimeStatus === "approved" ? biometricOvertimeHours : 0;
   const biometricOvertimePay = roundPayrollCalculation(
     calculatePayroll({
       dailyRate: currentRatePerDay,
@@ -338,6 +390,8 @@ export default function PayrollEditModal({
       deductions: 0,
     }),
   ).overtimePay;
+  const confirmedBiometricOvertimePay =
+    biometricOvertimeStatus === "approved" ? biometricOvertimePay : 0;
   const approvedOvertimePay = roundPayrollCalculation(
     calculatePayroll({
       dailyRate: currentRatePerDay,
@@ -349,10 +403,10 @@ export default function PayrollEditModal({
     }),
   ).overtimePay;
   const payableOvertimeHours = round2(
-    biometricOvertimeHours + approvedOvertimeHours,
+    confirmedBiometricOvertimeHours + approvedOvertimeHours,
   );
   const payableOvertimePay = round2(
-    biometricOvertimePay + approvedOvertimePay,
+    confirmedBiometricOvertimePay + approvedOvertimePay,
   );
   const pendingOvertimePay = pendingOvertimeEntries.reduce(
     (sum, entry) => sum + entry.pay,
@@ -372,6 +426,10 @@ export default function PayrollEditModal({
   };
   const paidLeavePay = paidLeaveEntries.reduce(
     (sum, entry) => sum + entry.pay,
+    0,
+  );
+  const allowancePay = allowanceEntries.reduce(
+    (sum, entry) => sum + entry.amount,
     0,
   );
   const deductionTotals = deductionEntries.reduce(
@@ -401,9 +459,9 @@ export default function PayrollEditModal({
     calculatePayroll({
       dailyRate: currentRatePerDay,
       regularHours: regularWorkedHours,
-      overtimeHours: biometricOvertimeHours + approvedOvertimeHours,
+      overtimeHours: confirmedBiometricOvertimeHours + approvedOvertimeHours,
       overtimeMultiplier: DEFAULT_OVERTIME_MULTIPLIER,
-      allowance: paidHolidayPay + paidLeavePay,
+      allowance: paidHolidayPay + paidLeavePay + allowancePay,
       deductions: {
         cashAdvance: cashAdvanceAmount,
         sssGsis: deductionTotals.sssGsis,
@@ -495,6 +553,23 @@ export default function PayrollEditModal({
     setActiveAdjustmentForm(null);
   }
 
+  function addAllowance() {
+    const amount = parseNonNegativeValue(allowanceAmountInput);
+    if (amount <= 0) return;
+
+    setAllowanceEntries((prev) => [
+      ...prev,
+      {
+        id: createEntryId(),
+        amount: Number(amount.toFixed(2)),
+        notes: allowanceNotes.trim(),
+      },
+    ]);
+    setAllowanceAmountInput("");
+    setAllowanceNotes("");
+    setActiveAdjustmentForm(null);
+  }
+
   function saveReductions() {
     if (!isPayrollManager) return;
 
@@ -537,6 +612,10 @@ export default function PayrollEditModal({
     setOvertimeEntries((prev) => prev.filter((entry) => entry.id !== id));
   }
 
+  function removeAllowance(id: string) {
+    setAllowanceEntries((prev) => prev.filter((entry) => entry.id !== id));
+  }
+
   async function handleSaveChanges() {
     if (!editingPayrollRow || isSavingChanges) return;
 
@@ -569,9 +648,11 @@ export default function PayrollEditModal({
         cashAdvanceEntries,
         overtimeEntries: [...approvedEntries, ...result.entries],
         paidLeaveEntries,
+        allowanceEntries,
         deductionEntries: isPayrollManager
           ? deductionEntries
           : payroll.editingPayrollAdjustments.deductionEntries,
+        biometricOvertimeStatus,
       });
 
       if (result.entries.length > 0) {
@@ -983,6 +1064,7 @@ export default function PayrollEditModal({
                 {(cashAdvanceEntries.length > 0 ||
                   overtimeEntries.length > 0 ||
                   paidLeaveEntries.length > 0 ||
+                  allowanceEntries.length > 0 ||
                   deductionEntries.length > 0) && (
                   <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-2">
                     {cashAdvanceEntries.map((entry) => (
@@ -1083,6 +1165,30 @@ export default function PayrollEditModal({
                       </div>
                     ))}
 
+                    {allowanceEntries.map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="flex items-center gap-3 text-sm"
+                      >
+                        <span className="font-semibold text-emerald-600">
+                          Allowance +{formatPeso(entry.amount)}
+                        </span>
+
+                        {entry.notes && (
+                          <span className="text-xs text-gray-500 truncate">
+                            {entry.notes}
+                          </span>
+                        )}
+
+                        <button
+                          onClick={() => removeAllowance(entry.id)}
+                          className="ml-auto rounded-md bg-red-50 p-1 text-red-500 transition hover:bg-red-100 hover:text-red-600"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+
                     {deductionEntries.length > 0 && (
                       <div className="flex items-center gap-3 text-sm">
                         <span className="font-semibold text-red-600">
@@ -1130,8 +1236,8 @@ export default function PayrollEditModal({
                 )}
                 {overtimeLogs.length > 0 && (
                   <p className="mt-1 text-xs font-semibold text-emerald-700">
-                    Hours above 8 are tagged as overtime. Overtime pay stays
-                    pending until CEO approval.
+                    Hours above 8 are tagged as overtime. Biometric overtime is
+                    excluded until HR confirms it below.
                   </p>
                 )}
                 {highOvertimeHoursLogs.length > 0 && (
@@ -1198,9 +1304,10 @@ export default function PayrollEditModal({
                         const isOvertimeDay =
                           computeSameDayOvertimeMinutes(log.otIn, log.otOut) >
                             0 && !isPaidHoliday;
-                        const statusFallback = (
-                          <span className="text-red-500">Missed</span>
-                        );
+                        const otPunchStarted = Boolean(log.otIn || log.otOut);
+                        const shouldShowOtMissed =
+                          otPunchStarted ||
+                          getEditableOvertimeHours(log) > 0;
 
                         return (
                           <tr
@@ -1218,7 +1325,7 @@ export default function PayrollEditModal({
                             <td className="px-3 py-2.5 text-sm text-apple-charcoal">
                               <div className="flex min-w-[4.5rem] flex-col items-start gap-1">
                                 <span className="font-medium leading-tight">
-                                  {toWeekLabel(log.date)}
+                                  {log.date}
                                 </span>
                                 <div className="flex flex-col items-start gap-1">
                                   {isPaidHoliday && (
@@ -1248,38 +1355,42 @@ export default function PayrollEditModal({
                               {extractSiteName(log.site) || "-"}
                             </td>
                             <td className="px-3 py-2.5 text-sm text-apple-charcoal">
-                              {log.time1In
-                                ? formatLogTime(log.time1In)
-                                : isPaidHoliday
-                                  ? "-"
-                                  : statusFallback}
+                              {renderBiometricTimeCell({
+                                value: log.time1In,
+                                isPaidHoliday,
+                              })}
                             </td>
                             <td className="px-3 py-2.5 text-sm text-apple-charcoal">
-                              {log.time1Out
-                                ? formatLogTime(log.time1Out)
-                                : isPaidHoliday
-                                  ? "-"
-                                  : statusFallback}
+                              {renderBiometricTimeCell({
+                                value: log.time1Out,
+                                isPaidHoliday,
+                              })}
                             </td>
                             <td className="px-3 py-2.5 text-sm text-apple-charcoal">
-                              {log.time2In
-                                ? formatLogTime(log.time2In)
-                                : isPaidHoliday
-                                  ? "-"
-                                  : statusFallback}
+                              {renderBiometricTimeCell({
+                                value: log.time2In,
+                                isPaidHoliday,
+                              })}
                             </td>
                             <td className="px-3 py-2.5 text-sm text-apple-charcoal">
-                              {log.time2Out
-                                ? formatLogTime(log.time2Out)
-                                : isPaidHoliday
-                                  ? "-"
-                                  : statusFallback}
+                              {renderBiometricTimeCell({
+                                value: log.time2Out,
+                                isPaidHoliday,
+                              })}
                             </td>
                             <td className="px-3 py-2.5 text-sm text-apple-charcoal">
-                              {formatLogTime(log.otIn)}
+                              {renderBiometricTimeCell({
+                                value: log.otIn,
+                                isPaidHoliday,
+                                showMissedWhenEmpty: shouldShowOtMissed,
+                              })}
                             </td>
                             <td className="px-3 py-2.5 text-sm text-apple-charcoal">
-                              {formatLogTime(log.otOut)}
+                              {renderBiometricTimeCell({
+                                value: log.otOut,
+                                isPaidHoliday,
+                                showMissedWhenEmpty: shouldShowOtMissed,
+                              })}
                             </td>
                             <td className="px-3 py-2.5 text-right">
                               <input
@@ -1468,17 +1579,60 @@ export default function PayrollEditModal({
                     {formatPeso(payableOvertimePay)}
                   </span>
                 </div>
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-apple-charcoal">
-                    + Biometric Overtime
-                    <span className="ml-1 text-xs text-apple-smoke">
-                      ({formatPayrollNumber(biometricOvertimeHours)} hrs)
+                {biometricOvertimePay > 0 ? (
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-apple-charcoal">
+                      + Biometric Overtime
+                      <span className="ml-1 text-xs text-apple-smoke">
+                        ({formatPayrollNumber(biometricOvertimeHours)} hrs)
+                      </span>
                     </span>
-                  </span>
-                  <span className="font-mono font-semibold text-emerald-700 text-right">
-                    {formatPeso(biometricOvertimePay)}
-                  </span>
-                </div>
+                    <span className="font-mono font-semibold text-emerald-700 text-right">
+                      {formatPeso(biometricOvertimePay)}
+                    </span>
+                  </div>
+                ) : null}
+                {hasBiometricOvertime ? (
+                  <div className="rounded-xl border border-apple-mist bg-apple-snow/70 px-3 py-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold uppercase tracking-widest text-apple-smoke">
+                          Biometric Overtime Decision
+                        </p>
+                        <p className="text-sm text-apple-charcoal">
+                          {biometricOvertimeStatus === "approved"
+                            ? "Confirmed and included in final total pay."
+                            : biometricOvertimeStatus === "rejected"
+                              ? "Rejected and excluded from final total pay."
+                              : "Waiting for payroll manager confirmation."}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setConfirmBiometricOvertimeStatus("approved")
+                          }
+                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                        >
+                          <Check size={15} />
+                          Confirm
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setConfirmBiometricOvertimeStatus("rejected")
+                          }
+                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-semibold text-red-600 transition hover:bg-red-100"
+                        >
+                          <X size={15} />
+                          Exclude
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
                 {sitePayBreakdownWithAllocation.length > 1 && (
                   <div className="rounded-xl border border-apple-mist bg-apple-snow/70 px-3 py-2">
                     <p className="text-2xs font-semibold uppercase tracking-widest text-apple-smoke">
@@ -1509,46 +1663,6 @@ export default function PayrollEditModal({
                   <span className="text-apple-charcoal">+ Paid Holiday</span>
                   <span className="font-mono font-semibold text-emerald-700 text-right">
                     {formatPeso(paidHolidayPay)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-apple-charcoal">
-                    + Approved Overtime
-                  </span>
-                  <span className="font-mono font-semibold text-emerald-700 text-right">
-                    {formatPeso(approvedOvertimePay)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-apple-charcoal">
-                    + Pending Overtime
-                  </span>
-                  <span className="font-mono font-semibold text-amber-700 text-right">
-                    {formatPeso(pendingOvertimePay)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-apple-charcoal">
-                    + Returned Overtime
-                  </span>
-                  <span className="font-mono font-semibold text-[#2d6a4f] text-right">
-                    {formatPeso(rejectedOvertimePay)}
-                  </span>
-                </div>
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
-                  Pending overtime is excluded from total pay until the CEO
-                  approves it.
-                </div>
-                {rejectedOvertimeEntries.length > 0 && (
-                  <div className="rounded-xl border border-[#cfe3d3] bg-[#eef7f0] px-3 py-2 text-xs font-semibold text-[#2d6a4f]">
-                    Returned overtime stays excluded from total pay until HR
-                    submits a new request.
-                  </div>
-                )}
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-apple-charcoal">+ Paid Leave</span>
-                  <span className="font-mono font-semibold text-emerald-700 text-right">
-                    {formatPeso(paidLeavePay)}
                   </span>
                 </div>
                 <div className="border-t border-apple-mist pt-2 mt-2 flex items-center justify-between gap-3 text-sm">
@@ -1595,6 +1709,12 @@ export default function PayrollEditModal({
                     saving.
                   </div>
                 )}
+                {hasBiometricOvertime && biometricOvertimeStatus === null ? (
+                  <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+                    Confirm or exclude biometric overtime before saving so the
+                    final total pay uses the intended overtime amount.
+                  </div>
+                ) : null}
                 <div className="border-t border-apple-mist pt-2 mt-2 flex items-center justify-between gap-3">
                   <span className="text-base font-bold text-apple-charcoal">
                     Adjusted Total Pay
@@ -1623,7 +1743,10 @@ export default function PayrollEditModal({
               onClick={() => {
                 void handleSaveChanges();
               }}
-              disabled={isSavingChanges}
+              disabled={
+                isSavingChanges ||
+                (hasBiometricOvertime && biometricOvertimeStatus === null)
+              }
               className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
               {isSavingChanges ? (
@@ -1638,6 +1761,62 @@ export default function PayrollEditModal({
           </div>
         </div>
       </div>
+      {confirmBiometricOvertimeStatus ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/35 p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-apple-mist bg-white shadow-[0_24px_60px_rgba(15,23,42,0.18)]">
+            <div className="flex items-start gap-3 border-b border-apple-mist px-5 py-4">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                <AlertTriangle size={20} />
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-apple-steel">
+                  Confirm Overtime
+                </p>
+                <h3 className="mt-1 text-lg font-semibold text-apple-charcoal">
+                  {confirmBiometricOvertimeStatus === "approved"
+                    ? "Include biometric overtime in final pay?"
+                    : "Exclude biometric overtime from final pay?"}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-apple-steel">
+                  {confirmBiometricOvertimeStatus === "approved"
+                    ? `This will add ${formatPayrollNumber(biometricOvertimeHours)} biometric overtime hour(s) to the employee's final total pay.`
+                    : "This will keep biometric overtime out of the employee's final total pay."}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 px-5 py-4 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setConfirmBiometricOvertimeStatus(null)}
+                className="h-10 rounded-xl border border-apple-silver px-4 text-sm font-semibold text-apple-ash transition hover:border-apple-charcoal"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBiometricOvertimeStatus(confirmBiometricOvertimeStatus);
+                  setConfirmBiometricOvertimeStatus(null);
+                }}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-semibold text-white transition hover:bg-emerald-800"
+              >
+                {confirmBiometricOvertimeStatus === "approved" ? (
+                  <>
+                    <Check size={15} />
+                    Confirm Overtime
+                  </>
+                ) : (
+                  <>
+                    <X size={15} />
+                    Exclude Overtime
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

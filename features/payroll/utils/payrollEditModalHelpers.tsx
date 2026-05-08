@@ -6,6 +6,7 @@ export type AdjustmentFormType =
   | "cashAdvance"
   | "overtime"
   | "paidLeave"
+  | "allowance"
   | "reductions"
   | null;
 

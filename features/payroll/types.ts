@@ -29,6 +29,12 @@ export interface PayrollPaidLeaveEntry {
   notes: string;
 }
 
+export interface PayrollAllowanceEntry {
+  id: string;
+  amount: number;
+  notes: string;
+}
+
 export interface PayrollDeductionEntry {
   id: string;
   sssGsis: number;
@@ -42,7 +48,9 @@ export interface PayrollAdjustmentSet {
   cashAdvanceEntries: PayrollCashAdvanceEntry[];
   overtimeEntries: PayrollOvertimeEntry[];
   paidLeaveEntries: PayrollPaidLeaveEntry[];
+  allowanceEntries: PayrollAllowanceEntry[];
   deductionEntries: PayrollDeductionEntry[];
+  biometricOvertimeStatus: "approved" | "rejected" | null;
 }
 
 export interface PayrollRowOverride {
@@ -54,12 +62,15 @@ export interface PayrollRowOverride {
   cashAdvanceEntries?: PayrollCashAdvanceEntry[];
   overtimeEntries?: PayrollOvertimeEntry[];
   paidLeaveEntries?: PayrollPaidLeaveEntry[];
+  allowanceEntries?: PayrollAllowanceEntry[];
   deductionEntries?: PayrollDeductionEntry[];
   cashAdvanceTotal?: number;
   overtimeEntriesPayTotal?: number;
   overtimeEntriesHoursTotal?: number;
   paidLeaveEntriesPayTotal?: number;
+  allowanceEntriesTotal?: number;
   deductionsTotal?: number;
+  biometricOvertimeStatus?: "approved" | "rejected" | null;
 }
 
 export interface PayrollEditSummary {

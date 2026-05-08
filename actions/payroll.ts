@@ -333,6 +333,14 @@ function computeRowAdjustmentTotals(override: PayrollRowOverride | undefined) {
           0,
         ),
   );
+  const allowancePay = round2(
+    Number.isFinite(override?.allowanceEntriesTotal)
+      ? (override?.allowanceEntriesTotal ?? 0)
+      : (override?.allowanceEntries ?? []).reduce(
+          (sum, entry) => sum + entry.amount,
+          0,
+        ),
+  );
   const deductions = round2(
     Number.isFinite(override?.deductionsTotal)
       ? (override?.deductionsTotal ?? 0)
@@ -353,7 +361,9 @@ function computeRowAdjustmentTotals(override: PayrollRowOverride | undefined) {
     overtimePay,
     overtimeHours,
     leavePay,
+    allowancePay,
     deductions,
+    biometricOvertimeStatus: override?.biometricOvertimeStatus ?? null,
   };
 }
 
@@ -881,8 +891,15 @@ export async function savePayrollRunAction(input: SavePayrollRunInput) {
 
   const rowSnapshots = input.payrollRows.map((row) => {
     const override = input.payrollOverrides[row.id];
-    const { cashAdvance, overtimePay, overtimeHours, leavePay, deductions } =
-      computeRowAdjustmentTotals(override);
+    const {
+      cashAdvance,
+      overtimePay,
+      overtimeHours,
+      leavePay,
+      allowancePay,
+      deductions,
+      biometricOvertimeStatus,
+    } = computeRowAdjustmentTotals(override);
     const branchRateKey = buildEmployeeBranchRateKey(
       row.worker,
       row.role,
@@ -901,7 +918,9 @@ export async function savePayrollRunAction(input: SavePayrollRunInput) {
       overtimePay,
       overtimeHours,
       leavePay,
+      allowancePay,
       ratePerDay,
+      biometricOvertimeStatus,
     };
   });
 
@@ -1080,12 +1099,44 @@ export async function savePayrollRunAction(input: SavePayrollRunInput) {
       ) ?? null;
 
     const approvedOvertimeHours = round2(approvedOvertime?.totalHours ?? 0);
-    const allowance = round2(holidayPay + snapshot.leavePay);
+    const includedSites = new Set(splitSiteNames(snapshot.row.site));
+    const biometricOvertimeHours =
+      snapshot.biometricOvertimeStatus === "approved"
+        ? round2(
+            input.payrollAttendanceInputs.reduce((sum, record) => {
+              if (
+                normalizeEmployeeNameKey(record.name) !==
+                normalizeEmployeeNameKey(snapshot.row.worker)
+              ) {
+                return sum;
+              }
+              if (
+                (record.role ?? "").trim().toUpperCase() !==
+                snapshot.row.role.trim().toUpperCase()
+              ) {
+                return sum;
+              }
+
+              const siteName = normalizeSiteName(record.site);
+              if (includedSites.size > 0 && !includedSites.has(siteName)) {
+                return sum;
+              }
+
+              return sum + (record.overtimeHours ?? 0);
+            }, 0),
+          )
+        : 0;
+    const overtimeHours = round2(
+      biometricOvertimeHours + approvedOvertimeHours,
+    );
+    const allowance = round2(
+      holidayPay + snapshot.leavePay + snapshot.allowancePay,
+    );
     const calculation = roundPayrollCalculation(
       calculatePayroll({
         dailyRate: snapshot.ratePerDay,
         regularHours: snapshot.row.hoursWorked,
-        overtimeHours: approvedOvertimeHours,
+        overtimeHours,
         overtimeMultiplier: DEFAULT_OVERTIME_MULTIPLIER,
         allowance,
         deductions: {
@@ -1102,6 +1153,8 @@ export async function savePayrollRunAction(input: SavePayrollRunInput) {
       allowance,
       regularPayExcludingHoliday: calculation.regularPay,
       approvedOvertimeHours,
+      biometricOvertimeHours,
+      overtimeHours,
       approvedOvertimePay: calculation.overtimePay,
       totalDeductions: calculation.totalDeductions,
       totalPay: calculation.netPay,

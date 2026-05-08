@@ -43,6 +43,7 @@ import {
   summarizePayrollTotals,
 } from "@/features/payroll/utils/payrollSelectors";
 import type {
+  PayrollAllowanceEntry,
   PayrollAdjustmentSet,
   PayrollCashAdvanceEntry,
   PayrollDeductionEntry,
@@ -63,7 +64,9 @@ const EMPTY_ADJUSTMENTS: PayrollAdjustmentSet = {
   cashAdvanceEntries: [],
   overtimeEntries: [],
   paidLeaveEntries: [],
+  allowanceEntries: [],
   deductionEntries: [],
+  biometricOvertimeStatus: null,
 };
 
 function sanitizeEditableHours(
@@ -320,6 +323,28 @@ function sumOvertimeHours(
 
 function sumPaidLeavePay(entries: PayrollPaidLeaveEntry[] | undefined): number {
   return round2((entries ?? []).reduce((sum, entry) => sum + entry.pay, 0));
+}
+
+function sanitizeAllowanceEntries(
+  entries: PayrollAllowanceEntry[] | undefined,
+): PayrollAllowanceEntry[] {
+  if (!entries || entries.length === 0) return [];
+  return entries
+    .map((entry) => ({
+      id: String(entry.id || `${Date.now()}-${Math.random()}`),
+      amount:
+        Number.isFinite(entry.amount) && entry.amount > 0
+          ? round2(entry.amount)
+          : 0,
+      notes: String(entry.notes ?? "").trim(),
+    }))
+    .filter((entry) => entry.amount > 0);
+}
+
+function sumAllowanceEntries(
+  entries: PayrollAllowanceEntry[] | undefined,
+): number {
+  return round2((entries ?? []).reduce((sum, entry) => sum + entry.amount, 0));
 }
 
 export interface UsePayrollStateArgs {
@@ -729,11 +754,16 @@ export function usePayrollState({
               logHours: existingOverride?.logHours,
               cashAdvanceEntries: existingOverride?.cashAdvanceEntries ?? [],
               paidLeaveEntries: existingOverride?.paidLeaveEntries ?? [],
+              allowanceEntries: existingOverride?.allowanceEntries ?? [],
               deductionEntries: existingOverride?.deductionEntries ?? [],
               cashAdvanceTotal: existingOverride?.cashAdvanceTotal ?? 0,
               paidLeaveEntriesPayTotal:
                 existingOverride?.paidLeaveEntriesPayTotal ?? 0,
+              allowanceEntriesTotal:
+                existingOverride?.allowanceEntriesTotal ?? 0,
               deductionsTotal: existingOverride?.deductionsTotal ?? 0,
+              biometricOvertimeStatus:
+                existingOverride?.biometricOvertimeStatus ?? null,
               overtimeEntries: mergedEntries,
               overtimeEntriesPayTotal: sumOvertimePay(
                 mergedEntries,
@@ -846,7 +876,9 @@ export function usePayrollState({
       cashAdvanceEntries: override?.cashAdvanceEntries ?? [],
       overtimeEntries: override?.overtimeEntries ?? [],
       paidLeaveEntries: override?.paidLeaveEntries ?? [],
+      allowanceEntries: override?.allowanceEntries ?? [],
       deductionEntries: override?.deductionEntries ?? [],
+      biometricOvertimeStatus: override?.biometricOvertimeStatus ?? null,
     };
   }, [editingPayrollRowId, payrollOverrides]);
 
@@ -862,6 +894,10 @@ export function usePayrollState({
           Number.isFinite(override?.paidLeaveEntriesPayTotal)
             ? round2(override?.paidLeaveEntriesPayTotal ?? 0)
             : sumPaidLeavePay(override?.paidLeaveEntries);
+        const manualAllowance =
+          Number.isFinite(override?.allowanceEntriesTotal)
+            ? round2(override?.allowanceEntriesTotal ?? 0)
+            : sumAllowanceEntries(override?.allowanceEntries);
         const approvedOvertimePay = sumOvertimePay(
           override?.overtimeEntries,
           "approved",
@@ -870,6 +906,11 @@ export function usePayrollState({
           override?.overtimeEntries,
           "approved",
         );
+        const biometricOvertimeApproved =
+          override?.biometricOvertimeStatus === "approved";
+        const biometricOvertimeHours = biometricOvertimeApproved
+          ? round2(row.overtimeHours)
+          : 0;
         const cashAdvance =
           Number.isFinite(override?.cashAdvanceTotal)
             ? round2(override?.cashAdvanceTotal ?? 0)
@@ -884,8 +925,10 @@ export function usePayrollState({
           row,
           basePay,
           leavePay,
+          manualAllowance,
           approvedOvertimePay,
           approvedOvertimeHours,
+          biometricOvertimeHours,
           cashAdvance,
           deductions,
           ratePerDay,
@@ -922,8 +965,12 @@ export function usePayrollState({
 
       return preparedRows.map((entry) => {
         const holidayPay = holidayPayByRowId.get(entry.row.id) ?? 0;
-        const allowance = round2(holidayPay + entry.leavePay);
-        const overtimeHours = round2(entry.approvedOvertimeHours);
+        const allowance = round2(
+          holidayPay + entry.leavePay + entry.manualAllowance,
+        );
+        const overtimeHours = round2(
+          entry.biometricOvertimeHours + entry.approvedOvertimeHours,
+        );
         const calculation = roundPayrollCalculation(
           calculatePayroll({
             dailyRate: entry.ratePerDay,
@@ -1410,6 +1457,9 @@ export function usePayrollState({
     const nextPaidLeaveEntries = sanitizePaidLeaveEntries(
       adjustments?.paidLeaveEntries ?? existingOverride?.paidLeaveEntries,
     );
+    const nextAllowanceEntries = sanitizeAllowanceEntries(
+      adjustments?.allowanceEntries ?? existingOverride?.allowanceEntries,
+    );
     const nextDeductionEntries = sanitizeDeductionEntries(
       adjustments?.deductionEntries ?? existingOverride?.deductionEntries,
     );
@@ -1423,6 +1473,7 @@ export function usePayrollState({
       "approved",
     );
     const nextPaidLeaveEntriesPayTotal = sumPaidLeavePay(nextPaidLeaveEntries);
+    const nextAllowanceEntriesTotal = sumAllowanceEntries(nextAllowanceEntries);
     const nextDeductionsTotal = sumDeductionEntries(nextDeductionEntries);
 
     setPayrollOverrides((prev) => ({
@@ -1436,12 +1487,18 @@ export function usePayrollState({
         cashAdvanceEntries: nextCashAdvanceEntries,
         overtimeEntries: nextOvertimeEntries,
         paidLeaveEntries: nextPaidLeaveEntries,
+        allowanceEntries: nextAllowanceEntries,
         deductionEntries: nextDeductionEntries,
         cashAdvanceTotal: nextCashAdvanceTotal,
         overtimeEntriesPayTotal: nextOvertimeEntriesPayTotal,
         overtimeEntriesHoursTotal: nextOvertimeEntriesHoursTotal,
         paidLeaveEntriesPayTotal: nextPaidLeaveEntriesPayTotal,
+        allowanceEntriesTotal: nextAllowanceEntriesTotal,
         deductionsTotal: nextDeductionsTotal,
+        biometricOvertimeStatus:
+          adjustments?.biometricOvertimeStatus ??
+          existingOverride?.biometricOvertimeStatus ??
+          null,
       },
     }));
 

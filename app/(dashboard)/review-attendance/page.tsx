@@ -8,15 +8,15 @@ import { useAppState } from "@/features/app/AppStateProvider";
 
 export default function ReviewAttendancePage() {
   const router = useRouter();
-  const { records, site, attendance, workspaceReset } = useAppState();
+  const { hydrated, records, site, attendance, workspaceReset } = useAppState();
 
   useEffect(() => {
-    if (workspaceReset || records.length === 0) {
+    if (hydrated && (workspaceReset || records.length === 0)) {
       router.replace("/upload-attendance");
     }
-  }, [records.length, router, workspaceReset]);
+  }, [hydrated, records.length, router, workspaceReset]);
 
-  if (workspaceReset || records.length === 0) {
+  if (!hydrated || workspaceReset || records.length === 0) {
     return null;
   }
 
