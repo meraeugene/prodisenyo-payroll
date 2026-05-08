@@ -17,7 +17,7 @@ import {
   matchesSearchText,
 } from "@/lib/utils";
 import type { DailyLogRow, Step2Sort } from "@/types";
-import { expandDateSummary, normalizePeriodLabel } from "@/features/payroll/utils/payrollDateHelpers";
+import { normalizePeriodLabel } from "@/features/payroll/utils/payrollDateHelpers";
 import {
   areLikelySameEmployeeName,
   normalizeEmployeeNameKey,
@@ -474,7 +474,7 @@ export function summarizePayrollTotals(rows: PayrollRow[]): {
 export function buildEditingPayrollLogs(
   dailyRows: DailyLogRow[],
   editingPayrollRow: PayrollRow | null,
-  attendancePeriod: string,
+  _attendancePeriod: string,
 ): DailyLogRow[] {
   if (!editingPayrollRow) return [];
 
@@ -493,53 +493,7 @@ export function buildEditingPayrollLogs(
     return a.employee.localeCompare(b.employee);
   });
 
-  const dateRange = expandDateSummary(
-    editingPayrollRow.date,
-    matched.map((row) => row.date),
-    attendancePeriod,
-  );
-
-  const allDates = Array.from(
-    new Set([...dateRange, ...matched.map((row) => row.date)]),
-  ).sort((a, b) => a.localeCompare(b));
-
-  if (allDates.length === 0) return matched;
-
-  const byDate = new Map<string, DailyLogRow[]>();
-  for (const row of matched) {
-    const existing = byDate.get(row.date);
-    if (existing) {
-      existing.push(row);
-      continue;
-    }
-
-    byDate.set(row.date, [row]);
-  }
-
-  const employeeLabel = matched[0]?.employee ?? editingPayrollRow.worker;
-
-  return allDates.flatMap((date) => {
-    const logs = byDate.get(date);
-    if (logs && logs.length > 0) return logs;
-
-    return [
-      {
-        date,
-        employee: employeeLabel,
-        time1In: "",
-        time1Out: "",
-        time2In: "",
-        time2Out: "",
-        otIn: "",
-        otOut: "",
-        regularHours: 0,
-        overtimeHours: 0,
-        totalHours: 0,
-        hours: 0,
-        site: "",
-      },
-    ];
-  });
+  return matched;
 }
 
 export function buildEditingPayrollSummary(

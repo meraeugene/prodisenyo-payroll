@@ -1325,7 +1325,7 @@ export default function PayrollEditModal({
                             <td className="px-3 py-2.5 text-sm text-apple-charcoal">
                               <div className="flex min-w-[4.5rem] flex-col items-start gap-1">
                                 <span className="font-medium leading-tight">
-                                  {log.date}
+                                  {toWeekLabel(log.date)}
                                 </span>
                                 <div className="flex flex-col items-start gap-1">
                                   {isPaidHoliday && (
