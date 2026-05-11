@@ -92,7 +92,10 @@ function normalizeSiteName(value: string): string {
     .trim();
 }
 
-function parsePeriodRange(label: string): { start: string | null; end: string | null } {
+function parsePeriodRange(label: string): {
+  start: string | null;
+  end: string | null;
+} {
   const match = label.match(/(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})/);
   if (!match) {
     return { start: null, end: null };
