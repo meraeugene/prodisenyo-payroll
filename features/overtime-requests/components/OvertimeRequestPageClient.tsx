@@ -5,12 +5,10 @@ import { CalendarDays, Clock3, LoaderCircle, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import DashboardPageHero from "@/components/DashboardPageHero";
 import { submitOvertimeRequestAction } from "@/actions/payroll";
-import { ROLE_CODE_TO_NAME, ROLE_CODES, type RoleCode } from "@/lib/payrollConfig";
 import {
   formatOvertimeRequesterRole,
   type OvertimeRequestRecord,
 } from "@/features/overtime-requests/types";
-import type { OvertimeApprovalMode } from "@/types/database";
 
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("en-PH", {
@@ -37,7 +35,6 @@ function getStatusLabel(status: OvertimeRequestRecord["status"]) {
 
 type OvertimeFormErrors = {
   employeeName?: string;
-  roleCode?: string;
   siteName?: string;
   requestDate?: string;
   overtimeHours?: string;
@@ -61,7 +58,6 @@ export default function OvertimeRequestPageClient({
 }) {
   const [requests, setRequests] = useState(initialRequests);
   const [employeeName, setEmployeeName] = useState(initialEmployeeName);
-  const [roleCode, setRoleCode] = useState<RoleCode | "">("");
   const [siteName, setSiteName] = useState("");
   const [periodLabel, setPeriodLabel] = useState("");
   const [requestDate, setRequestDate] = useState(() =>
@@ -69,8 +65,6 @@ export default function OvertimeRequestPageClient({
   );
   const [overtimeHours, setOvertimeHours] = useState("");
   const [reason, setReason] = useState("");
-  const [approvalMode, setApprovalMode] =
-    useState<OvertimeApprovalMode>("auto_on_date");
   const [formErrors, setFormErrors] = useState<OvertimeFormErrors>({});
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -97,10 +91,6 @@ export default function OvertimeRequestPageClient({
 
     if (!trimmedSiteName) {
       errors.siteName = "Site name is required.";
-    }
-
-    if (approvalMode === "auto_on_date" && !roleCode) {
-      errors.roleCode = "Role / occupation is required.";
     }
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(requestDate)) {
@@ -135,19 +125,16 @@ export default function OvertimeRequestPageClient({
       try {
         const result = await submitOvertimeRequestAction({
           employeeName: employeeName.trim(),
-          roleCode: roleCode || null,
           siteName: siteName.trim(),
           periodLabel: periodLabel.trim(),
           requestDate,
           overtimeHours: Number(overtimeHours || 0),
           amount: 0,
           reason: reason.trim(),
-          approvalMode,
         });
 
         setRequests((current) => [result.request, ...current]);
         setEmployeeName(initialEmployeeName);
-        setRoleCode("");
         setSiteName("");
         setPeriodLabel("");
         setOvertimeHours("");
@@ -178,7 +165,7 @@ export default function OvertimeRequestPageClient({
   }
 
   return (
-    <div className="p-0 sm:p-6 xl:flex xl:h-screen xl:flex-col xl:overflow-hidden">
+    <div className="p-0 sm:p-6 xl:flex xl:flex-col">
       <DashboardPageHero
         eyebrow="Overtime Workflow"
         title="Request Overtime"
@@ -219,38 +206,6 @@ export default function OvertimeRequestPageClient({
 
             <label className="space-y-1 text-sm text-apple-smoke">
               <span className="font-medium text-apple-charcoal">
-                Role / Occupation{" "}
-                {approvalMode === "auto_on_date" ? (
-                  <span className="text-rose-500">*</span>
-                ) : null}
-              </span>
-              <select
-                value={roleCode}
-                onChange={(event) => {
-                  setRoleCode(event.target.value as RoleCode | "");
-                  setFormErrors((current) => ({
-                    ...current,
-                    roleCode: undefined,
-                  }));
-                }}
-                className={baseInputClass(Boolean(formErrors.roleCode))}
-              >
-                <option value="">Select role</option>
-                {ROLE_CODES.map((code) => (
-                  <option key={code} value={code}>
-                    {ROLE_CODE_TO_NAME[code]} ({code})
-                  </option>
-                ))}
-              </select>
-              {formErrors.roleCode ? (
-                <p className="text-xs font-medium text-rose-600">
-                  {formErrors.roleCode}
-                </p>
-              ) : null}
-            </label>
-
-            <label className="space-y-1 text-sm text-apple-smoke">
-              <span className="font-medium text-apple-charcoal">
                 Site Name <span className="text-rose-500">*</span>
               </span>
               <input
@@ -282,50 +237,6 @@ export default function OvertimeRequestPageClient({
                 className={baseInputClass(false)}
                 placeholder="e.g. 2026-04-01 to 2026-04-15"
               />
-            </label>
-
-            <label className="space-y-1 text-sm text-apple-smoke md:col-span-2">
-              <span className="font-medium text-apple-charcoal">
-                Approval Type
-              </span>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
-                  <input
-                    type="radio"
-                    name="approvalMode"
-                    value="auto_on_date"
-                    checked={approvalMode === "auto_on_date"}
-                    onChange={() => setApprovalMode("auto_on_date")}
-                    className="h-4 w-4 accent-[#1f6a37]"
-                  />
-                  <span>
-                    <span className="block font-semibold">
-                      Auto approve on date
-                    </span>
-                    <span className="block text-xs text-emerald-700">
-                      Included once payroll opens for that date.
-                    </span>
-                  </span>
-                </label>
-                <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-apple-mist bg-white px-3 py-2 text-sm text-apple-smoke">
-                  <input
-                    type="radio"
-                    name="approvalMode"
-                    value="manual"
-                    checked={approvalMode === "manual"}
-                    onChange={() => setApprovalMode("manual")}
-                    className="h-4 w-4 accent-[#1f6a37]"
-                  />
-                  <span>
-                    <span className="block font-semibold text-apple-charcoal">
-                      CEO manual approval
-                    </span>
-                    <span className="block text-xs text-apple-steel">
-                      Keeps the existing approval queue.
-                    </span>
-                  </span>
-                </label>
-              </div>
             </label>
 
             <label className="space-y-1 text-sm text-apple-smoke">
@@ -440,7 +351,7 @@ export default function OvertimeRequestPageClient({
               No overtime requests submitted yet.
             </p>
           ) : (
-            <div className="max-h-[30rem] space-y-3 overflow-y-scroll pr-1 xl:min-h-0 xl:flex-1 xl:max-h-none">
+            <div className="space-y-3">
               {sortedRequests.map((request) => (
                 <article
                   key={request.id}
@@ -480,24 +391,6 @@ export default function OvertimeRequestPageClient({
                           {request.request_date}
                         </span>
                       </p>
-                      <p className="flex items-center justify-between gap-2">
-                        <span>Approval</span>
-                        <span className="font-semibold text-apple-charcoal">
-                          {request.approval_mode === "auto_on_date"
-                            ? request.auto_approved_at
-                              ? "Auto-approved"
-                              : "Auto on date"
-                            : "CEO manual"}
-                        </span>
-                      </p>
-                      {request.role_code ? (
-                        <p className="flex items-center justify-between gap-2">
-                          <span>Role</span>
-                          <span className="font-semibold text-apple-charcoal">
-                            {request.role_code}
-                          </span>
-                        </p>
-                      ) : null}
                       <p className="flex items-center justify-between gap-2">
                         <span className="inline-flex items-center gap-1.5">
                           <Clock3 size={14} className="text-sky-700" />
@@ -575,22 +468,6 @@ export default function OvertimeRequestPageClient({
                   {requestDate}
                 </span>
               </p>
-              <p>
-                Approval:{" "}
-                <span className="font-semibold text-apple-charcoal">
-                  {approvalMode === "auto_on_date"
-                    ? "Auto approve on work date"
-                    : "CEO manual approval"}
-                </span>
-              </p>
-              {roleCode ? (
-                <p>
-                  Role:{" "}
-                  <span className="font-semibold text-apple-charcoal">
-                    {ROLE_CODE_TO_NAME[roleCode]} ({roleCode})
-                  </span>
-                </p>
-              ) : null}
               <p>
                 Overtime hours:{" "}
                 <span className="font-semibold text-sky-700">

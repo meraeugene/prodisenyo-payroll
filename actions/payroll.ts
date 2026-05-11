@@ -1,6 +1,6 @@
 "use server";
 
-import type { OvertimeApprovalMode, PayrollRunStatus } from "@/types/database";
+import type { PayrollRunStatus } from "@/types/database";
 import type { Database } from "@/types/database";
 import type { AttendanceRecordInput, PayrollRow } from "@/lib/payrollEngine";
 import { calculatePayroll, roundPayrollCalculation } from "@/lib/payrollEngine";
@@ -25,106 +25,17 @@ import type { OvertimeRequestRecord } from "@/features/overtime-requests/types";
 
 interface SubmitOvertimeRequestInput {
   employeeName: string;
-  roleCode?: string | null;
   siteName: string;
   periodLabel?: string | null;
   requestDate: string;
   overtimeHours: number;
   amount?: number;
   reason?: string | null;
-  approvalMode?: OvertimeApprovalMode;
 }
 
 interface RejectOvertimeRequestFormInput {
   requestId: string;
   rejectionReason?: string | null;
-}
-
-interface SavePayrollRunInput {
-  attendanceImportId: string | null;
-  payrollRunId: string | null;
-  siteName: string;
-  attendancePeriod: string;
-  payableHolidayDays: number;
-  employeeBranchRates: Record<string, number>;
-  payrollAttendanceInputs: AttendanceRecordInput[];
-  payrollRows: PayrollRow[];
-  payrollOverrides: Record<string, PayrollRowOverride>;
-}
-
-function createPayrollSaveError(
-  code: string,
-  message: string,
-  details?: Record<string, unknown>,
-): Error {
-  const suffix = details ? ` | ${JSON.stringify(details)}` : "";
-  return new Error(`[${code}] ${message}${suffix}`);
-}
-
-function parsePeriodRange(label: string): {
-  start: string | null;
-  end: string | null;
-} {
-  const match = label.match(/(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})/);
-  if (!match) return { start: null, end: null };
-
-  return {
-    start: match[1] ?? null,
-    end: match[2] ?? null,
-  };
-}
-
-function normalizeSiteName(value: string): string {
-  return value.trim() || "Unknown Site";
-}
-
-function normalizeLookupKey(value: string): string {
-  return normalizeEmployeeNameKey(value.trim());
-}
-
-function sameNullableText(a: string | null, b: string | null): boolean {
-  return (a ?? null) === (b ?? null);
-}
-
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
-function splitSiteNames(value: string): string[] {
-  return value
-    .split(",")
-    .map((site) => site.trim())
-    .filter((site) => site.length > 0);
-}
-
-function toIsoDate(value: Date): string {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function buildDateRange(start: string | null, end: string | null): string[] {
-  if (!start || !end) return [];
-  const startDate = new Date(`${start}T00:00:00`);
-  const endDate = new Date(`${end}T00:00:00`);
-  if (
-    !Number.isFinite(startDate.getTime()) ||
-    !Number.isFinite(endDate.getTime())
-  ) {
-    return [];
-  }
-  if (endDate.getTime() < startDate.getTime()) return [];
-
-  const dates: string[] = [];
-  const cursor = new Date(startDate);
-  let guard = 0;
-  while (cursor.getTime() <= endDate.getTime() && guard < 93) {
-    dates.push(toIsoDate(cursor));
-    cursor.setDate(cursor.getDate() + 1);
-    guard += 1;
-  }
-  return dates;
 }
 
 async function loadPayrollReportsData(database: any) {
@@ -133,30 +44,16 @@ async function loadPayrollReportsData(database: any) {
     .select(
       "id, attendance_import_id, site_name, period_label, period_start, period_end, status, net_total, created_at, submitted_at",
     )
-    .neq("status", "rejected")
-    .order("submitted_at", { ascending: false, nullsFirst: false })
+    .neq("status", "draft")
+    .order("submitted_at", { ascending: false })
     .order("created_at", { ascending: false });
 
   if (error) {
-    throw new Error(`Failed to load payroll reports. ${error.message}`);
+    throw new Error(`Unable to load payroll reports. ${error.message}`);
   }
 
   return {
-    reports: (data ?? []) as Array<
-      Pick<
-        Database["public"]["Tables"]["payroll_runs"]["Row"],
-        | "id"
-        | "attendance_import_id"
-        | "site_name"
-        | "period_label"
-        | "period_start"
-        | "period_end"
-        | "status"
-        | "net_total"
-        | "created_at"
-        | "submitted_at"
-      >
-    >,
+    reports: (data ?? []) as Database["public"]["Tables"]["payroll_runs"]["Row"][],
   };
 }
 
@@ -179,76 +76,53 @@ async function loadPayrollReportDetails(database: any, payrollRunId: string) {
     throw new Error("Payroll report not found.");
   }
 
-  const [itemsResult, initialLogsResult, totalsResult] = await Promise.all([
-    database
-      .from("payroll_run_items")
-      .select(
-        "id, employee_name, role_code, site_name, days_worked, hours_worked, overtime_hours, rate_per_day, regular_pay, overtime_pay, holiday_pay, deductions_total, total_pay",
-      )
-      .eq("payroll_run_id", runId)
-      .order("employee_name", { ascending: true }),
-    report.attendance_import_id
-      ? database
-          .from("attendance_records")
-          .select(
-            "id, employee_name, log_date, log_time, log_type, log_source, site_name",
-          )
-          .eq("import_id", report.attendance_import_id)
-          .order("log_date", { ascending: true })
-          .order("log_time", { ascending: true })
-      : Promise.resolve({ data: [], error: null }),
-    database
-      .from("payroll_run_daily_totals")
-      .select(
-        "id, payroll_run_item_id, employee_name, role_code, site_name, payout_date, hours_worked, total_pay",
-      )
-      .eq("payroll_run_id", runId)
-      .order("payout_date", { ascending: true }),
-  ]);
+  const { data: itemsData, error: itemsError } = await database
+    .from("payroll_run_items")
+    .select(
+      "id, employee_name, role_code, site_name, days_worked, hours_worked, overtime_hours, rate_per_day, regular_pay, overtime_pay, holiday_pay, deductions_total, total_pay",
+    )
+    .eq("payroll_run_id", runId)
+    .order("employee_name", { ascending: true })
+    .order("site_name", { ascending: true });
 
-  let attendanceLogsData = (initialLogsResult.data ??
-    []) as Database["public"]["Tables"]["attendance_records"]["Row"][];
-  let attendanceLogsError = initialLogsResult.error;
+  const { data: totalsData, error: totalsError } = await database
+    .from("payroll_run_daily_totals")
+    .select(
+      "id, payroll_run_item_id, employee_name, role_code, site_name, payout_date, hours_worked, total_pay",
+    )
+    .eq("payroll_run_id", runId)
+    .order("payout_date", { ascending: true })
+    .order("employee_name", { ascending: true });
 
-  if (
-    !attendanceLogsError &&
-    attendanceLogsData.length === 0 &&
-    report.period_start &&
-    report.period_end
-  ) {
-    const fallbackSites = splitSiteNames(report.site_name).filter(
-      (site) => site.length > 0,
-    );
-    let fallbackQuery = database
+  let attendanceLogsData:
+    | Database["public"]["Tables"]["attendance_records"]["Row"][]
+    | [] = [];
+
+  if (report.attendance_import_id) {
+    const { data: attendanceData, error: attendanceError } = await database
       .from("attendance_records")
       .select(
         "id, employee_name, log_date, log_time, log_type, log_source, site_name",
       )
-      .gte("log_date", report.period_start)
-      .lte("log_date", report.period_end)
+      .eq("import_id", report.attendance_import_id)
       .order("log_date", { ascending: true })
       .order("log_time", { ascending: true });
 
-    if (fallbackSites.length === 1) {
-      fallbackQuery = fallbackQuery.eq("site_name", fallbackSites[0]);
-    } else if (fallbackSites.length > 1) {
-      fallbackQuery = fallbackQuery.in("site_name", fallbackSites);
+    if (attendanceError) {
+      throw new Error(
+        `Unable to load attendance logs. ${attendanceError.message}`,
+      );
     }
 
-    const fallbackLogsResult = await fallbackQuery;
-    if (fallbackLogsResult.error) {
-      attendanceLogsError = fallbackLogsResult.error;
-    } else {
-      attendanceLogsData = (fallbackLogsResult.data ??
+    attendanceLogsData =
+      (attendanceData ??
         []) as Database["public"]["Tables"]["attendance_records"]["Row"][];
-    }
   }
 
-  if (itemsResult.error || attendanceLogsError || totalsResult.error) {
+  if (itemsError || totalsError) {
     throw new Error(
-      itemsResult.error?.message ||
-        attendanceLogsError?.message ||
-        totalsResult.error?.message ||
+      itemsError?.message ||
+        totalsError?.message ||
         "Unable to load payroll report details.",
     );
   }
@@ -270,10 +144,10 @@ async function loadPayrollReportDetails(database: any, payrollRunId: string) {
     details: {
       loading: false,
       error: null,
-      payrollItems: (itemsResult.data ??
+      payrollItems: (itemsData ??
         []) as Database["public"]["Tables"]["payroll_run_items"]["Row"][],
       attendanceLogs: attendanceLogsData,
-      dailyTotals: (totalsResult.data ??
+      dailyTotals: (totalsData ??
         []) as Database["public"]["Tables"]["payroll_run_daily_totals"]["Row"][],
     },
   };
@@ -414,206 +288,7 @@ async function syncAdvanceOvertimeRequestsForPayroll(
     candidates: AdvanceOvertimePayrollCandidate[];
   },
 ) {
-  const periodRange = parsePeriodRange(input.attendancePeriod);
-  if (!periodRange.start || !periodRange.end || input.candidates.length === 0) {
-    return { approvedCount: 0, unmatchedCount: 0 };
-  }
-
-  const today = getPhilippineTodayIso();
-  const candidateLookup = new Map<string, AdvanceOvertimePayrollCandidate>();
-  input.candidates.forEach((candidate) => {
-    candidateLookup.set(
-      buildAdvanceOvertimeCandidateKey(
-        candidate.employeeName,
-        candidate.roleCode,
-        candidate.siteName,
-      ),
-      candidate,
-    );
-  });
-
-  const { data: requests, error } = await database
-    .from("overtime_requests")
-    .select(
-      "id, requested_by, employee_name, role_code, site_name, period_label, request_date, overtime_hours, amount, reason, status, approval_mode, payroll_adjustment_id",
-    )
-    .eq("approval_mode", "auto_on_date")
-    .eq("status", "pending")
-    .gte("request_date", periodRange.start)
-    .lte("request_date", periodRange.end)
-    .lte("request_date", today);
-
-  if (error) {
-    throw new Error(`Failed to load advance overtime requests. ${error.message}`);
-  }
-
-  let approvedCount = 0;
-  let unmatchedCount = 0;
-  const approvedAt = new Date().toISOString();
-
-  for (const request of (requests ?? []) as Array<{
-    id: string;
-    requested_by: string;
-    employee_name: string;
-    role_code: string | null;
-    site_name: string;
-    period_label: string | null;
-    request_date: string;
-    overtime_hours: number;
-    amount: number;
-    reason: string | null;
-    status: "pending" | "approved" | "rejected";
-    approval_mode: OvertimeApprovalMode;
-    payroll_adjustment_id: string | null;
-  }>) {
-    if (
-      request.period_label &&
-      request.period_label.trim() !== input.attendancePeriod
-    ) {
-      continue;
-    }
-
-    const candidate = candidateLookup.get(
-      buildAdvanceOvertimeCandidateKey(
-        request.employee_name,
-        request.role_code,
-        request.site_name,
-      ),
-    );
-
-    if (!candidate) {
-      unmatchedCount += 1;
-      continue;
-    }
-
-    const overtimeHours = round2(Number(request.overtime_hours ?? 0));
-    if (!Number.isFinite(overtimeHours) || overtimeHours <= 0) {
-      unmatchedCount += 1;
-      continue;
-    }
-
-    const calculated = roundPayrollCalculation(
-      calculatePayroll({
-        dailyRate: candidate.ratePerDay,
-        regularHours: 0,
-        overtimeHours,
-        overtimeMultiplier: DEFAULT_OVERTIME_MULTIPLIER,
-        allowance: 0,
-        deductions: 0,
-      }),
-    );
-    const amount = round2(calculated.overtimePay);
-    const notes = [
-      request.reason?.trim() || "Advance overtime request",
-      `Auto-approved on ${today} for requested date ${request.request_date}.`,
-    ].join("\n");
-
-    const adjustmentPayload = {
-      payroll_run_id: null,
-      payroll_run_item_id: null,
-      attendance_import_id: input.attendanceImportId,
-      employee_name: candidate.employeeName,
-      employee_name_key: normalizeLookupKey(candidate.employeeName),
-      role_code: candidate.roleCode,
-      site_name: candidate.siteName,
-      site_name_key: normalizeLookupKey(candidate.siteName),
-      period_label: input.attendancePeriod,
-      period_start: periodRange.start,
-      period_end: periodRange.end,
-      source_overtime_request_id: request.id,
-      adjustment_type: "overtime",
-      status: "approved",
-      requested_by: request.requested_by,
-      approved_by: input.userId,
-      effective_date: request.request_date,
-      quantity: overtimeHours,
-      amount,
-      notes,
-    };
-
-    let adjustmentId = request.payroll_adjustment_id;
-
-    if (adjustmentId) {
-      const { error: updateAdjustmentError } = await database
-        .from("payroll_adjustments")
-        .update(adjustmentPayload)
-        .eq("id", adjustmentId);
-
-      if (updateAdjustmentError) {
-        throw new Error(
-          `Failed to update auto-approved overtime adjustment. ${updateAdjustmentError.message}`,
-        );
-      }
-    } else {
-      const { data: existingAdjustment, error: existingAdjustmentError } =
-        await database
-          .from("payroll_adjustments")
-          .select("id")
-          .eq("source_overtime_request_id", request.id)
-          .maybeSingle();
-
-      if (existingAdjustmentError) {
-        throw new Error(
-          `Failed to check auto-approved overtime adjustment. ${existingAdjustmentError.message}`,
-        );
-      }
-
-      if (existingAdjustment?.id) {
-        adjustmentId = existingAdjustment.id;
-        const { error: updateExistingError } = await database
-          .from("payroll_adjustments")
-          .update(adjustmentPayload)
-          .eq("id", adjustmentId);
-
-        if (updateExistingError) {
-          throw new Error(
-            `Failed to refresh auto-approved overtime adjustment. ${updateExistingError.message}`,
-          );
-        }
-      } else {
-        const { data: createdAdjustment, error: createAdjustmentError } =
-          await database
-            .from("payroll_adjustments")
-            .insert(adjustmentPayload)
-            .select("id")
-            .single();
-
-        if (createAdjustmentError || !createdAdjustment) {
-          throw new Error(
-            `Failed to create auto-approved overtime adjustment. ${createAdjustmentError?.message ?? ""}`,
-          );
-        }
-
-        adjustmentId = createdAdjustment.id;
-      }
-    }
-
-    const { error: updateRequestError } = await database
-      .from("overtime_requests")
-      .update({
-        status: "approved",
-        approved_by: input.userId,
-        approved_at: approvedAt,
-        auto_approved_at: approvedAt,
-        payroll_adjustment_id: adjustmentId,
-        amount,
-        period_label: input.attendancePeriod,
-        rejected_at: null,
-        rejection_reason: null,
-      })
-      .eq("id", request.id)
-      .eq("status", "pending");
-
-    if (updateRequestError) {
-      throw new Error(
-        `Failed to mark advance overtime request approved. ${updateRequestError.message}`,
-      );
-    }
-
-    approvedCount += 1;
-  }
-
-  return { approvedCount, unmatchedCount };
+  return { approvedCount: 0, unmatchedCount: 0 };
 }
 
 interface AdvanceOvertimePayrollCandidate {
@@ -1863,7 +1538,7 @@ export async function getOvertimeRequestsApprovalDataAction() {
   const { data, error } = await database
     .from("overtime_requests")
     .select(
-      "id, requester_role, requested_by, approved_by, payroll_adjustment_id, employee_name, role_code, site_name, period_label, request_date, overtime_hours, amount, reason, approval_mode, status, approved_at, auto_approved_at, rejected_at, rejection_reason, created_at, updated_at",
+      "id, requester_role, requested_by, approved_by, employee_name, site_name, period_label, request_date, overtime_hours, amount, reason, status, approved_at, rejected_at, rejection_reason, created_at, updated_at",
     )
     .in("status", ["pending", "approved", "rejected"])
     .order("created_at", { ascending: false });
@@ -1888,7 +1563,7 @@ export async function getMyOvertimeRequestsAction() {
   const { data, error } = await database
     .from("overtime_requests")
     .select(
-      "id, requester_role, requested_by, approved_by, payroll_adjustment_id, employee_name, role_code, site_name, period_label, request_date, overtime_hours, amount, reason, approval_mode, status, approved_at, auto_approved_at, rejected_at, rejection_reason, created_at, updated_at",
+      "id, requester_role, requested_by, approved_by, employee_name, site_name, period_label, request_date, overtime_hours, amount, reason, status, approved_at, rejected_at, rejection_reason, created_at, updated_at",
     )
     .eq("requested_by", user.id)
     .order("created_at", { ascending: false });
@@ -1913,15 +1588,12 @@ export async function submitOvertimeRequestAction(
   const database = createSupabaseAdminClient() as any;
 
   const employeeName = (input.employeeName ?? "").trim();
-  const roleCode = (input.roleCode ?? "").trim().toUpperCase() || null;
   const siteName = (input.siteName ?? "").trim();
   const periodLabel = (input.periodLabel ?? "").trim() || null;
   const requestDate = (input.requestDate ?? "").trim();
   const overtimeHours = round2(Number(input.overtimeHours ?? 0));
   const amount = round2(Number(input.amount ?? 0));
   const reason = (input.reason ?? "").trim() || null;
-  const approvalMode =
-    input.approvalMode === "auto_on_date" ? "auto_on_date" : "manual";
 
   if (!employeeName) {
     throw new Error("Employee name is required.");
@@ -1929,10 +1601,6 @@ export async function submitOvertimeRequestAction(
 
   if (!siteName) {
     throw new Error("Site name is required.");
-  }
-
-  if (approvalMode === "auto_on_date" && !roleCode) {
-    throw new Error("Role / occupation is required for advance overtime.");
   }
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(requestDate)) {
@@ -1952,20 +1620,17 @@ export async function submitOvertimeRequestAction(
     .insert({
       requester_role: profile.role,
       requested_by: user.id,
-      payroll_adjustment_id: null,
       employee_name: employeeName,
-      role_code: roleCode,
       site_name: siteName,
       period_label: periodLabel,
       request_date: requestDate,
       overtime_hours: overtimeHours,
       amount,
       reason,
-      approval_mode: approvalMode,
       status: "pending",
     })
     .select(
-      "id, requester_role, requested_by, approved_by, payroll_adjustment_id, employee_name, role_code, site_name, period_label, request_date, overtime_hours, amount, reason, approval_mode, status, approved_at, auto_approved_at, rejected_at, rejection_reason, created_at, updated_at",
+      "id, requester_role, requested_by, approved_by, employee_name, site_name, period_label, request_date, overtime_hours, amount, reason, status, approved_at, rejected_at, rejection_reason, created_at, updated_at",
     )
     .single();
 
@@ -1991,7 +1656,7 @@ export async function approveOvertimeRequestFormAction(requestId: string) {
 
   const { data: request, error: requestError } = await database
     .from("overtime_requests")
-    .select("id, approval_mode")
+    .select("id")
     .eq("id", id)
     .eq("status", "pending")
     .maybeSingle();
@@ -2004,12 +1669,6 @@ export async function approveOvertimeRequestFormAction(requestId: string) {
 
   if (!request) {
     throw new Error("This overtime request can no longer be updated.");
-  }
-
-  if (request.approval_mode === "auto_on_date") {
-    throw new Error(
-      "Advance overtime requests are auto-approved by payroll on the requested date.",
-    );
   }
 
   const approvedAt = new Date().toISOString();
