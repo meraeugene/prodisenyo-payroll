@@ -9,6 +9,7 @@ import type {
   PayrollOvertimeEntry,
   PayrollRowOverride,
 } from "@/features/payroll/types";
+import type { PayrollRunRow } from "@/features/payroll-reports/types";
 import { requireRole } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import {
@@ -38,7 +39,115 @@ interface RejectOvertimeRequestFormInput {
   rejectionReason?: string | null;
 }
 
-async function loadPayrollReportsData(database: any) {
+interface SavePayrollRunInput {
+  attendanceImportId: string | null;
+  payrollRunId: string | null;
+  siteName: string;
+  attendancePeriod: string;
+  payableHolidayDays: number;
+  employeeBranchRates: Record<string, number>;
+  payrollAttendanceInputs: AttendanceRecordInput[];
+  payrollRows: PayrollRow[];
+  payrollOverrides: Record<string, PayrollRowOverride | undefined>;
+}
+
+type PayrollSaveErrorDetails = Record<string, unknown>;
+
+function createPayrollSaveError(
+  code: string,
+  message: string,
+  details?: PayrollSaveErrorDetails,
+): Error {
+  const error = new Error(message) as Error & {
+    code?: string;
+    details?: PayrollSaveErrorDetails;
+  };
+  error.code = code;
+  error.details = details;
+  return error;
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function normalizeLookupKey(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function normalizeSiteName(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "Unknown Site";
+  if (/^Multiple Sites/i.test(trimmed)) return trimmed;
+
+  return trimmed
+    .replace(/\.[^.]+$/i, "")
+    .replace(/\s+\d{4}\s*to\s*\d{4}$/i, "")
+    .replace(/\s+\d{4}to\d{4}$/i, "")
+    .trim();
+}
+
+function parsePeriodRange(label: string): { start: string | null; end: string | null } {
+  const match = label.match(/(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})/);
+  if (!match) {
+    return { start: null, end: null };
+  }
+
+  return {
+    start: match[1] ?? null,
+    end: match[2] ?? null,
+  };
+}
+
+function toIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function buildDateRange(start: string | null, end: string | null): string[] {
+  const parseIsoDate = (value: string | null): Date | null => {
+    if (!value) return null;
+    const parsed = new Date(`${value}T00:00:00`);
+    if (!Number.isFinite(parsed.getTime())) return null;
+    return parsed;
+  };
+
+  const startDate = parseIsoDate(start);
+  const endDate = parseIsoDate(end);
+  if (!startDate || !endDate) return [];
+  if (endDate.getTime() < startDate.getTime()) return [];
+
+  const days: string[] = [];
+  const cursor = new Date(startDate);
+  const maxDays = 93;
+  let count = 0;
+
+  while (cursor.getTime() <= endDate.getTime() && count < maxDays) {
+    days.push(toIsoDate(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+    count += 1;
+  }
+
+  return days;
+}
+
+function splitSiteNames(value: string): string[] {
+  return value
+    .split(",")
+    .map((site) => site.trim())
+    .filter((site) => site.length > 0);
+}
+
+async function loadPayrollReportsData(
+  database: any,
+): Promise<{ reports: PayrollRunRow[] }> {
   const { data, error } = await database
     .from("payroll_runs")
     .select(
@@ -53,8 +162,7 @@ async function loadPayrollReportsData(database: any) {
   }
 
   return {
-    reports: (data ??
-      []) as Database["public"]["Tables"]["payroll_runs"]["Row"][],
+    reports: (data ?? []) as PayrollRunRow[],
   };
 }
 
