@@ -133,7 +133,9 @@ export default function PayrollEditModal({
     const deductionEntry =
       payroll.editingPayrollAdjustments.deductionEntries[0] ?? null;
     setSssGsisInput(
-      deductionEntry ? normalizeNumericInput(String(deductionEntry.sssGsis)) : "",
+      deductionEntry
+        ? normalizeNumericInput(String(deductionEntry.sssGsis))
+        : "",
     );
     setPhilHealthInput(
       deductionEntry
@@ -141,7 +143,9 @@ export default function PayrollEditModal({
         : "",
     );
     setPagIbigInput(
-      deductionEntry ? normalizeNumericInput(String(deductionEntry.pagIbig)) : "",
+      deductionEntry
+        ? normalizeNumericInput(String(deductionEntry.pagIbig))
+        : "",
     );
     setWithholdingTaxInput(
       deductionEntry
@@ -260,20 +264,14 @@ export default function PayrollEditModal({
     currentLogsForPay.reduce((sum, log) => sum + log.totalHours, 0),
   );
   const regularWorkedHours = round2(
-    currentLogsForPay.reduce(
-      (sum, log) => sum + log.regularHours,
-      0,
-    ),
+    currentLogsForPay.reduce((sum, log) => sum + log.regularHours, 0),
   );
   const sitePayBreakdown = loggedSites.map((site) => {
     const siteLogs = currentLogsForPay.filter(
       (log) => extractSiteName(log.site) === site,
     );
     const siteHours = round2(
-      siteLogs.reduce(
-        (sum, log) => sum + log.regularHours,
-        0,
-      ),
+      siteLogs.reduce((sum, log) => sum + log.regularHours, 0),
     );
     const siteRateKey = buildEmployeeBranchRateKey(
       editingPayrollRow.worker,
@@ -324,7 +322,8 @@ export default function PayrollEditModal({
   );
   const highOvertimeHoursLogs = currentLogsForPay.filter(
     (log) =>
-      log.totalHours >= OVERTIME_ALERT_HOURS && !holidayLogDateSet.has(log.date),
+      log.totalHours >= OVERTIME_ALERT_HOURS &&
+      !holidayLogDateSet.has(log.date),
   );
   const overtimeLogs = currentLogsForPay.filter(
     (log) =>
@@ -455,6 +454,13 @@ export default function PayrollEditModal({
       deductionTotals.withholdingTax +
       deductionTotals.otherDeductions,
   );
+  const deductionDetailItems = [
+    { label: "SSS/GSIS", amount: deductionTotals.sssGsis },
+    { label: "PhilHealth", amount: deductionTotals.philHealth },
+    { label: "Pag-IBIG", amount: deductionTotals.pagIbig },
+    { label: "Withholding Tax", amount: deductionTotals.withholdingTax },
+    { label: "Other deductions", amount: deductionTotals.otherDeductions },
+  ].filter((item) => item.amount > 0);
   const finalPayrollCalculation = roundPayrollCalculation(
     calculatePayroll({
       dailyRate: currentRatePerDay,
@@ -729,13 +735,14 @@ export default function PayrollEditModal({
                   Adjustments
                 </p>
               </div>
-              <div className="max-w-[720px] space-y-4 p-4 sm:p-5">
+              <div className="w-full space-y-4 p-4 sm:p-5">
                 {/* ─── BUTTONS (SAME WIDTH) ─── */}
-                <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-4">
+                <div className="grid w-full grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-2">
                   {[
                     { key: "cashAdvance", label: "Cash Advance" },
                     { key: "overtime", label: "Overtime" },
                     { key: "paidLeave", label: "Paid Leave" },
+                    { key: "allowance", label: "Allowance" },
                     ...(isPayrollManager
                       ? [{ key: "reductions", label: "Reductions" }]
                       : []),
@@ -975,6 +982,65 @@ export default function PayrollEditModal({
                   </form>
                 )}
 
+                {/* ─── ALLOWANCE ─── */}
+                {activeAdjustmentForm === "allowance" && (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      addAllowance();
+                    }}
+                    className="w-full rounded-xl border border-gray-200 bg-apple-snow/40 p-4 space-y-4"
+                  >
+                    <div className="flex flex-wrap gap-4">
+                      <div className="flex flex-col w-full sm:w-[240px]">
+                        <label className="text-xs text-gray-500 mb-1">
+                          Allowance Amount
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="0"
+                          value={allowanceAmountInput}
+                          onChange={(e) =>
+                            setAllowanceAmountInput(
+                              normalizeNumericInput(e.target.value),
+                            )
+                          }
+                          className="h-10 px-3 rounded-xl border border-apple-charcoal/40 hover:border-apple-charcoal focus:outline-none text-sm font-semibold focus:bg-white focus:border-black"
+                        />
+                      </div>
+
+                      <div className="flex flex-col flex-1">
+                        <label className="text-xs text-gray-500 mb-1">
+                          Notes
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="(Optional)"
+                          value={allowanceNotes}
+                          onChange={(e) => setAllowanceNotes(e.target.value)}
+                          className="h-10 px-3 rounded-xl border border-apple-charcoal/40 hover:border-apple-charcoal focus:outline-none text-sm focus:bg-white focus:border-black"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setActiveAdjustmentForm(null)}
+                        className="h-9 w-full rounded-lg px-4 text-sm text-gray-500 hover:bg-gray-100 sm:w-auto"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="h-9 w-full rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white hover:bg-emerald-800 sm:w-auto"
+                      >
+                        Add Allowance
+                      </button>
+                    </div>
+                  </form>
+                )}
+
                 {/* REDUCTIONS */}
                 {activeAdjustmentForm === "reductions" && isPayrollManager && (
                   <form
@@ -1194,13 +1260,16 @@ export default function PayrollEditModal({
                         <span className="font-semibold text-red-600">
                           Reductions -{formatPeso(payrollDeductionsAmount)}
                         </span>
-                        <span className="text-xs text-gray-500 truncate">
-                          SSS/GSIS {formatPeso(deductionTotals.sssGsis)},{" "}
-                          PhilHealth {formatPeso(deductionTotals.philHealth)},{" "}
-                          Pag-IBIG {formatPeso(deductionTotals.pagIbig)}, Tax{" "}
-                          {formatPeso(deductionTotals.withholdingTax)}, Other{" "}
-                          {formatPeso(deductionTotals.otherDeductions)}
-                        </span>
+                        {deductionDetailItems.length > 0 && (
+                          <span className="text-xs text-gray-500 truncate">
+                            {deductionDetailItems
+                              .map(
+                                (item) =>
+                                  `${item.label} ${formatPeso(item.amount)}`,
+                              )
+                              .join(", ")}
+                          </span>
+                        )}
                         {isPayrollManager ? (
                           <button
                             onClick={clearReductions}
@@ -1306,8 +1375,7 @@ export default function PayrollEditModal({
                             0 && !isPaidHoliday;
                         const otPunchStarted = Boolean(log.otIn || log.otOut);
                         const shouldShowOtMissed =
-                          otPunchStarted ||
-                          getEditableOvertimeHours(log) > 0;
+                          otPunchStarted || getEditableOvertimeHours(log) > 0;
 
                         return (
                           <tr
@@ -1665,6 +1733,14 @@ export default function PayrollEditModal({
                     {formatPeso(paidHolidayPay)}
                   </span>
                 </div>
+                {allowancePay > 0 && (
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-apple-charcoal">+ Allowance</span>
+                    <span className="font-mono font-semibold text-emerald-700 text-right">
+                      {formatPeso(allowancePay)}
+                    </span>
+                  </div>
+                )}
                 <div className="border-t border-apple-mist pt-2 mt-2 flex items-center justify-between gap-3 text-sm">
                   <span className="font-semibold text-apple-charcoal">
                     Gross Pay
@@ -1679,20 +1755,14 @@ export default function PayrollEditModal({
                     {formatPeso(cashAdvanceAmount)}
                   </span>
                 </div>
-                {[
-                  ["SSS / GSIS", deductionTotals.sssGsis],
-                  ["PhilHealth", deductionTotals.philHealth],
-                  ["Pag-IBIG", deductionTotals.pagIbig],
-                  ["Withholding Tax", deductionTotals.withholdingTax],
-                  ["Other deductions", deductionTotals.otherDeductions],
-                ].map(([label, amount]) => (
+                {deductionDetailItems.map((item) => (
                   <div
-                    key={label}
+                    key={item.label}
                     className="flex items-center justify-between gap-3 text-sm"
                   >
-                    <span className="text-apple-charcoal">- {label}</span>
+                    <span className="text-apple-charcoal">- {item.label}</span>
                     <span className="font-mono font-semibold text-red-600 text-right">
-                      {formatPeso(Number(amount))}
+                      {formatPeso(item.amount)}
                     </span>
                   </div>
                 ))}
@@ -1725,7 +1795,6 @@ export default function PayrollEditModal({
                 </div>
               </div>
             </div>
-
           </div>
         </div>
         <div className="sticky bottom-0 z-10 border-t border-apple-mist bg-white/95 px-4 py-4 backdrop-blur sm:px-7">
