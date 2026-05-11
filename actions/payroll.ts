@@ -53,7 +53,8 @@ async function loadPayrollReportsData(database: any) {
   }
 
   return {
-    reports: (data ?? []) as Database["public"]["Tables"]["payroll_runs"]["Row"][],
+    reports: (data ??
+      []) as Database["public"]["Tables"]["payroll_runs"]["Row"][],
   };
 }
 
@@ -114,9 +115,8 @@ async function loadPayrollReportDetails(database: any, payrollRunId: string) {
       );
     }
 
-    attendanceLogsData =
-      (attendanceData ??
-        []) as Database["public"]["Tables"]["attendance_records"]["Row"][];
+    attendanceLogsData = (attendanceData ??
+      []) as Database["public"]["Tables"]["attendance_records"]["Row"][];
   }
 
   if (itemsError || totalsError) {
@@ -275,7 +275,9 @@ function buildPayrollCandidatesFromRows(
     employeeName: row.worker,
     roleCode: row.role.trim().toUpperCase() || "UNKNOWN",
     siteName: normalizeSiteName(row.site),
-    ratePerDay: round2((row.customRate ?? row.defaultRate ?? 0) * FULL_WORKDAY_HOURS),
+    ratePerDay: round2(
+      (row.customRate ?? row.defaultRate ?? 0) * FULL_WORKDAY_HOURS,
+    ),
   }));
 }
 
@@ -1485,9 +1487,7 @@ export async function approveOvertimeAdjustmentAction(adjustmentId: string) {
           const { error: updateDailyTotalError } = await database
             .from("payroll_run_daily_totals")
             .update({
-              total_pay: round2(
-                (existingDailyTotal.total_pay ?? 0) + netDelta,
-              ),
+              total_pay: round2((existingDailyTotal.total_pay ?? 0) + netDelta),
               hours_worked: round2(
                 (existingDailyTotal.hours_worked ?? 0) +
                   (adjustment.quantity ?? 0),
