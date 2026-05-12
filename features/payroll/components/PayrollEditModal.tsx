@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -44,6 +44,7 @@ import {
   buildOvertimeRequestNotes,
   parseOvertimeRequestNotes,
 } from "@/features/payroll/utils/overtimeRequestNotes";
+import { isIsoDateWithinRange } from "@/features/payroll/utils/payrollDateHelpers";
 import { computeSameDayOvertimeMinutes } from "@/lib/utils";
 import {
   allocateCombinedBranchPay,
@@ -186,6 +187,20 @@ export default function PayrollEditModal({
     setAllReportLogsPage((page) => Math.min(page, totalPages));
   }, [payroll.editingPayrollLogs.length]);
 
+  const payableHolidayDateSet = useMemo(() => {
+    const range = payroll.payrollDateRange;
+    if (!range || payroll.paidHolidays.length === 0) {
+      return new Set<string>();
+    }
+    return new Set(
+      payroll.paidHolidays
+        .filter((holiday) =>
+          isIsoDateWithinRange(holiday.date, range.start, range.end),
+        )
+        .map((holiday) => holiday.date),
+    );
+  }, [payroll.paidHolidays, payroll.payrollDateRange]);
+
   if (!editingPayrollRow || !payrollEditDraft) return null;
 
   function getEditableRegularHours(log: DailyLogRow): number {
@@ -252,14 +267,6 @@ export default function PayrollEditModal({
     formatPayrollPeriodFromText(primarySiteSource) ??
     formatPayrollPeriodFromText(editingPayrollRow.date);
   const currentLogsForPay = payroll.editingPayrollLogsForAnalytics;
-  const editingDates = new Set(
-    payroll.editingPayrollLogs.map((log) => log.date),
-  );
-  const holidayLogDateSet = new Set(
-    payroll.paidHolidays
-      .map((holiday) => holiday.date)
-      .filter((date) => editingDates.has(date)),
-  );
   const totalWorkedHours = round2(
     currentLogsForPay.reduce((sum, log) => sum + log.totalHours, 0),
   );
@@ -313,22 +320,22 @@ export default function PayrollEditModal({
         FULL_WORKDAY_HOURS,
   );
   const daysWorked = computeDaysWorked(regularWorkedHours);
-  const paidHolidayBonusDays = holidayLogDateSet.size;
+  const paidHolidayBonusDays = payroll.payableHolidayDays;
   const underHoursLogs = currentLogsForPay.filter(
     (log) =>
       log.hours > 0 &&
       log.regularHours < FULL_WORKDAY_HOURS &&
-      !holidayLogDateSet.has(log.date),
+      !payableHolidayDateSet.has(log.date),
   );
   const highOvertimeHoursLogs = currentLogsForPay.filter(
     (log) =>
       log.totalHours >= OVERTIME_ALERT_HOURS &&
-      !holidayLogDateSet.has(log.date),
+      !payableHolidayDateSet.has(log.date),
   );
   const overtimeLogs = currentLogsForPay.filter(
     (log) =>
       computeSameDayOvertimeMinutes(log.otIn, log.otOut) > 0 &&
-      !holidayLogDateSet.has(log.date),
+      !payableHolidayDateSet.has(log.date),
   );
   const hasHoursReviewWarning =
     underHoursLogs.length > 0 || highOvertimeHoursLogs.length > 0;
@@ -372,7 +379,7 @@ export default function PayrollEditModal({
   const biometricOvertimeHours = round2(
     currentLogsForPay.reduce(
       (sum, log) =>
-        holidayLogDateSet.has(log.date) ? sum : sum + log.overtimeHours,
+        payableHolidayDateSet.has(log.date) ? sum : sum + log.overtimeHours,
       0,
     ),
   );
@@ -659,6 +666,10 @@ export default function PayrollEditModal({
           ? deductionEntries
           : payroll.editingPayrollAdjustments.deductionEntries,
         biometricOvertimeStatus,
+        biometricOvertimeHours:
+          biometricOvertimeStatus === "approved"
+            ? biometricOvertimeHours
+            : null,
       });
 
       if (result.entries.length > 0) {
@@ -1356,7 +1367,7 @@ export default function PayrollEditModal({
                       </tr>
                     ) : (
                       visibleAllReportLogs.map((log, index) => {
-                        const isPaidHoliday = holidayLogDateSet.has(log.date);
+                        const isPaidHoliday = payableHolidayDateSet.has(log.date);
                         const editableRegularHours =
                           getEditableRegularHours(log);
                         const editableOvertimeHours =

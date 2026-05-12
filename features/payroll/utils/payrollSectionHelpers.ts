@@ -8,7 +8,7 @@ import {
 } from "@/lib/payrollConfig";
 import type { Step2Sort } from "@/types";
 import type { UsePayrollStateResult } from "@/features/payroll/hooks/usePayrollState";
-import type { LogHourOverrideValue } from "@/features/payroll/types";
+import type { LogHourOverrideValue, PayrollRowOverride } from "@/features/payroll/types";
 import {
   allocateCombinedBranchPay,
   buildEditingPayrollLogs,
@@ -92,6 +92,42 @@ export function formatDaysLabel(daysWorked: number): string {
 
 export function round2(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+function sumManualAllowanceFromOverride(
+  override: PayrollRowOverride | undefined,
+): number {
+  if (!override) return 0;
+  if (Number.isFinite(override.allowanceEntriesTotal)) {
+    return round2(override.allowanceEntriesTotal ?? 0);
+  }
+  return round2(
+    (override.allowanceEntries ?? []).reduce(
+      (sum, entry) => sum + entry.amount,
+      0,
+    ),
+  );
+}
+
+function sumPayrollDeductionsFromOverride(
+  override: PayrollRowOverride | undefined,
+): number {
+  if (!override) return 0;
+  if (Number.isFinite(override.deductionsTotal)) {
+    return round2(override.deductionsTotal ?? 0);
+  }
+  return round2(
+    (override.deductionEntries ?? []).reduce(
+      (sum, entry) =>
+        sum +
+        entry.sssGsis +
+        entry.philHealth +
+        entry.pagIbig +
+        entry.withholdingTax +
+        entry.otherDeductions,
+      0,
+    ),
+  );
 }
 
 function compareGroupedEmployees(
@@ -255,6 +291,8 @@ export function buildGroupedEmployeeMetrics(
   const compensation = buildGroupedEmployeeCompensation(employee, payroll);
   let paidLeavePay = 0;
   let cashAdvancePay = 0;
+  let manualAllowancePay = 0;
+  let payrollDeductionsPay = 0;
 
   for (const row of employee.sites) {
     const override = payroll.payrollOverrides[row.id];
@@ -267,10 +305,15 @@ export function buildGroupedEmployeeMetrics(
     for (const entry of override.cashAdvanceEntries ?? []) {
       cashAdvancePay += entry.amount;
     }
+
+    manualAllowancePay += sumManualAllowanceFromOverride(override);
+    payrollDeductionsPay += sumPayrollDeductionsFromOverride(override);
   }
 
   const paidHolidayPay = payroll.payableHolidayDays * FIXED_PAY_RATE_PER_DAY;
-  const allowance = paidHolidayPay + paidLeavePay;
+  const allowance = round2(
+    paidHolidayPay + paidLeavePay + manualAllowancePay,
+  );
   const effectiveDailyRate =
     compensation.totalWorkedHours > 0
       ? (compensation.totalBasePay / compensation.totalWorkedHours) * 8
@@ -285,7 +328,10 @@ export function buildGroupedEmployeeMetrics(
       ),
       overtimeMultiplier: DEFAULT_OVERTIME_MULTIPLIER,
       allowance,
-      deductions: cashAdvancePay,
+      deductions: {
+        cashAdvance: cashAdvancePay,
+        payrollDeductions: payrollDeductionsPay,
+      },
     }),
   );
   const dailyRates = Array.from(

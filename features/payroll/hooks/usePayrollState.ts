@@ -762,6 +762,8 @@ export function usePayrollState({
               allowanceEntriesTotal:
                 existingOverride?.allowanceEntriesTotal ?? 0,
               deductionsTotal: existingOverride?.deductionsTotal ?? 0,
+              biometricOvertimeHours:
+                existingOverride?.biometricOvertimeHours ?? null,
               biometricOvertimeStatus:
                 existingOverride?.biometricOvertimeStatus ?? null,
               overtimeEntries: mergedEntries,
@@ -879,6 +881,7 @@ export function usePayrollState({
       allowanceEntries: override?.allowanceEntries ?? [],
       deductionEntries: override?.deductionEntries ?? [],
       biometricOvertimeStatus: override?.biometricOvertimeStatus ?? null,
+      biometricOvertimeHours: override?.biometricOvertimeHours ?? null,
     };
   }, [editingPayrollRowId, payrollOverrides]);
 
@@ -908,8 +911,14 @@ export function usePayrollState({
         );
         const biometricOvertimeApproved =
           override?.biometricOvertimeStatus === "approved";
+        const storedBiometricHours = override?.biometricOvertimeHours;
         const biometricOvertimeHours = biometricOvertimeApproved
-          ? round2(row.overtimeHours)
+          ? round2(
+              storedBiometricHours != null &&
+                Number.isFinite(storedBiometricHours)
+                ? Number(storedBiometricHours)
+                : row.overtimeHours,
+            )
           : 0;
         const cashAdvance =
           Number.isFinite(override?.cashAdvanceTotal)
@@ -1476,6 +1485,23 @@ export function usePayrollState({
     const nextAllowanceEntriesTotal = sumAllowanceEntries(nextAllowanceEntries);
     const nextDeductionsTotal = sumDeductionEntries(nextDeductionEntries);
 
+    const nextBiometricStatus =
+      adjustments?.biometricOvertimeStatus ??
+      existingOverride?.biometricOvertimeStatus ??
+      null;
+
+    let nextBiometricHours: number | null =
+      existingOverride?.biometricOvertimeHours ?? null;
+    if (nextBiometricStatus === "approved") {
+      nextBiometricHours =
+        adjustments?.biometricOvertimeHours != null &&
+        Number.isFinite(adjustments.biometricOvertimeHours)
+          ? round2(adjustments.biometricOvertimeHours)
+          : (existingOverride?.biometricOvertimeHours ?? null);
+    } else if (nextBiometricStatus === "rejected") {
+      nextBiometricHours = null;
+    }
+
     setPayrollOverrides((prev) => ({
       ...prev,
       [editingPayrollRow.id]: {
@@ -1495,10 +1521,8 @@ export function usePayrollState({
         paidLeaveEntriesPayTotal: nextPaidLeaveEntriesPayTotal,
         allowanceEntriesTotal: nextAllowanceEntriesTotal,
         deductionsTotal: nextDeductionsTotal,
-        biometricOvertimeStatus:
-          adjustments?.biometricOvertimeStatus ??
-          existingOverride?.biometricOvertimeStatus ??
-          null,
+        biometricOvertimeStatus: nextBiometricStatus,
+        biometricOvertimeHours: nextBiometricHours,
       },
     }));
 

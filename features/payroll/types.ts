@@ -51,6 +51,8 @@ export interface PayrollAdjustmentSet {
   allowanceEntries: PayrollAllowanceEntry[];
   deductionEntries: PayrollDeductionEntry[];
   biometricOvertimeStatus: "approved" | "rejected" | null;
+  /** When approved, total biometric OT hours (matches edit modal / all-site logs). */
+  biometricOvertimeHours?: number | null;
 }
 
 export interface PayrollRowOverride {
@@ -71,6 +73,7 @@ export interface PayrollRowOverride {
   allowanceEntriesTotal?: number;
   deductionsTotal?: number;
   biometricOvertimeStatus?: "approved" | "rejected" | null;
+  biometricOvertimeHours?: number | null;
 }
 
 export interface PayrollEditSummary {
