@@ -17,6 +17,7 @@ import {
   FIXED_PAY_RATE_PER_DAY,
   FULL_WORKDAY_HOURS,
 } from "@/features/payroll/utils/payrollSelectors";
+import type { EmployeeBranchRateConfig } from "@/features/payroll/utils/branchRateConfig";
 import {
   buildEmployeeBranchRateKey,
   normalizeEmployeeNameKey,
@@ -45,7 +46,7 @@ interface SavePayrollRunInput {
   siteName: string;
   attendancePeriod: string;
   payableHolidayDays: number;
-  employeeBranchRates: Record<string, number>;
+  employeeBranchRates: Record<string, EmployeeBranchRateConfig>;
   payrollAttendanceInputs: AttendanceRecordInput[];
   payrollRows: PayrollRow[];
   payrollOverrides: Record<string, PayrollRowOverride | undefined>;
@@ -939,8 +940,9 @@ export async function savePayrollRunAction(input: SavePayrollRunInput) {
       row.role,
       row.site,
     );
+    const branchRateConfig = input.employeeBranchRates[branchRateKey];
     const ratePerDay = round2(
-      input.employeeBranchRates[branchRateKey] ??
+      branchRateConfig?.dailyRate ??
         (row.customRate ?? row.defaultRate) * FULL_WORKDAY_HOURS,
     );
 
@@ -1097,7 +1099,7 @@ export async function savePayrollRunAction(input: SavePayrollRunInput) {
                     snapshot.row.role,
                     site,
                   )
-                ] ?? snapshot.ratePerDay,
+                ]?.dailyRate ?? snapshot.ratePerDay,
             }))
           : [
               {

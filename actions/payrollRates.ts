@@ -12,6 +12,7 @@ interface SaveEmployeeBranchRateInput {
   roleCode: string;
   siteName: string;
   dailyRate: number;
+  regularPaidHours: number;
 }
 
 export async function saveEmployeeBranchRatesAction(
@@ -26,13 +27,16 @@ export async function saveEmployeeBranchRatesAction(
       const roleCode = entry.roleCode.trim().toUpperCase();
       const siteName = entry.siteName.trim();
       const dailyRate = Number(entry.dailyRate);
+      const regularPaidHours = Number(entry.regularPaidHours);
 
       if (
         !employeeName ||
         !roleCode ||
         !siteName ||
         !Number.isFinite(dailyRate) ||
-        dailyRate < 0
+        dailyRate < 0 ||
+        !Number.isFinite(regularPaidHours) ||
+        regularPaidHours <= 0
       ) {
         return null;
       }
@@ -44,6 +48,7 @@ export async function saveEmployeeBranchRatesAction(
         site_name: siteName,
         site_name_key: normalizeSiteKey(siteName),
         daily_rate: Math.round(dailyRate * 100) / 100,
+        regular_paid_hours: Math.round(regularPaidHours * 100) / 100,
         updated_by: user.id,
       };
     })

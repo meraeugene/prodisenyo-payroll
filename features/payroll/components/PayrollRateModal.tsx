@@ -10,6 +10,10 @@ import {
   formatPayrollNumber,
 } from "@/features/payroll/utils/payrollFormatters";
 import { buildEmployeeBranchRateKey } from "@/features/payroll/utils/payrollMappers";
+import {
+  DEFAULT_REGULAR_PAID_HOURS,
+  normalizeEmployeeBranchRateConfig,
+} from "@/features/payroll/utils/branchRateConfig";
 
 interface PayrollRateModalProps {
   payroll: UsePayrollStateResult;
@@ -32,6 +36,7 @@ export default function PayrollRateModal({ payroll }: PayrollRateModalProps) {
           fallbackRate: Number(
             ((row.customRate ?? row.defaultRate) * 8).toFixed(2),
           ),
+          fallbackRegularPaidHours: DEFAULT_REGULAR_PAID_HOURS,
         }))
         .sort((a, b) => {
           const byWorker = a.worker.localeCompare(b.worker);
@@ -81,17 +86,28 @@ export default function PayrollRateModal({ payroll }: PayrollRateModalProps) {
         const changedSummaries: string[] = [];
         const changedEntries = editableRows
           .map((row) => {
-            const nextDailyRate =
-              payroll.payrollRateDraft[row.key] ?? row.fallbackRate;
-            const currentDailyRate =
-              payroll.employeeBranchRates[row.key] ?? row.fallbackRate;
+            const nextConfig = normalizeEmployeeBranchRateConfig(
+              payroll.payrollRateDraft[row.key],
+              row.fallbackRate,
+            );
+            const currentConfig = normalizeEmployeeBranchRateConfig(
+              payroll.employeeBranchRates[row.key],
+              row.fallbackRate,
+            );
+            const nextDailyRate = nextConfig.dailyRate;
+            const currentDailyRate = currentConfig.dailyRate;
+            const nextRegularPaidHours = nextConfig.regularPaidHours;
+            const currentRegularPaidHours = currentConfig.regularPaidHours;
 
-            if (Math.abs(nextDailyRate - currentDailyRate) < 0.005) {
+            if (
+              Math.abs(nextDailyRate - currentDailyRate) < 0.005 &&
+              Math.abs(nextRegularPaidHours - currentRegularPaidHours) < 0.005
+            ) {
               return null;
             }
 
             changedSummaries.push(
-              `${row.worker} - ${row.siteLabel}: ${formatPayrollNumber(currentDailyRate)} -> ${formatPayrollNumber(nextDailyRate)}`,
+              `${row.worker} - ${row.siteLabel}: ${formatPayrollNumber(currentDailyRate)} -> ${formatPayrollNumber(nextDailyRate)}, ${formatPayrollNumber(currentRegularPaidHours)}h -> ${formatPayrollNumber(nextRegularPaidHours)}h`,
             );
 
             return {
@@ -99,6 +115,7 @@ export default function PayrollRateModal({ payroll }: PayrollRateModalProps) {
               roleCode: row.role,
               siteName: row.site,
               dailyRate: nextDailyRate,
+              regularPaidHours: nextRegularPaidHours,
             };
           })
           .filter((entry): entry is NonNullable<typeof entry> =>
@@ -223,15 +240,24 @@ export default function PayrollRateModal({ payroll }: PayrollRateModalProps) {
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-apple-steel">
                   Daily Rate
                 </th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-apple-steel">
+                  Regular Paid Hours
+                </th>
               </tr>
             </thead>
             <tbody>
               {filteredRows.length > 0 ? (
-                filteredRows.map((row) => (
-                  <tr
-                    key={row.key}
-                    className="border-b border-apple-mist/70 last:border-0"
-                  >
+                filteredRows.map((row) => {
+                  const draftConfig = normalizeEmployeeBranchRateConfig(
+                    payroll.payrollRateDraft[row.key],
+                    row.fallbackRate,
+                  );
+
+                  return (
+                    <tr
+                      key={row.key}
+                      className="border-b border-apple-mist/70 last:border-0"
+                    >
                     <td className="px-4 py-3 font-medium text-apple-charcoal">
                       <div className="flex items-center gap-2">
                         <span>{row.worker}</span>
@@ -253,35 +279,65 @@ export default function PayrollRateModal({ payroll }: PayrollRateModalProps) {
                         type="number"
                         min={0}
                         step="0.01"
-                        value={
-                          payroll.payrollRateDraft[row.key] ?? row.fallbackRate
-                        }
+                        value={draftConfig.dailyRate}
                         onChange={(event) => {
                           const parsed = Number.parseFloat(event.target.value);
                           payroll.setPayrollRateDraft((prev) => ({
                             ...prev,
-                            [row.key]:
-                              Number.isFinite(parsed) && parsed >= 0
-                                ? parsed
-                                : 0,
+                            [row.key]: {
+                              ...normalizeEmployeeBranchRateConfig(
+                                prev[row.key],
+                                row.fallbackRate,
+                              ),
+                              dailyRate:
+                                Number.isFinite(parsed) && parsed >= 0
+                                  ? parsed
+                                  : 0,
+                            },
                           }));
                         }}
                         className="h-10 w-full rounded-2xl border border-apple-silver bg-white px-3 text-right text-sm text-apple-charcoal transition-all focus:border-apple-charcoal focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15"
                       />
                       <p className="mt-1 text-right text-[11px] text-apple-steel">
                         Hourly:{" "}
-                        {formatPayrollNumber(
-                          (payroll.payrollRateDraft[row.key] ??
-                            row.fallbackRate) / 8,
-                        )}
+                        {formatPayrollNumber(draftConfig.dailyRate / 8)}
                       </p>
                     </td>
-                  </tr>
-                ))
+                    <td className="px-4 py-3">
+                      <input
+                        type="number"
+                        min={0.01}
+                        step="0.25"
+                        value={draftConfig.regularPaidHours}
+                        onChange={(event) => {
+                          const parsed = Number.parseFloat(event.target.value);
+                          payroll.setPayrollRateDraft((prev) => ({
+                            ...prev,
+                            [row.key]: {
+                              ...normalizeEmployeeBranchRateConfig(
+                                prev[row.key],
+                                row.fallbackRate,
+                              ),
+                              regularPaidHours:
+                                Number.isFinite(parsed) && parsed > 0
+                                  ? parsed
+                                  : row.fallbackRegularPaidHours,
+                            },
+                          }));
+                        }}
+                        className="h-10 w-full rounded-2xl border border-apple-silver bg-white px-3 text-right text-sm text-apple-charcoal transition-all focus:border-apple-charcoal focus:outline-none focus:ring-2 focus:ring-apple-charcoal/15"
+                      />
+                      <p className="mt-1 text-right text-[11px] text-apple-steel">
+                        Max regular hours paid
+                      </p>
+                    </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td
-                    colSpan={4}
+                    colSpan={5}
                     className="px-4 py-8 text-center text-sm text-apple-steel"
                   >
                     No employee branch rates matched your search.

@@ -24,6 +24,7 @@ import {
 import {
   buildEmployeeBranchRateKey,
   getLogOverrideKey,
+  parsePayrollIdentity,
 } from "@/features/payroll/utils/payrollMappers";
 import type { PayslipExportRecord } from "@/lib/payslipExport";
 
@@ -40,8 +41,9 @@ export interface GroupedEmployeePayrollRow {
 }
 
 export interface GroupedEmployeeMetrics {
-  totalHours: number;
-  payableDays: number;
+  actualTotalHours: number;
+  paidRegularHours: number;
+  daysWorked: number;
   basePay: number;
   paidHolidayPay: number;
   approvedOvertimePay: number;
@@ -272,7 +274,7 @@ export function buildGroupedEmployeeCompensation(
             site,
             hoursWorked,
             dailyRatePerDay:
-              payroll.employeeBranchRates[rateKey] ?? fallbackRate,
+              payroll.employeeBranchRates[rateKey]?.dailyRate ?? fallbackRate,
           };
         })
       : employee.sites.map((row) => ({
@@ -284,11 +286,76 @@ export function buildGroupedEmployeeCompensation(
   return allocateCombinedBranchPay(breakdown);
 }
 
+function buildMergedLogOverrides(
+  payroll: UsePayrollStateResult,
+): Record<string, LogHourOverrideValue> {
+  return Object.values(payroll.payrollOverrides).reduce<
+    Record<string, LogHourOverrideValue>
+  >((acc, override) => {
+    if (!override.logHours) return acc;
+    Object.assign(acc, override.logHours);
+    return acc;
+  }, {});
+}
+
+function buildGroupedEmployeeLogMetrics(
+  employee: GroupedEmployeePayrollRow,
+  payroll: UsePayrollStateResult,
+): {
+  actualTotalHours: number;
+  daysWorked: number;
+} {
+  const employeeKey = normalizeEmployeeName(employee.name);
+  const roleKey = normalizeRoleCode(employee.role) ?? "UNKNOWN";
+  const allowedSites = new Set(
+    summarizeGroupedSites(employee.sites).map((entry) => entry.site),
+  );
+  const mergedLogOverrides = buildMergedLogOverrides(payroll);
+  let actualTotalHours = 0;
+  let daysWorked = 0;
+
+  for (const log of payroll.dailyRows) {
+    const identity = parsePayrollIdentity(log.employee);
+    const normalizedName = normalizeEmployeeName(identity.name);
+    const normalizedRole = normalizeRoleCode(identity.role) ?? "UNKNOWN";
+    const normalizedSite = extractSiteName(log.site) || log.site || "Unknown Site";
+
+    if (normalizedName !== employeeKey) continue;
+    if (normalizedRole !== roleKey) continue;
+    if (allowedSites.size > 0 && !allowedSites.has(normalizedSite)) continue;
+
+    const override = mergedLogOverrides[getLogOverrideKey(log)];
+    const regularHours =
+      typeof override === "number"
+        ? override
+        : override?.regularHours ?? log.regularHours;
+    const overtimeHours =
+      typeof override === "number"
+        ? log.overtimeHours
+        : override?.overtimeHours ?? log.overtimeHours;
+    const totalHours = round2(
+      Math.max(0, Number(regularHours) || 0) +
+        Math.max(0, Number(overtimeHours) || 0),
+    );
+
+    actualTotalHours = round2(actualTotalHours + totalHours);
+    if (totalHours > 0) {
+      daysWorked += 1;
+    }
+  }
+
+  return {
+    actualTotalHours,
+    daysWorked,
+  };
+}
+
 export function buildGroupedEmployeeMetrics(
   employee: GroupedEmployeePayrollRow,
   payroll: UsePayrollStateResult,
 ): GroupedEmployeeMetrics {
   const compensation = buildGroupedEmployeeCompensation(employee, payroll);
+  const logMetrics = buildGroupedEmployeeLogMetrics(employee, payroll);
   let paidLeavePay = 0;
   let cashAdvancePay = 0;
   let manualAllowancePay = 0;
@@ -343,8 +410,9 @@ export function buildGroupedEmployeeMetrics(
   ).sort((a, b) => a - b);
 
   return {
-    totalHours: compensation.totalWorkedHours,
-    payableDays: compensation.totalPayableDays,
+    actualTotalHours: logMetrics.actualTotalHours,
+    paidRegularHours: compensation.totalWorkedHours,
+    daysWorked: logMetrics.daysWorked,
     basePay: compensation.totalBasePay,
     paidHolidayPay: round2(paidHolidayPay),
     approvedOvertimePay: calculation.overtimePay,
@@ -373,7 +441,7 @@ export function buildPayslipRecord(
     worker: employee.name,
     role: employee.role,
     site,
-    hoursWorked: metrics.totalHours,
+    hoursWorked: metrics.paidRegularHours,
     overtimeHours: employee.sites.reduce((sum, row) => sum + row.overtimeHours, 0),
     regularPay: compensation.totalBasePay,
     totalPay: metrics.totalPay,
@@ -399,8 +467,8 @@ export function buildPayslipRecord(
     role: employee.role,
     site: site || "-",
     period: periodLabel ?? representativeRow.date ?? "-",
-    daysWorked: metrics.payableDays,
-    totalHours: metrics.totalHours,
+    daysWorked: metrics.daysWorked,
+    totalHours: metrics.actualTotalHours,
     ratePerDay:
       compensation.totalPayableDays > 0
         ? compensation.totalBasePay / compensation.totalPayableDays

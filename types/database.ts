@@ -220,6 +220,7 @@ export interface Database {
           site_name: string;
           site_name_key: string;
           daily_rate: number;
+          regular_paid_hours: number;
           updated_by: string | null;
           created_at: string;
           updated_at: string;
@@ -232,6 +233,7 @@ export interface Database {
           site_name: string;
           site_name_key: string;
           daily_rate: number;
+          regular_paid_hours?: number;
           updated_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -243,6 +245,7 @@ export interface Database {
           site_name?: string;
           site_name_key?: string;
           daily_rate?: number;
+          regular_paid_hours?: number;
           updated_by?: string | null;
           updated_at?: string;
         };

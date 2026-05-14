@@ -17,6 +17,12 @@ import {
   parseNonNegativeOrFallback,
 } from "@/features/payroll/utils/payrollFormatters";
 import {
+  capRegularWorkedHours,
+  DEFAULT_REGULAR_PAID_HOURS,
+  normalizeEmployeeBranchRateConfig,
+  type EmployeeBranchRateConfig,
+} from "@/features/payroll/utils/branchRateConfig";
+import {
   extractIsoPayrollRange,
   isIsoDateWithinRange,
   normalizePeriodLabel,
@@ -379,17 +385,21 @@ export interface UsePayrollStateResult {
   payrollRoleFilter: RoleCode | "ALL";
   setPayrollRoleFilter: (value: RoleCode | "ALL") => void;
   showPayrollRateModal: boolean;
-  payrollRateDraft: Record<string, number>;
+  payrollRateDraft: Record<string, EmployeeBranchRateConfig>;
   setPayrollRateDraft: (
     value:
-      | Record<string, number>
-      | ((prev: Record<string, number>) => Record<string, number>),
+      | Record<string, EmployeeBranchRateConfig>
+      | ((
+          prev: Record<string, EmployeeBranchRateConfig>,
+        ) => Record<string, EmployeeBranchRateConfig>),
   ) => void;
-  employeeBranchRates: Record<string, number>;
+  employeeBranchRates: Record<string, EmployeeBranchRateConfig>;
   setEmployeeBranchRates: (
     value:
-      | Record<string, number>
-      | ((prev: Record<string, number>) => Record<string, number>),
+      | Record<string, EmployeeBranchRateConfig>
+      | ((
+          prev: Record<string, EmployeeBranchRateConfig>,
+        ) => Record<string, EmployeeBranchRateConfig>),
   ) => void;
   payrollAttendanceInputs: AttendanceRecordInput[];
   payrollOverrides: Record<string, PayrollRowOverride>;
@@ -481,8 +491,12 @@ export function usePayrollState({
   const [payrollDateFilter, setPayrollDateFilter] = useState("");
   const [payrollSort, setPayrollSort] = useState<Step2Sort>("name-asc");
   const [showPayrollRateModal, setShowPayrollRateModal] = useState(false);
-  const [payrollRateDraft, setPayrollRateDraft] = useState<Record<string, number>>({});
-  const [employeeBranchRates, setEmployeeBranchRates] = useState<Record<string, number>>({});
+  const [payrollRateDraft, setPayrollRateDraft] = useState<
+    Record<string, EmployeeBranchRateConfig>
+  >({});
+  const [employeeBranchRates, setEmployeeBranchRates] = useState<
+    Record<string, EmployeeBranchRateConfig>
+  >({});
   const [editingPayrollRowId, setEditingPayrollRowId] = useState<string | null>(
     null,
   );
@@ -507,7 +521,9 @@ export function usePayrollState({
         const supabase = createSupabaseBrowserClient();
         const { data, error } = await supabase
           .from("employee_branch_rates")
-          .select("employee_name, role_code, site_name, daily_rate");
+          .select(
+            "employee_name, role_code, site_name, daily_rate, regular_paid_hours",
+          );
 
         if (error || cancelled) return;
 
@@ -516,13 +532,20 @@ export function usePayrollState({
           role_code: string;
           site_name: string;
           daily_rate: number;
-        }>).reduce<Record<string, number>>((acc, row) => {
+          regular_paid_hours: number | null;
+        }>).reduce<Record<string, EmployeeBranchRateConfig>>((acc, row) => {
           const key = buildEmployeeBranchRateKey(
             row.employee_name,
             row.role_code,
             row.site_name,
           );
-          acc[key] = Number(row.daily_rate ?? 0);
+          acc[key] = normalizeEmployeeBranchRateConfig(
+            {
+              dailyRate: row.daily_rate,
+              regularPaidHours: row.regular_paid_hours,
+            },
+            Number(row.daily_rate ?? 0),
+          );
           return acc;
         }, {});
 
@@ -603,8 +626,23 @@ export function usePayrollState({
           record.hours >= 0,
       );
 
-    return coalescePayrollAttendanceInputs(normalizedInputs);
-  }, [dailyRows, persistedLogHourOverrides]);
+    return coalescePayrollAttendanceInputs(normalizedInputs).map((record) => {
+      const branchRateConfig =
+        employeeBranchRates[
+          buildEmployeeBranchRateKey(record.name, record.role, record.site)
+        ];
+      const cappedRegularHours = capRegularWorkedHours(
+        record.hours,
+        branchRateConfig?.regularPaidHours ?? DEFAULT_REGULAR_PAID_HOURS,
+      );
+
+      return {
+        ...record,
+        hours: cappedRegularHours,
+        totalHours: round2(cappedRegularHours + (record.overtimeHours ?? 0)),
+      };
+    });
+  }, [dailyRows, employeeBranchRates, persistedLogHourOverrides]);
   const payrollBaseRows = useMemo(
     () =>
       buildPayrollBaseRows(
@@ -612,9 +650,10 @@ export function usePayrollState({
         payrollRoleRates,
         attendancePeriod,
       ).map((row) => {
-        const branchRate = employeeBranchRates[
+        const branchRateConfig = employeeBranchRates[
           buildEmployeeBranchRateKey(row.worker, row.role, row.site)
         ];
+        const branchRate = branchRateConfig?.dailyRate;
 
         if (!Number.isFinite(branchRate) || branchRate <= 0) {
           return row;
@@ -889,8 +928,15 @@ export function usePayrollState({
     () => {
       const preparedRows = payrollBaseComputedRows.map((row) => {
         const override = payrollOverrides[row.id];
+        const branchRateKey = buildEmployeeBranchRateKey(
+          row.worker,
+          row.role,
+          row.site,
+        );
+        const rateConfig = employeeBranchRates[branchRateKey];
         const ratePerDay = round2(
-          (row.customRate ?? row.defaultRate) * FULL_WORKDAY_HOURS,
+          rateConfig?.dailyRate ??
+            (row.customRate ?? row.defaultRate) * FULL_WORKDAY_HOURS,
         );
         const basePay = computeBasePay(row.hoursWorked, ratePerDay);
         const leavePay =
@@ -1014,6 +1060,7 @@ export function usePayrollState({
       });
     },
     [
+      employeeBranchRates,
       payrollBaseComputedRows,
       payrollOverrides,
       payableHolidayDateSet,
@@ -1248,13 +1295,18 @@ export function usePayrollState({
   }
 
   function openPayrollRateModal() {
-    const nextDraft = payrollBaseComputedRows.reduce<Record<string, number>>(
+    const nextDraft = payrollBaseComputedRows.reduce<
+      Record<string, EmployeeBranchRateConfig>
+    >(
       (acc, row) => {
         const key = buildEmployeeBranchRateKey(row.worker, row.role, row.site);
         const fallbackRate = round2(
           (row.customRate ?? row.defaultRate) * FULL_WORKDAY_HOURS,
         );
-        acc[key] = employeeBranchRates[key] ?? fallbackRate;
+        acc[key] = normalizeEmployeeBranchRateConfig(
+          employeeBranchRates[key],
+          fallbackRate,
+        );
         return acc;
       },
       {},

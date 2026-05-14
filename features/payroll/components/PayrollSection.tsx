@@ -572,8 +572,7 @@ export default function PayrollSection({
                             employee,
                             payroll,
                           );
-                          const employeeDaysWorked =
-                            employeeMetrics.payableDays;
+                          const employeeDaysWorked = employeeMetrics.daysWorked;
                           const employeeTotalPay = employeeMetrics.totalPay;
                           const employeeHourlyRateLabel =
                             employeeMetrics.dailyRates.length <= 1
@@ -613,7 +612,7 @@ export default function PayrollSection({
                               </td>
 
                               <td className="px-4 py-3 text-sm font-mono text-apple-charcoal text-right">
-                                {formatPayrollNumber(employeeMetrics.totalHours)} hrs
+                                {formatPayrollNumber(employeeMetrics.actualTotalHours)} hrs
                               </td>
                               <td className="px-4 py-3 text-sm font-mono text-apple-charcoal text-right">
                                 {formatDaysLabel(employeeDaysWorked)}
@@ -1016,7 +1015,7 @@ ${
                     site: summarizeGroupedSites(selectedEmployee.sites)
                       .map((entry) => entry.site)
                       .join(", "),
-                    hoursWorked: metrics.totalHours,
+                    hoursWorked: metrics.paidRegularHours,
                     overtimeHours: selectedEmployee.sites.reduce(
                       (sum, row) => sum + row.overtimeHours,
                       0,

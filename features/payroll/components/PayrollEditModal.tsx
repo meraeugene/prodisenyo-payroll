@@ -41,6 +41,10 @@ import {
   getLogOverrideKey,
 } from "@/features/payroll/utils/payrollMappers";
 import {
+  capRegularWorkedHours,
+  DEFAULT_REGULAR_PAID_HOURS,
+} from "@/features/payroll/utils/branchRateConfig";
+import {
   buildOvertimeRequestNotes,
   parseOvertimeRequestNotes,
 } from "@/features/payroll/utils/overtimeRequestNotes";
@@ -48,7 +52,6 @@ import { isIsoDateWithinRange } from "@/features/payroll/utils/payrollDateHelper
 import { computeSameDayOvertimeMinutes } from "@/lib/utils";
 import {
   allocateCombinedBranchPay,
-  computeDaysWorked,
   FIXED_PAY_RATE_PER_DAY,
   FULL_WORKDAY_HOURS,
 } from "@/features/payroll/utils/payrollSelectors";
@@ -267,26 +270,54 @@ export default function PayrollEditModal({
     formatPayrollPeriodFromText(primarySiteSource) ??
     formatPayrollPeriodFromText(editingPayrollRow.date);
   const currentLogsForPay = payroll.editingPayrollLogsForAnalytics;
+  const getSiteRateConfig = (siteName: string) =>
+    payroll.employeeBranchRates[
+      buildEmployeeBranchRateKey(
+        editingPayrollRow.worker,
+        editingPayrollRow.role,
+        siteName,
+      )
+    ];
   const totalWorkedHours = round2(
     currentLogsForPay.reduce((sum, log) => sum + log.totalHours, 0),
   );
   const regularWorkedHours = round2(
-    currentLogsForPay.reduce((sum, log) => sum + log.regularHours, 0),
+    currentLogsForPay.reduce((sum, log) => {
+      const siteName = extractSiteName(log.site) || log.site;
+      return (
+        sum +
+        capRegularWorkedHours(
+          log.regularHours,
+          getSiteRateConfig(siteName)?.regularPaidHours ??
+            DEFAULT_REGULAR_PAID_HOURS,
+        )
+      );
+    }, 0),
   );
   const sitePayBreakdown = loggedSites.map((site) => {
     const siteLogs = currentLogsForPay.filter(
       (log) => extractSiteName(log.site) === site,
     );
     const siteHours = round2(
-      siteLogs.reduce((sum, log) => sum + log.regularHours, 0),
+      siteLogs.reduce(
+        (sum, log) =>
+          sum +
+          capRegularWorkedHours(
+            log.regularHours,
+            getSiteRateConfig(site)?.regularPaidHours ??
+              DEFAULT_REGULAR_PAID_HOURS,
+          ),
+        0,
+      ),
     );
     const siteRateKey = buildEmployeeBranchRateKey(
       editingPayrollRow.worker,
       editingPayrollRow.role,
       site,
     );
+    const siteRateConfig = payroll.employeeBranchRates[siteRateKey];
     const siteRatePerDay = round2(
-      payroll.employeeBranchRates[siteRateKey] ??
+      siteRateConfig?.dailyRate ??
         (editingPayrollRow.customRate ?? editingPayrollRow.defaultRate) *
           FULL_WORKDAY_HOURS,
     );
@@ -294,12 +325,15 @@ export default function PayrollEditModal({
       site,
       hours: siteHours,
       ratePerDay: siteRatePerDay,
+      regularPaidHours:
+        siteRateConfig?.regularPaidHours ?? DEFAULT_REGULAR_PAID_HOURS,
     };
   });
   const branchPayInputs = sitePayBreakdown.map((entry) => ({
     site: entry.site,
     hoursWorked: entry.hours,
     dailyRatePerDay: entry.ratePerDay,
+    regularPaidHours: entry.regularPaidHours,
   }));
   const branchPayAllocation = allocateCombinedBranchPay(branchPayInputs);
   const sitePayBreakdownWithAllocation = sitePayBreakdown.map((entry) => {
@@ -319,7 +353,7 @@ export default function PayrollEditModal({
       (editingPayrollRow.customRate ?? editingPayrollRow.defaultRate) *
         FULL_WORKDAY_HOURS,
   );
-  const daysWorked = computeDaysWorked(regularWorkedHours);
+  const daysWorked = currentLogsForPay.filter((log) => log.totalHours > 0).length;
   const paidHolidayBonusDays = payroll.payableHolidayDays;
   const underHoursLogs = currentLogsForPay.filter(
     (log) =>
@@ -1310,14 +1344,16 @@ export default function PayrollEditModal({
                 )}
                 {underHoursLogs.length > 0 && (
                   <p className="mt-1 text-xs font-semibold text-amber-700">
-                    Under-8 logs are not full paid days by themselves, but their
-                    hours accumulate toward total paid days.
+                    Under-8 shifts are still counted as worked days when total
+                    hours are above 0, but regular pay only uses the capped
+                    paid hours.
                   </p>
                 )}
                 {overtimeLogs.length > 0 && (
                   <p className="mt-1 text-xs font-semibold text-emerald-700">
-                    Hours above 8 are tagged as overtime. Biometric overtime is
-                    excluded until HR confirms it below.
+                    Overtime is only paid from OT In and OT Out records.
+                    Extra regular-shift minutes stay unpaid unless HR confirms
+                    the overtime below.
                   </p>
                 )}
                 {highOvertimeHoursLogs.length > 0 && (
@@ -1582,11 +1618,15 @@ export default function PayrollEditModal({
                     value: String(payroll.editingPayrollSummary.attendanceDays),
                   },
                   {
-                    label: "Computed Paid Days",
-                    value: formatPayrollNumber(daysWorked),
+                    label: "Days Worked",
+                    value: String(daysWorked),
                   },
                   {
-                    label: "Service Hours",
+                    label: "Actual Total Hours",
+                    value: `${formatPayrollNumber(totalWorkedHours)} hrs`,
+                  },
+                  {
+                    label: "Paid Regular Hours",
                     value: `${formatPayrollNumber(regularWorkedHours)} hrs`,
                   },
                   {
@@ -1626,7 +1666,15 @@ export default function PayrollEditModal({
               <div className="p-4 space-y-2">
                 <div className="flex items-center justify-between gap-3 text-sm">
                   <span className="text-apple-charcoal">
-                    Total Service Hours
+                    Actual Total Hours
+                  </span>
+                  <span className="font-mono font-semibold text-apple-charcoal text-right">
+                    {formatPayrollNumber(totalWorkedHours)} hrs
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-apple-charcoal">
+                    Paid Regular Hours
                   </span>
                   <span className="font-mono font-semibold text-apple-charcoal text-right">
                     {formatPayrollNumber(regularWorkedHours)} hrs
@@ -1634,14 +1682,14 @@ export default function PayrollEditModal({
                 </div>
                 <div className="flex items-center justify-between gap-3 text-sm">
                   <span className="text-apple-charcoal">
-                    Days Worked (hours/8)
+                    Days Worked
                   </span>
                   <span className="font-mono font-semibold text-apple-charcoal text-right">
-                    {formatPayrollNumber(daysWorked)}
+                    {daysWorked}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-apple-charcoal">Service Pay</span>
+                  <span className="text-apple-charcoal">Total Regular Pay</span>
                   <span className="font-mono font-semibold text-apple-charcoal text-right">
                     {formatPeso(baseWorkedPay)}
                   </span>
