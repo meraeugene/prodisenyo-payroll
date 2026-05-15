@@ -36,6 +36,7 @@ function timeToMinutes(time: string): number {
   return h * 60 + m;
 }
 
+const REGULAR_TIMEOUT_OT_IN_FALLBACK_START_MINUTES = 17 * 60 + 30;
 const EVENING_OVERTIME_START_MINUTES = 18 * 60;
 const END_OF_DAY_MINUTES = 24 * 60;
 const MISFILED_TIME1_OUT_IN_START_MINUTES = 10 * 60;
@@ -140,6 +141,22 @@ function latestValidMinutes(...times: string[]): number | null {
   return Math.max(...values);
 }
 
+function resolveRegularOutMinutes(
+  time1Out: string,
+  time2Out: string,
+  otIn: string,
+): number | null {
+  const regularOutMinutes = latestValidMinutes(time1Out, time2Out);
+  if (regularOutMinutes !== null) return regularOutMinutes;
+
+  const otInMinutes = timeToMinutes(otIn);
+  if (otInMinutes < REGULAR_TIMEOUT_OT_IN_FALLBACK_START_MINUTES) {
+    return null;
+  }
+
+  return otInMinutes;
+}
+
 function calculateDailyWorkMinutes(times: {
   time1In?: string | null;
   time1Out?: string | null;
@@ -152,7 +169,7 @@ function calculateDailyWorkMinutes(times: {
     normalizeBiometricDailyTimes(times);
 
   const regularInMinutes = earliestValidMinutes(time1In, time2In);
-  const regularOutMinutes = latestValidMinutes(time1Out, time2Out);
+  const regularOutMinutes = resolveRegularOutMinutes(time1Out, time2Out, otIn);
   const regularMinutes =
     regularInMinutes !== null && regularOutMinutes !== null
       ? boundedForwardPairMinutes(

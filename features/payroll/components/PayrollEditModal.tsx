@@ -1831,19 +1831,6 @@ export default function PayrollEditModal({
                     yet.
                   </div>
                 )}
-                {hasHoursReviewWarning && (
-                  <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
-                    Overtime hours (10h+) or lacking time (&lt;8h) may affect
-                    payroll calculation. Please double-check all logs before
-                    saving.
-                  </div>
-                )}
-                {hasBiometricOvertime && biometricOvertimeStatus === null ? (
-                  <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
-                    Confirm or exclude biometric overtime before saving so the
-                    final total pay uses the intended overtime amount.
-                  </div>
-                ) : null}
                 <div className="border-t border-apple-mist pt-2 mt-2 flex items-center justify-between gap-3">
                   <span className="text-base font-bold text-apple-charcoal">
                     Adjusted Total Pay

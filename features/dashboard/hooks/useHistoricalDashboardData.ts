@@ -19,6 +19,7 @@ import {
   buildDailyRows,
   selectAvailableSites,
 } from "@/features/attendance/utils/attendanceSelectors";
+import { calculateDailyWorkMinutes } from "@/lib/utils";
 
 type AttendanceRecordRow =
   Database["public"]["Tables"]["attendance_records"]["Row"];
@@ -158,29 +159,6 @@ function formatMoney(value: number): string {
   })}`;
 }
 
-function toMinutes(timeText: string): number {
-  const match = timeText.match(/^(\d{1,2}):(\d{2})$/);
-  if (!match) return -1;
-
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return -1;
-  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return -1;
-  return hours * 60 + minutes;
-}
-
-function boundedPairMinutes(inTime: string, outTime: string): number {
-  if (!inTime || !outTime) return 0;
-  const inMinutes = toMinutes(inTime);
-  const outMinutes = toMinutes(outTime);
-  if (inMinutes < 0 || outMinutes < 0) return 0;
-
-  let diff = outMinutes - inMinutes;
-  if (diff < 0) diff += 24 * 60;
-  if (diff <= 0 || diff > 16 * 60) return 0;
-  return diff;
-}
-
 function mapAttendanceRecords(rows: AttendanceRecordRow[]): AttendanceRecord[] {
   return rows.map((row) => ({
     date: row.log_date,
@@ -303,10 +281,14 @@ function buildEmployeesFromAttendance(records: AttendanceRecord[]): Employee[] {
   >();
 
   for (const daily of grouped.values()) {
-    const regularMinutes =
-      boundedPairMinutes(daily.time1In, daily.time1Out) +
-      boundedPairMinutes(daily.time2In, daily.time2Out);
-    const overtimeMinutes = boundedPairMinutes(daily.otIn, daily.otOut);
+    const { regularMinutes, overtimeMinutes } = calculateDailyWorkMinutes({
+      time1In: daily.time1In,
+      time1Out: daily.time1Out,
+      time2In: daily.time2In,
+      time2Out: daily.time2Out,
+      otIn: daily.otIn,
+      otOut: daily.otOut,
+    });
     const key = daily.name.trim().toLowerCase();
     const employee =
       byEmployee.get(key) ?? {
