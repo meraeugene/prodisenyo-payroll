@@ -59,6 +59,8 @@ type RestoredAttendanceImport = {
   id: string;
   site_name: string;
   period_label: string;
+  period_start: string | null;
+  period_end: string | null;
   original_filename: string;
 };
 
@@ -181,6 +183,19 @@ function buildEmployeesFromRecords(records: AttendanceRecord[]): Employee[] {
     }));
 }
 
+function buildStoredPeriodLabel(
+  periodStart: string | null,
+  periodEnd: string | null,
+  fallbackLabel: string | null,
+): string {
+  if (periodStart && periodEnd) {
+    return `${periodStart} to ${periodEnd}`;
+  }
+
+  const trimmedFallback = fallbackLabel?.trim();
+  return trimmedFallback || "Current Period";
+}
+
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFileItem[]>([]);
@@ -260,7 +275,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
         const { data: importData, error: importError } = await supabase
           .from("attendance_imports")
-          .select("id, site_name, period_label, original_filename")
+          .select(
+            "id, site_name, period_label, period_start, period_end, original_filename",
+          )
           .eq("uploaded_by", user.id)
           .order("created_at", { ascending: false })
           .limit(1)
@@ -294,7 +311,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
         setCurrentAttendanceImportId(latestImport.id);
         setSite(latestImport.site_name ?? "Unknown Site");
-        setAttendancePeriod(latestImport.period_label ?? "Current Period");
+        setAttendancePeriod(
+          buildStoredPeriodLabel(
+            latestImport.period_start ?? null,
+            latestImport.period_end ?? null,
+            latestImport.period_label ?? null,
+          ),
+        );
         setRecords(nextRecords);
         setEmployees(buildEmployeesFromRecords(nextRecords));
 

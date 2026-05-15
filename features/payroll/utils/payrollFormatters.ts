@@ -1,4 +1,10 @@
-﻿export function formatPayrollNumber(value: number): string {
+function parseIsoDateText(value: string): Date | null {
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
+export function formatPayrollNumber(value: number): string {
   return value.toLocaleString("en-PH", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -17,7 +23,10 @@ export function formatLogTime(value: string): string {
   return trimmed;
 }
 
-export function parseNonNegativeOrFallback(value: string, fallback: number): number {
+export function parseNonNegativeOrFallback(
+  value: string,
+  fallback: number,
+): number {
   const parsed = Number.parseFloat(value);
   if (!Number.isFinite(parsed) || parsed < 0) return fallback;
   return parsed;
@@ -48,6 +57,25 @@ export function toWeekLabel(isoDate: string): string {
   return `${parsed.getDate()}/${days[parsed.getDay()]}`;
 }
 
+export function formatHumanPayrollPeriod(
+  startIso: string,
+  endIso: string,
+): string | null {
+  const startDate = parseIsoDateText(startIso);
+  const endDate = parseIsoDateText(endIso);
+  if (!startDate || !endDate) return null;
+
+  const sameYear = startDate.getFullYear() === endDate.getFullYear();
+  const startOptions: Intl.DateTimeFormatOptions = sameYear
+    ? { month: "long", day: "numeric" }
+    : { month: "long", day: "numeric", year: "numeric" };
+  const endOptions: Intl.DateTimeFormatOptions = sameYear
+    ? { month: "long", day: "numeric" }
+    : { month: "long", day: "numeric", year: "numeric" };
+
+  return `${startDate.toLocaleDateString("en-US", startOptions)} to ${endDate.toLocaleDateString("en-US", endOptions)}`;
+}
+
 export function extractSiteName(rawSite: string): string {
   const cleaned = rawSite.trim();
   if (!cleaned) return "";
@@ -66,7 +94,9 @@ export function extractSiteName(rawSite: string): string {
   return normalized;
 }
 
-export function extractPayrollPeriod(value: string): { start: string; end: string } | null {
+export function extractPayrollPeriod(
+  value: string,
+): { start: string; end: string } | null {
   const normalized = value.trim();
   if (!normalized) return null;
 
@@ -122,4 +152,3 @@ export function formatPayrollPeriodFromText(value: string): string | null {
   if (!parsed) return null;
   return formatCompactPayrollPeriodLabel(parsed.start, parsed.end);
 }
-

@@ -90,6 +90,70 @@ function parsePeriodRange(label: string): { start: string | null; end: string | 
   };
 }
 
+function buildRecordPeriodRange(
+  records: ParseResult["records"],
+): { start: string | null; end: string | null } {
+  let start: string | null = null;
+  let end: string | null = null;
+
+  for (const record of records) {
+    const date = record.date?.trim();
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    if (!start || date < start) start = date;
+    if (!end || date > end) end = date;
+  }
+
+  return { start, end };
+}
+
+function resolveAttendanceImportPeriod(result: ParseResult): {
+  label: string;
+  start: string | null;
+  end: string | null;
+} {
+  const parsedLabelRange = parsePeriodRange(result.period);
+  const recordRange = buildRecordPeriodRange(result.records);
+
+  const hasParsedLabelRange =
+    parsedLabelRange.start !== null && parsedLabelRange.end !== null;
+  const hasRecordRange = recordRange.start !== null && recordRange.end !== null;
+
+  if (
+    hasParsedLabelRange &&
+    hasRecordRange &&
+    recordRange.start! >= parsedLabelRange.start! &&
+    recordRange.end! <= parsedLabelRange.end!
+  ) {
+    return {
+      label: `${recordRange.start} to ${recordRange.end}`,
+      start: recordRange.start,
+      end: recordRange.end,
+    };
+  }
+
+  if (hasParsedLabelRange) {
+    return {
+      label: `${parsedLabelRange.start} to ${parsedLabelRange.end}`,
+      start: parsedLabelRange.start,
+      end: parsedLabelRange.end,
+    };
+  }
+
+  if (hasRecordRange) {
+    return {
+      label: `${recordRange.start} to ${recordRange.end}`,
+      start: recordRange.start,
+      end: recordRange.end,
+    };
+  }
+
+  return {
+    label: result.period,
+    start: null,
+    end: null,
+  };
+}
+
 function chunkArray<T>(items: T[], size: number): T[][] {
   const chunks: T[][] = [];
 
@@ -222,7 +286,7 @@ export async function saveAttendanceImportAction({
   const database = createSupabaseAdminClient() as any;
 
   const normalizedImportSite = normalizeSiteName(result.site);
-  const periodRange = parsePeriodRange(result.period);
+  const resolvedPeriod = resolveAttendanceImportPeriod(result);
   const normalizedSiteNames = collectNormalizedSiteNames(fileNames, result);
   const fileLabel =
     fileNames.length <= 1 ? fileNames[0] ?? "attendance-upload" : fileNames.join(" | ");
@@ -282,9 +346,9 @@ export async function saveAttendanceImportAction({
     original_filename: fileLabel,
     site_id: site?.id ?? null,
     site_name: normalizedImportSite,
-    period_label: result.period,
-    period_start: periodRange.start,
-    period_end: periodRange.end,
+    period_label: resolvedPeriod.label,
+    period_start: resolvedPeriod.start,
+    period_end: resolvedPeriod.end,
     storage_path: null,
     uploaded_by: user.id,
     raw_rows: result.rawRows,

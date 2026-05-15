@@ -30,6 +30,7 @@ import type {
 import type { AppRole } from "@/types/database";
 import {
   extractSiteName,
+  formatHumanPayrollPeriod,
   formatLogTime,
   formatPayrollPeriodFromText,
   formatPayrollNumber,
@@ -52,6 +53,7 @@ import { isIsoDateWithinRange } from "@/features/payroll/utils/payrollDateHelper
 import { computeSameDayOvertimeMinutes } from "@/lib/utils";
 import {
   allocateCombinedBranchPay,
+  buildDateSpanFromDates,
   FIXED_PAY_RATE_PER_DAY,
   FULL_WORKDAY_HOURS,
 } from "@/features/payroll/utils/payrollSelectors";
@@ -266,7 +268,22 @@ export default function PayrollEditModal({
     payroll.editingPayrollLogs.find(
       (log) => extractSiteName(log.site).length > 0,
     )?.site ?? editingPayrollRow.site;
+  const editingLogDateSpan = buildDateSpanFromDates(
+    payroll.editingPayrollLogs.map((log) => log.date),
+  );
   const primarySitePeriodLabel =
+    (editingLogDateSpan
+      ? formatHumanPayrollPeriod(
+          editingLogDateSpan.start,
+          editingLogDateSpan.end,
+        )
+      : null) ??
+    (payroll.payrollDateRange
+      ? formatHumanPayrollPeriod(
+          payroll.payrollDateRange.start,
+          payroll.payrollDateRange.end,
+        )
+      : null) ??
     formatPayrollPeriodFromText(primarySiteSource) ??
     formatPayrollPeriodFromText(editingPayrollRow.date);
   const currentLogsForPay = payroll.editingPayrollLogsForAnalytics;
