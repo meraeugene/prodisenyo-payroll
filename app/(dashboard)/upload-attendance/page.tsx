@@ -5,6 +5,7 @@ import DashboardPageHero from "@/components/DashboardPageHero";
 import UploadZone from "@/components/UploadZone";
 import { useAppState } from "@/features/app/AppStateProvider";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export default function UploadAttendancePage() {
   const {
@@ -28,7 +29,11 @@ export default function UploadAttendancePage() {
     setCurrentAttendanceImportId(saveResult.importId);
     setCurrentPayrollRunMeta({ id: null, status: null });
     handleParsed(result);
-    router.push("/review-attendance");
+    toast.success("Attendance reports ready for review.", {
+      description: "Your uploaded files were processed and saved.",
+    });
+    router.refresh();
+    router.replace("/review-attendance");
   }
 
   return (

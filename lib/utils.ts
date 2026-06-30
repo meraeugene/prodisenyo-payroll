@@ -157,6 +157,36 @@ function resolveRegularOutMinutes(
   return otInMinutes;
 }
 
+function calculateRegularPairMinutes(times: {
+  time1In: string;
+  time1Out: string;
+  time2In: string;
+  time2Out: string;
+  otIn: string;
+}): number {
+  const time1Minutes = boundedForwardPairMinutes(times.time1In, times.time1Out);
+  const time2Minutes = boundedForwardPairMinutes(times.time2In, times.time2Out);
+  const pairedMinutes = time1Minutes + time2Minutes;
+
+  if (pairedMinutes > 0) {
+    return pairedMinutes;
+  }
+
+  const regularInMinutes = earliestValidMinutes(times.time1In, times.time2In);
+  const regularOutMinutes = resolveRegularOutMinutes(
+    times.time1Out,
+    times.time2Out,
+    times.otIn,
+  );
+
+  return regularInMinutes !== null && regularOutMinutes !== null
+    ? boundedForwardPairMinutes(
+        minutesToTimeText(regularInMinutes),
+        minutesToTimeText(regularOutMinutes),
+      )
+    : 0;
+}
+
 function calculateDailyWorkMinutes(times: {
   time1In?: string | null;
   time1Out?: string | null;
@@ -168,15 +198,13 @@ function calculateDailyWorkMinutes(times: {
   const { time1In, time1Out, time2In, time2Out, otIn, otOut } =
     normalizeBiometricDailyTimes(times);
 
-  const regularInMinutes = earliestValidMinutes(time1In, time2In);
-  const regularOutMinutes = resolveRegularOutMinutes(time1Out, time2Out, otIn);
-  const regularMinutes =
-    regularInMinutes !== null && regularOutMinutes !== null
-      ? boundedForwardPairMinutes(
-          minutesToTimeText(regularInMinutes),
-          minutesToTimeText(regularOutMinutes),
-        )
-      : 0;
+  const regularMinutes = calculateRegularPairMinutes({
+    time1In,
+    time1Out,
+    time2In,
+    time2Out,
+    otIn,
+  });
   const overtimeMinutes = boundedForwardPairMinutes(otIn, otOut);
 
   return {

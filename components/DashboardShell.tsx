@@ -560,19 +560,6 @@ export default function DashboardShell({
 
               {isPayrollManager ? (
                 <>
-                  {renderSidebarSectionLabel({
-                    label: "Requests",
-                    collapsed,
-                  })}
-                  {PAYROLL_MANAGER_REQUEST_ITEMS.map((item) =>
-                    renderSidebarLink({
-                      item,
-                      pathname,
-                      collapsed,
-                      onNavigate: () => setOpen(false),
-                    }),
-                  )}
-
                   {canSeeWorkflowNav ? (
                     <>
                       {renderSidebarSectionLabel({
@@ -595,6 +582,19 @@ export default function DashboardShell({
                     collapsed,
                   })}
                   {BUDGET_NAV_ITEMS.map((item) =>
+                    renderSidebarLink({
+                      item,
+                      pathname,
+                      collapsed,
+                      onNavigate: () => setOpen(false),
+                    }),
+                  )}
+
+                  {renderSidebarSectionLabel({
+                    label: "Requests",
+                    collapsed,
+                  })}
+                  {PAYROLL_MANAGER_REQUEST_ITEMS.map((item) =>
                     renderSidebarLink({
                       item,
                       pathname,

@@ -106,8 +106,22 @@ export default function PayrollRateModal({ payroll }: PayrollRateModalProps) {
               return null;
             }
 
+            const dailyRateChanged =
+              Math.abs(nextDailyRate - currentDailyRate) >= 0.005;
+            const regularHoursChanged =
+              Math.abs(nextRegularPaidHours - currentRegularPaidHours) >=
+              0.005;
+            const changeDetails = [
+              dailyRateChanged
+                ? `daily rate ${formatPayrollNumber(currentDailyRate)} to ${formatPayrollNumber(nextDailyRate)}`
+                : null,
+              regularHoursChanged
+                ? `regular paid hours ${formatPayrollNumber(currentRegularPaidHours)}h to ${formatPayrollNumber(nextRegularPaidHours)}h`
+                : null,
+            ].filter(Boolean);
+
             changedSummaries.push(
-              `${row.worker} - ${row.siteLabel}: ${formatPayrollNumber(currentDailyRate)} -> ${formatPayrollNumber(nextDailyRate)}, ${formatPayrollNumber(currentRegularPaidHours)}h -> ${formatPayrollNumber(nextRegularPaidHours)}h`,
+              `${row.worker} at ${row.siteLabel}: ${changeDetails.join(", ")}`,
             );
 
             return {
@@ -132,20 +146,19 @@ export default function PayrollRateModal({ payroll }: PayrollRateModalProps) {
         payroll.setEmployeeBranchRates({ ...payroll.payrollRateDraft });
         payroll.applyPayrollRates();
         const primaryMessage =
-          changedSummaries[0] ??
-          (result.saved === 1
-            ? "Saved 1 branch rate change."
-            : `Saved ${result.saved} branch rate changes.`);
+          result.saved === 1
+            ? "Branch rate saved."
+            : `${result.saved} branch rates saved.`;
 
         const extraCount = changedSummaries.length - 1;
         const description =
-          extraCount > 0
-            ? `${changedSummaries.slice(1, 3).join(" | ")}${
+          changedSummaries.length > 0
+            ? `${changedSummaries.slice(0, 3).join(" | ")}${
                 extraCount > 2
                   ? ` | +${extraCount - 2} more change${extraCount - 2 === 1 ? "" : "s"}`
                   : ""
               }`
-            : "Branch-specific employee rate updated.";
+            : "The employee's branch-specific rate was updated.";
 
         toast.success(primaryMessage, {
           description,

@@ -373,11 +373,20 @@ function detectPeriodRange(rows: unknown[][]): DateRange | null {
     const joined = row.map((c) => String(c)).join(" ");
 
     const isoMatch = joined.match(
-      /(\d{4}-\d{2}-\d{2})\s*[-~]\s*(\d{4}-\d{2}-\d{2})/,
+      /(\d{4}[-/]\d{1,2}[-/]\d{1,2})\s*[-~]\s*(\d{4}[-/]\d{1,2}[-/]\d{1,2})/,
     );
     if (isoMatch) {
       const start = parseDate(isoMatch[1]);
       const end = parseDate(isoMatch[2]);
+      if (start && end) return normalizeDateRange(start, end);
+    }
+
+    const numericMonthDayYearMatch = joined.match(
+      /(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})\s*[-~]\s*(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/,
+    );
+    if (numericMonthDayYearMatch) {
+      const start = parseDate(numericMonthDayYearMatch[1]);
+      const end = parseDate(numericMonthDayYearMatch[2]);
       if (start && end) return normalizeDateRange(start, end);
     }
 
@@ -387,6 +396,16 @@ function detectPeriodRange(rows: unknown[][]): DateRange | null {
     if (textMatch) {
       const start = parseDate(textMatch[1]);
       const end = parseDate(textMatch[2]);
+      if (start && end) return normalizeDateRange(start, end);
+    }
+
+    const sameMonthTextMatch = joined.match(
+      /([A-Za-z]+)\s+(\d{1,2})\s*[-~]\s*(\d{1,2}),?\s*(\d{4})/,
+    );
+    if (sameMonthTextMatch) {
+      const [, month, startDay, endDay, year] = sameMonthTextMatch;
+      const start = parseDate(`${month} ${startDay}, ${year}`);
+      const end = parseDate(`${month} ${endDay}, ${year}`);
       if (start && end) return normalizeDateRange(start, end);
     }
   }
@@ -842,7 +861,10 @@ function buildEmployeesFromAccumulators(
 }
 
 function parseDate(value: string): Date | null {
-  const cleaned = value.replace(/\s+/g, " ").replace(/,\s*/g, ", ").trim();
+  const cleaned = value
+    .replace(/\s+/g, " ")
+    .replace(/,\s*/g, ", ")
+    .trim();
   const parsed = new Date(cleaned);
   if (Number.isNaN(parsed.getTime())) return null;
   return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
