@@ -5,8 +5,8 @@ const Module = require("node:module");
 const test = require("node:test");
 const ts = require("typescript");
 
-function loadAttendanceCalculator() {
-  const sourcePath = path.resolve(__dirname, "../lib/utils.ts");
+function loadTypeScriptModule(relativePath) {
+  const sourcePath = path.resolve(__dirname, relativePath);
   const source = fs.readFileSync(sourcePath, "utf8");
   const compiledSource = ts.transpileModule(source, {
     compilerOptions: {
@@ -20,19 +20,23 @@ function loadAttendanceCalculator() {
   compiledModule.paths = Module._nodeModulePaths(path.dirname(sourcePath));
   compiledModule._compile(compiledSource, sourcePath);
 
-  return compiledModule.exports.calculateDailyWorkMinutes;
+  return compiledModule.exports;
 }
 
-const calculateDailyWorkMinutes = loadAttendanceCalculator();
+const { calculateDailyWorkMinutes } = loadTypeScriptModule("../lib/utils.ts");
+const {
+  calculatePaidRegularHours,
+  DEFAULT_REGULAR_PAID_HOURS,
+} = loadTypeScriptModule("../features/payroll/utils/branchRateConfig.ts");
 
-test("deducts the mandatory unpaid hour when lunch punches are missing", () => {
+test("keeps attendance regular hours as the actual shift span", () => {
   assert.deepEqual(
     calculateDailyWorkMinutes({ time1In: "07:49", time2Out: "16:29" }),
-    { regularMinutes: 460, overtimeMinutes: 0, totalMinutes: 460 },
+    { regularMinutes: 520, overtimeMinutes: 0, totalMinutes: 520 },
   );
 });
 
-test("deducts a precisely one-hour recorded lunch break", () => {
+test("keeps recorded lunch time in the actual attendance span", () => {
   assert.equal(
     calculateDailyWorkMinutes({
       time1In: "07:30",
@@ -40,35 +44,24 @@ test("deducts a precisely one-hour recorded lunch break", () => {
       time2In: "13:00",
       time2Out: "16:30",
     }).regularMinutes,
-    480,
+    540,
   );
 });
 
-test("deducts a longer recorded lunch break in full", () => {
+test("deducts one unpaid hour for each worked day in payroll", () => {
   assert.equal(
-    calculateDailyWorkMinutes({
-      time1In: "07:30",
-      time1Out: "12:00",
-      time2In: "13:30",
-      time2Out: "16:30",
-    }).regularMinutes,
-    450,
+    calculatePaidRegularHours(8.67, DEFAULT_REGULAR_PAID_HOURS),
+    7.67,
   );
-});
-
-test("enforces the one-hour minimum when the recorded lunch is shorter", () => {
   assert.equal(
-    calculateDailyWorkMinutes({
-      time1In: "07:30",
-      time1Out: "12:00",
-      time2In: "12:30",
-      time2Out: "16:30",
-    }).regularMinutes,
-    480,
+    Array.from({ length: 5 }, () =>
+      calculatePaidRegularHours(8.67, DEFAULT_REGULAR_PAID_HOURS),
+    ).reduce((sum, hours) => sum + hours, 0),
+    38.35,
   );
 });
 
-test("keeps overtime separate from the unpaid regular break", () => {
+test("keeps overtime separate from actual and paid regular hours", () => {
   assert.deepEqual(
     calculateDailyWorkMinutes({
       time1In: "07:30",
@@ -76,7 +69,7 @@ test("keeps overtime separate from the unpaid regular break", () => {
       otIn: "18:00",
       otOut: "20:00",
     }),
-    { regularMinutes: 480, overtimeMinutes: 120, totalMinutes: 600 },
+    { regularMinutes: 540, overtimeMinutes: 120, totalMinutes: 660 },
   );
 });
 

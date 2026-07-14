@@ -4,6 +4,7 @@ export interface EmployeeBranchRateConfig {
 }
 
 export const DEFAULT_REGULAR_PAID_HOURS = 8;
+export const UNPAID_BREAK_HOURS_PER_WORKDAY = 1;
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
@@ -29,6 +30,21 @@ export function capRegularWorkedHours(
 
   return round2(
     Math.min(numericWorkedHours, normalizeRegularPaidHours(regularPaidHours)),
+  );
+}
+
+export function calculatePaidRegularHours(
+  actualRegularHours: number | null | undefined,
+  regularPaidHours: number | null | undefined,
+): number {
+  const numericActualHours = Number(actualRegularHours);
+  if (!Number.isFinite(numericActualHours) || numericActualHours <= 0) {
+    return 0;
+  }
+
+  return capRegularWorkedHours(
+    Math.max(0, numericActualHours - UNPAID_BREAK_HOURS_PER_WORKDAY),
+    regularPaidHours,
   );
 }
 

@@ -228,13 +228,7 @@ export default function AttendanceReviewSection({
                           key={h}
                           className="px-4 py-3.5 text-left text-2xs font-semibold uppercase tracking-widest text-[#9babaf]"
                         >
-                          {h === "Regular Hours" ? (
-                            <span title="Regular hours exclude the mandatory unpaid one-hour break. Longer recorded lunch breaks are also excluded.">
-                              Regular Hours*
-                            </span>
-                          ) : (
-                            h
-                          )}
+                          {h}
                         </th>
                       ))}
                     </tr>
@@ -320,10 +314,6 @@ export default function AttendanceReviewSection({
                     )}
                   </tbody>
                 </table>
-                <p className="px-4 py-2 text-xs text-apple-steel">
-                  * Regular Hours exclude the mandatory unpaid one-hour break.
-                  Longer recorded lunch breaks are also unpaid.
-                </p>
               </div>
             ) : (
               <div className="overflow-x-auto rounded-[14px] border border-[#e7ecef] bg-white shadow-[0_10px_24px_rgba(15,23,42,0.04)] [-webkit-overflow-scrolling:touch]">

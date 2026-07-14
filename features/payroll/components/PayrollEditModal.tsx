@@ -42,8 +42,9 @@ import {
   getLogOverrideKey,
 } from "@/features/payroll/utils/payrollMappers";
 import {
-  capRegularWorkedHours,
+  calculatePaidRegularHours,
   DEFAULT_REGULAR_PAID_HOURS,
+  UNPAID_BREAK_HOURS_PER_WORKDAY,
 } from "@/features/payroll/utils/branchRateConfig";
 import {
   buildOvertimeRequestNotes,
@@ -303,7 +304,7 @@ export default function PayrollEditModal({
       const siteName = extractSiteName(log.site) || log.site;
       return (
         sum +
-        capRegularWorkedHours(
+        calculatePaidRegularHours(
           log.regularHours,
           getSiteRateConfig(siteName)?.regularPaidHours ??
             DEFAULT_REGULAR_PAID_HOURS,
@@ -319,7 +320,7 @@ export default function PayrollEditModal({
       siteLogs.reduce(
         (sum, log) =>
           sum +
-          capRegularWorkedHours(
+          calculatePaidRegularHours(
             log.regularHours,
             getSiteRateConfig(site)?.regularPaidHours ??
               DEFAULT_REGULAR_PAID_HOURS,
@@ -371,6 +372,10 @@ export default function PayrollEditModal({
         FULL_WORKDAY_HOURS,
   );
   const daysWorked = currentLogsForPay.filter((log) => log.totalHours > 0).length;
+  const unpaidBreakHours = round2(
+    currentLogsForPay.filter((log) => log.regularHours > 0).length *
+      UNPAID_BREAK_HOURS_PER_WORKDAY,
+  );
   const paidHolidayBonusDays = payroll.payableHolidayDays;
   const underHoursLogs = currentLogsForPay.filter(
     (log) =>
@@ -1528,7 +1533,7 @@ export default function PayrollEditModal({
                               <input
                                 type="number"
                                 min={0}
-                                max={FULL_WORKDAY_HOURS}
+                                max={16}
                                 step="0.01"
                                 onFocus={(e) => e.currentTarget.select()}
                                 value={getEditableRegularHoursValue(log)}
@@ -1687,6 +1692,14 @@ export default function PayrollEditModal({
                   </span>
                   <span className="font-mono font-semibold text-apple-charcoal text-right">
                     {formatPayrollNumber(totalWorkedHours)} hrs
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-apple-charcoal">
+                    Unpaid Break ({formatPayrollNumber(unpaidBreakHours)} hrs)
+                  </span>
+                  <span className="font-mono font-semibold text-rose-600 text-right">
+                    -{formatPayrollNumber(unpaidBreakHours)} hrs
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3 text-sm">

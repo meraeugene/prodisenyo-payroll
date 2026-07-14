@@ -17,7 +17,7 @@ import {
   parseNonNegativeOrFallback,
 } from "@/features/payroll/utils/payrollFormatters";
 import {
-  capRegularWorkedHours,
+  calculatePaidRegularHours,
   DEFAULT_REGULAR_PAID_HOURS,
   normalizeEmployeeBranchRateConfig,
   type EmployeeBranchRateConfig,
@@ -631,15 +631,15 @@ export function usePayrollState({
         employeeBranchRates[
           buildEmployeeBranchRateKey(record.name, record.role, record.site)
         ];
-      const cappedRegularHours = capRegularWorkedHours(
+      const paidRegularHours = calculatePaidRegularHours(
         record.hours,
         branchRateConfig?.regularPaidHours ?? DEFAULT_REGULAR_PAID_HOURS,
       );
 
       return {
         ...record,
-        hours: cappedRegularHours,
-        totalHours: round2(cappedRegularHours + (record.overtimeHours ?? 0)),
+        hours: paidRegularHours,
+        totalHours: round2(paidRegularHours + (record.overtimeHours ?? 0)),
       };
     });
   }, [dailyRows, employeeBranchRates, persistedLogHourOverrides]);
@@ -1592,7 +1592,7 @@ export function usePayrollState({
     const normalized = normalizeNumericInput(valueText);
     const value = sanitizeEditableHours(
       Number.parseFloat(normalized),
-      field === "regularHours" ? FULL_WORKDAY_HOURS : MAX_LOG_HOURS_PER_DAY,
+      MAX_LOG_HOURS_PER_DAY,
     );
 
     setLogHourOverrides((prev) => {

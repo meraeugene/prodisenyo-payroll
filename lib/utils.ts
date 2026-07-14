@@ -39,7 +39,6 @@ function timeToMinutes(time: string): number {
 const REGULAR_TIMEOUT_OT_IN_FALLBACK_START_MINUTES = 17 * 60 + 30;
 const EVENING_OVERTIME_START_MINUTES = 18 * 60;
 const END_OF_DAY_MINUTES = 24 * 60;
-const MINIMUM_UNPAID_BREAK_MINUTES = 60;
 const MISFILED_TIME1_OUT_IN_START_MINUTES = 10 * 60;
 const MISFILED_TIME1_OUT_IN_END_MINUTES = 12 * 60 + 59;
 
@@ -158,7 +157,7 @@ function resolveRegularOutMinutes(
   return otInMinutes;
 }
 
-function calculateRegularMinutesAfterBreak(times: {
+function calculateRegularSpanMinutes(times: {
   time1In: string;
   time1Out: string;
   time2In: string;
@@ -177,16 +176,7 @@ function calculateRegularMinutesAfterBreak(times: {
   const regularSpanMinutes = regularOutMinutes - regularInMinutes;
   if (regularSpanMinutes <= 0 || regularSpanMinutes > 16 * 60) return 0;
 
-  const recordedBreakMinutes = boundedForwardPairMinutes(
-    times.time1Out,
-    times.time2In,
-  );
-  const unpaidBreakMinutes = Math.max(
-    MINIMUM_UNPAID_BREAK_MINUTES,
-    recordedBreakMinutes,
-  );
-
-  return Math.max(0, regularSpanMinutes - unpaidBreakMinutes);
+  return regularSpanMinutes;
 }
 
 function calculateDailyWorkMinutes(times: {
@@ -200,7 +190,7 @@ function calculateDailyWorkMinutes(times: {
   const { time1In, time1Out, time2In, time2Out, otIn, otOut } =
     normalizeBiometricDailyTimes(times);
 
-  const regularMinutes = calculateRegularMinutesAfterBreak({
+  const regularMinutes = calculateRegularSpanMinutes({
     time1In,
     time1Out,
     time2In,
