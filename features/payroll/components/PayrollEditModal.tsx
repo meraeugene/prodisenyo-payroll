@@ -303,26 +303,17 @@ export default function PayrollEditModal({
     (sum, log) => sum + log.regularHours,
     0,
   );
-  const regularWorkedHours = round2(
-    currentLogsForPay.reduce((sum, log) => {
-      const siteName = extractSiteName(log.site) || log.site;
-      return (
-        sum +
-        calculatePaidRegularHours(log.regularHours)
-      );
-    }, 0),
+  const regularWorkedHours = currentLogsForPay.reduce(
+    (sum, log) => sum + calculatePaidRegularHours(log.regularHours),
+    0,
   );
   const sitePayBreakdown = loggedSites.map((site) => {
     const siteLogs = currentLogsForPay.filter(
       (log) => extractSiteName(log.site) === site,
     );
-    const siteHours = round2(
-      siteLogs.reduce(
-        (sum, log) =>
-          sum +
-          calculatePaidRegularHours(log.regularHours),
-        0,
-      ),
+    const siteHours = siteLogs.reduce(
+      (sum, log) => sum + calculatePaidRegularHours(log.regularHours),
+      0,
     );
     const siteRateKey = buildEmployeeBranchRateKey(
       editingPayrollRow.worker,

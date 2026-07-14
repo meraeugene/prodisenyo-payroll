@@ -66,6 +66,15 @@ test("preserves precision for five workdays at a different daily rate", () => {
   assert.equal(Math.round(calculateRegularPay(500, paidHours, 8) * 100) / 100, 2455);
 });
 
+test("uses full minute precision even when displayed paid hours round to two decimals", () => {
+  const paidHours = [530, 530, 530, 530, 530, 537]
+    .map((minutes) => calculatePaidRegularHours(minutes / 60))
+    .reduce((sum, hours) => sum + hours, 0);
+
+  assert.equal(Math.round(paidHours * 100) / 100, 47.12);
+  assert.equal(Math.round(calculateRegularPay(500, paidHours, 8) * 100) / 100, 2944.79);
+});
+
 test("keeps overtime separate from actual and paid regular hours", () => {
   assert.deepEqual(
     calculateDailyWorkMinutes({
