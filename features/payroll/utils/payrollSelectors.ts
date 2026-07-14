@@ -3,7 +3,6 @@ import {
   calculatePayroll,
   generatePayroll,
   recalculatePayrollRow,
-  roundPayrollCalculation,
 } from "@/lib/payrollEngine";
 import {
   DEFAULT_OVERTIME_MULTIPLIER,
@@ -96,15 +95,13 @@ export function computeBasePay(
   totalHours: number,
   dailyRatePerDay = FIXED_PAY_RATE_PER_DAY,
 ): number {
-  return roundPayrollCalculation(
-    calculatePayroll({
-      dailyRate: dailyRatePerDay,
-      regularHours: totalHours,
-      overtimeHours: 0,
-      allowance: 0,
-      deductions: 0,
-    }),
-  ).regularPay;
+  return calculatePayroll({
+    dailyRate: dailyRatePerDay,
+    regularHours: totalHours,
+    overtimeHours: 0,
+    allowance: 0,
+    deductions: 0,
+  }).regularPay;
 }
 
 export function allocateCombinedBranchPay(
@@ -115,7 +112,7 @@ export function allocateCombinedBranchPay(
       site: entry.site,
       hoursWorked:
         Number.isFinite(entry.hoursWorked) && entry.hoursWorked > 0
-          ? round2(entry.hoursWorked)
+          ? entry.hoursWorked
           : 0,
       dailyRatePerDay:
         Number.isFinite(entry.dailyRatePerDay) && entry.dailyRatePerDay > 0
@@ -127,31 +124,31 @@ export function allocateCombinedBranchPay(
     }))
     .filter((entry) => entry.site.trim().length > 0 || entry.hoursWorked > 0);
 
-  const totalWorkedHours = round2(
-    breakdown.reduce((sum, entry) => sum + entry.hoursWorked, 0),
+  const totalWorkedHours = breakdown.reduce(
+    (sum, entry) => sum + entry.hoursWorked,
+    0,
   );
 
   for (const entry of breakdown) {
-    entry.payableHours = round2(entry.hoursWorked);
+    entry.payableHours = entry.hoursWorked;
   }
 
   for (const entry of breakdown) {
-    entry.payableDays = round2(entry.payableHours / FULL_WORKDAY_HOURS);
+    entry.payableDays = entry.payableHours / FULL_WORKDAY_HOURS;
     entry.basePay = computeBasePay(entry.payableHours, entry.dailyRatePerDay);
   }
 
-  const totalBasePay = round2(
-    breakdown.reduce((sum, entry) => sum + entry.basePay, 0),
-  );
-  const totalPayableHours = round2(
-    breakdown.reduce((sum, entry) => sum + entry.payableHours, 0),
+  const totalBasePay = breakdown.reduce((sum, entry) => sum + entry.basePay, 0);
+  const totalPayableHours = breakdown.reduce(
+    (sum, entry) => sum + entry.payableHours,
+    0,
   );
 
   return {
     totalWorkedHours,
     totalPayableHours,
-    totalPayableDays: round2(totalPayableHours / FULL_WORKDAY_HOURS),
-    ignoredHours: round2(totalWorkedHours - totalPayableHours),
+    totalPayableDays: totalPayableHours / FULL_WORKDAY_HOURS,
+    ignoredHours: totalWorkedHours - totalPayableHours,
     totalBasePay,
     breakdown,
   };
@@ -243,9 +240,9 @@ export function mapDailyRowsToAttendanceInputs(
     .map((row) => {
       const identity = parsePayrollIdentity(row.employee);
       const dailyMinutes = calculateDailyWorkMinutes(row);
-      const regularHours = round2(dailyMinutes.regularMinutes / 60);
-      const overtimeHours = round2(dailyMinutes.overtimeMinutes / 60);
-      const totalHours = round2(dailyMinutes.totalMinutes / 60);
+      const regularHours = dailyMinutes.regularMinutes / 60;
+      const overtimeHours = dailyMinutes.overtimeMinutes / 60;
+      const totalHours = dailyMinutes.totalMinutes / 60;
 
       return {
         name: identity.name,
@@ -541,28 +538,24 @@ export function applyLogHourOverrides(
         ? override
         : typeof override?.regularHours === "number"
           ? override.regularHours
-          : log.regularHours;
+          : calculateDailyWorkMinutes(log).regularMinutes / 60;
     const overtimeHours =
       typeof override === "number"
         ? log.overtimeHours
         : typeof override?.overtimeHours === "number"
           ? override.overtimeHours
-          : log.overtimeHours;
+          : calculateDailyWorkMinutes(log).overtimeMinutes / 60;
     const normalizedRegularHours =
-      Number.isFinite(regularHours) && regularHours >= 0
-        ? round2(regularHours)
-        : 0;
+      Number.isFinite(regularHours) && regularHours >= 0 ? regularHours : 0;
     const normalizedOvertimeHours =
-      Number.isFinite(overtimeHours) && overtimeHours >= 0
-        ? round2(overtimeHours)
-        : 0;
+      Number.isFinite(overtimeHours) && overtimeHours >= 0 ? overtimeHours : 0;
 
     return {
       ...log,
       hours: normalizedRegularHours,
       regularHours: normalizedRegularHours,
       overtimeHours: normalizedOvertimeHours,
-      totalHours: round2(normalizedRegularHours + normalizedOvertimeHours),
+      totalHours: normalizedRegularHours + normalizedOvertimeHours,
     };
   });
 }

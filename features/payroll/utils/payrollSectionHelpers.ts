@@ -1,5 +1,6 @@
 import type { PayrollRow } from "@/lib/payrollEngine";
 import { calculatePayroll, roundPayrollCalculation } from "@/lib/payrollEngine";
+import { calculatePaidRegularHours } from "@/lib/payrollHours";
 import { matchesSearchText } from "@/lib/utils";
 import {
   DEFAULT_OVERTIME_MULTIPLIER,
@@ -251,7 +252,10 @@ export function buildGroupedEmployeeCompensation(
     if ((normalizeRoleCode(record.role) ?? "UNKNOWN") !== roleKey) return;
 
     const siteName = extractSiteName(record.site) || record.site || "Unknown Site";
-    hoursBySite.set(siteName, (hoursBySite.get(siteName) ?? 0) + record.hours);
+    hoursBySite.set(
+      siteName,
+      (hoursBySite.get(siteName) ?? 0) + calculatePaidRegularHours(record.hours),
+    );
   });
 
   const breakdown =
@@ -338,7 +342,7 @@ function buildGroupedEmployeeLogMetrics(
         Math.max(0, Number(overtimeHours) || 0),
     );
 
-    actualTotalHours = round2(actualTotalHours + totalHours);
+    actualTotalHours += totalHours;
     if (totalHours > 0) {
       daysWorked += 1;
     }

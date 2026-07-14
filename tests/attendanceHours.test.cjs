@@ -26,8 +26,8 @@ function loadTypeScriptModule(relativePath) {
 const { calculateDailyWorkMinutes } = loadTypeScriptModule("../lib/utils.ts");
 const {
   calculatePaidRegularHours,
-  DEFAULT_REGULAR_PAID_HOURS,
-} = loadTypeScriptModule("../features/payroll/utils/branchRateConfig.ts");
+  calculateRegularPay,
+} = loadTypeScriptModule("../lib/payrollHours.ts");
 
 test("keeps attendance regular hours as the actual shift span", () => {
   assert.deepEqual(
@@ -48,17 +48,22 @@ test("keeps recorded lunch time in the actual attendance span", () => {
   );
 });
 
-test("deducts one unpaid hour for each worked day in payroll", () => {
-  assert.equal(
-    calculatePaidRegularHours(8.67, DEFAULT_REGULAR_PAID_HOURS),
-    7.67,
-  );
-  assert.equal(
-    Array.from({ length: 5 }, () =>
-      calculatePaidRegularHours(8.67, DEFAULT_REGULAR_PAID_HOURS),
-    ).reduce((sum, hours) => sum + hours, 0),
-    38.35,
-  );
+test("deducts one unpaid hour per workday without rounding intermediate hours", () => {
+  const paidHours = [8.12, 8, 9, 9, 9, 10]
+    .map(calculatePaidRegularHours)
+    .reduce((sum, hours) => sum + hours, 0);
+
+  assert.equal(paidHours, 47.12);
+  assert.equal(Math.round(calculateRegularPay(600, paidHours, 8) * 100) / 100, 3534);
+});
+
+test("preserves precision for five workdays at a different daily rate", () => {
+  const paidHours = [8.28, 9, 9, 9, 9]
+    .map(calculatePaidRegularHours)
+    .reduce((sum, hours) => sum + hours, 0);
+
+  assert.equal(paidHours, 39.28);
+  assert.equal(Math.round(calculateRegularPay(500, paidHours, 8) * 100) / 100, 2455);
 });
 
 test("keeps overtime separate from actual and paid regular hours", () => {

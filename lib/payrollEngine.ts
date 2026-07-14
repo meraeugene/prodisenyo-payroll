@@ -6,6 +6,10 @@ import {
   normalizeRoleCode,
   type RoleCode,
 } from "@/lib/payrollConfig";
+import {
+  calculatePaidRegularHours,
+  calculateRegularPay,
+} from "@/lib/payrollHours";
 
 export type PayrollDeductionsInput =
   | number
@@ -165,7 +169,11 @@ export function calculatePayroll(input: CalculatePayrollInput): PayrollCalculati
   const allowance = toNonNegativeNumber(input.allowance);
   const totalDeductions = sumDeductions(input.deductions);
   const hourlyRate = dailyRate / HOURS_PER_DAY;
-  const regularPay = regularHours * hourlyRate;
+  const regularPay = calculateRegularPay(
+    dailyRate,
+    regularHours,
+    HOURS_PER_DAY,
+  );
   const overtimePay = overtimeHours * hourlyRate * overtimeMultiplier;
   const grossPay = regularPay + overtimePay + allowance;
   const netPay = grossPay - totalDeductions;
@@ -245,6 +253,7 @@ export function generatePayroll(
     const numericHours = Number(record.hours);
     if (!Number.isFinite(numericHours) || numericHours < 0) continue;
 
+    const paidRegularHours = calculatePaidRegularHours(numericHours);
     const site = normalizeWhitespace(record.site) || "Unknown Site";
     const date = normalizeWhitespace(record.date);
     const key = `${role}|||${workerName}|||${site}`;
@@ -255,13 +264,13 @@ export function generatePayroll(
         worker: workerName,
         role,
         site,
-        totalHours: numericHours,
+        totalHours: paidRegularHours,
         dates: new Set(date ? [date] : []),
       });
       continue;
     }
 
-    existing.totalHours += numericHours;
+    existing.totalHours += paidRegularHours;
     if (date) existing.dates.add(date);
   }
 
@@ -276,7 +285,7 @@ export function generatePayroll(
       role: group.role,
       site: group.site,
       date: summarizeDates(group.dates),
-      hoursWorked: roundTo(group.totalHours),
+      hoursWorked: group.totalHours,
       overtimeHours: 0,
       defaultRate,
       customRate: null,

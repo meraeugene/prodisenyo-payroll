@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { syncAdvanceOvertimeRequestsForPayrollAction } from "@/actions/payroll";
 import type { AttendanceRecordInput, PayrollRow } from "@/lib/payrollEngine";
 import { calculatePayroll, roundPayrollCalculation } from "@/lib/payrollEngine";
+import { calculateDailyWorkMinutes } from "@/lib/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import {
   DEFAULT_DAILY_RATE_BY_ROLE,
@@ -17,8 +18,6 @@ import {
   parseNonNegativeOrFallback,
 } from "@/features/payroll/utils/payrollFormatters";
 import {
-  calculatePaidRegularHours,
-  DEFAULT_REGULAR_PAID_HOURS,
   normalizeEmployeeBranchRateConfig,
   type EmployeeBranchRateConfig,
 } from "@/features/payroll/utils/branchRateConfig";
@@ -589,23 +588,17 @@ export function usePayrollState({
       .map((row) => {
         const identity = parsePayrollIdentity(row.employee);
         const key = getLogOverrideKey(row);
+        const calculatedMinutes = calculateDailyWorkMinutes(row);
+        const calculatedRegularHours = calculatedMinutes.regularMinutes / 60;
+        const calculatedOvertimeHours = calculatedMinutes.overtimeMinutes / 60;
         const overrideHours = normalizeLogHourOverrideValue(
           persistedLogHourOverrides[key],
           {
-            regularHours:
-              row.regularHours > 0 || row.overtimeHours > 0
-                ? row.regularHours
-                : row.hours,
-            overtimeHours:
-              Number.isFinite(row.overtimeHours) && row.overtimeHours > 0
-                ? row.overtimeHours
-                : 0,
+            regularHours: calculatedRegularHours,
+            overtimeHours: calculatedOvertimeHours,
           },
         );
-        const baseRegularHours =
-          row.regularHours > 0 || row.overtimeHours > 0
-            ? row.regularHours
-            : row.hours;
+        const baseRegularHours = calculatedRegularHours;
         const regularHours = overrideHours.regularHours ?? baseRegularHours;
         const overtimeHours = overrideHours.overtimeHours ?? 0;
 
@@ -614,9 +607,9 @@ export function usePayrollState({
           role: identity.role,
           site: row.site,
           date: row.date,
-          hours: round2(regularHours),
-          overtimeHours: round2(overtimeHours),
-          totalHours: round2(regularHours + overtimeHours),
+          hours: regularHours,
+          overtimeHours,
+          totalHours: regularHours + overtimeHours,
         };
       })
       .filter(
@@ -626,23 +619,8 @@ export function usePayrollState({
           record.hours >= 0,
       );
 
-    return coalescePayrollAttendanceInputs(normalizedInputs).map((record) => {
-      const branchRateConfig =
-        employeeBranchRates[
-          buildEmployeeBranchRateKey(record.name, record.role, record.site)
-        ];
-      const paidRegularHours = calculatePaidRegularHours(
-        record.hours,
-        branchRateConfig?.regularPaidHours ?? DEFAULT_REGULAR_PAID_HOURS,
-      );
-
-      return {
-        ...record,
-        hours: paidRegularHours,
-        totalHours: round2(paidRegularHours + (record.overtimeHours ?? 0)),
-      };
-    });
-  }, [dailyRows, employeeBranchRates, persistedLogHourOverrides]);
+    return coalescePayrollAttendanceInputs(normalizedInputs);
+  }, [dailyRows, persistedLogHourOverrides]);
   const payrollBaseRows = useMemo(
     () =>
       buildPayrollBaseRows(
@@ -659,7 +637,7 @@ export function usePayrollState({
           return row;
         }
 
-        const hourlyRate = round2(branchRate / FULL_WORKDAY_HOURS);
+        const hourlyRate = branchRate / FULL_WORKDAY_HOURS;
         const basePay = computeBasePay(row.hoursWorked, branchRate);
         return {
           ...row,

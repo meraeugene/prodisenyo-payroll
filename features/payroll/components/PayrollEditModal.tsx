@@ -18,6 +18,10 @@ import {
   type RoleCode,
 } from "@/lib/payrollConfig";
 import { calculatePayroll, roundPayrollCalculation } from "@/lib/payrollEngine";
+import {
+  calculatePaidRegularHours,
+  UNPAID_BREAK_HOURS_PER_WORKDAY,
+} from "@/lib/payrollHours";
 import type { DailyLogRow } from "@/types";
 import type { UsePayrollStateResult } from "@/features/payroll/hooks/usePayrollState";
 import type {
@@ -41,11 +45,7 @@ import {
   buildEmployeeBranchRateKey,
   getLogOverrideKey,
 } from "@/features/payroll/utils/payrollMappers";
-import {
-  calculatePaidRegularHours,
-  DEFAULT_REGULAR_PAID_HOURS,
-  UNPAID_BREAK_HOURS_PER_WORKDAY,
-} from "@/features/payroll/utils/branchRateConfig";
+import { DEFAULT_REGULAR_PAID_HOURS } from "@/features/payroll/utils/branchRateConfig";
 import {
   buildOvertimeRequestNotes,
   parseOvertimeRequestNotes,
@@ -299,16 +299,16 @@ export default function PayrollEditModal({
   const totalWorkedHours = round2(
     currentLogsForPay.reduce((sum, log) => sum + log.totalHours, 0),
   );
+  const actualRegularHours = currentLogsForPay.reduce(
+    (sum, log) => sum + log.regularHours,
+    0,
+  );
   const regularWorkedHours = round2(
     currentLogsForPay.reduce((sum, log) => {
       const siteName = extractSiteName(log.site) || log.site;
       return (
         sum +
-        calculatePaidRegularHours(
-          log.regularHours,
-          getSiteRateConfig(siteName)?.regularPaidHours ??
-            DEFAULT_REGULAR_PAID_HOURS,
-        )
+        calculatePaidRegularHours(log.regularHours)
       );
     }, 0),
   );
@@ -320,11 +320,7 @@ export default function PayrollEditModal({
       siteLogs.reduce(
         (sum, log) =>
           sum +
-          calculatePaidRegularHours(
-            log.regularHours,
-            getSiteRateConfig(site)?.regularPaidHours ??
-              DEFAULT_REGULAR_PAID_HOURS,
-          ),
+          calculatePaidRegularHours(log.regularHours),
         0,
       ),
     );
@@ -1692,6 +1688,14 @@ export default function PayrollEditModal({
                   </span>
                   <span className="font-mono font-semibold text-apple-charcoal text-right">
                     {formatPayrollNumber(totalWorkedHours)} hrs
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-apple-charcoal">
+                    Actual Regular Hours
+                  </span>
+                  <span className="font-mono font-semibold text-apple-charcoal text-right">
+                    {formatPayrollNumber(actualRegularHours)} hrs
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3 text-sm">
