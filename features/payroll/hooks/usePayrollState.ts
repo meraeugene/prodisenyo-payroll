@@ -4,6 +4,7 @@ import { syncAdvanceOvertimeRequestsForPayrollAction } from "@/actions/payroll";
 import type { AttendanceRecordInput, PayrollRow } from "@/lib/payrollEngine";
 import { calculatePayroll, roundPayrollCalculation } from "@/lib/payrollEngine";
 import { calculateDailyWorkMinutes } from "@/lib/utils";
+import { normalizeLegacyRawRegularHours } from "@/features/payroll/utils/payrollLogHours";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import {
   DEFAULT_DAILY_RATE_BY_ROLE,
@@ -599,7 +600,10 @@ export function usePayrollState({
           },
         );
         const baseRegularHours = calculatedRegularHours;
-        const regularHours = overrideHours.regularHours ?? baseRegularHours;
+        const regularHours = normalizeLegacyRawRegularHours(
+          row,
+          overrideHours.regularHours ?? baseRegularHours,
+        );
         const overtimeHours = overrideHours.overtimeHours ?? 0;
 
         return {
@@ -1405,7 +1409,19 @@ export function usePayrollState({
             regularHours: baseLog?.regularHours ?? 0,
             overtimeHours: baseLog?.overtimeHours ?? 0,
           };
-          return [key, normalizeLogHourOverrideValue(value, fallback)] as const;
+          const normalized = normalizeLogHourOverrideValue(value, fallback);
+          return [
+            key,
+            {
+              ...normalized,
+              regularHours: baseLog
+                ? normalizeLegacyRawRegularHours(
+                    baseLog,
+                    normalized.regularHours,
+                  )
+                : normalized.regularHours,
+            },
+          ] as const;
         }),
     );
     setLogHourOverrides(sanitizedLogHours);

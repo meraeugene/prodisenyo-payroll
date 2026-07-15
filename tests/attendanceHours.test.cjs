@@ -5,7 +5,7 @@ const Module = require("node:module");
 const test = require("node:test");
 const ts = require("typescript");
 
-function loadTypeScriptModule(relativePath) {
+function loadTypeScriptModule(relativePath, dependencies = {}) {
   const sourcePath = path.resolve(__dirname, relativePath);
   const source = fs.readFileSync(sourcePath, "utf8");
   const compiledSource = ts.transpileModule(source, {
@@ -18,6 +18,11 @@ function loadTypeScriptModule(relativePath) {
 
   compiledModule.filename = sourcePath;
   compiledModule.paths = Module._nodeModulePaths(path.dirname(sourcePath));
+  const defaultRequire = compiledModule.require.bind(compiledModule);
+  compiledModule.require = (request) =>
+    Object.prototype.hasOwnProperty.call(dependencies, request)
+      ? dependencies[request]
+      : defaultRequire(request);
   compiledModule._compile(compiledSource, sourcePath);
 
   return compiledModule.exports;
@@ -25,6 +30,55 @@ function loadTypeScriptModule(relativePath) {
 
 const { calculateDailyWorkMinutes } = loadTypeScriptModule("../lib/utils.ts");
 const { calculateRegularPay } = loadTypeScriptModule("../lib/payrollHours.ts");
+const {
+  buildPayrollLogBiometricBreakdown,
+  normalizeLegacyRawRegularHours,
+} = loadTypeScriptModule(
+  "../features/payroll/utils/payrollLogHours.ts",
+  { "@/lib/utils": { calculateDailyWorkMinutes } },
+);
+
+function buildDailyLog(time1In, time2Out) {
+  return {
+    date: "2026-02-01",
+    employee: "Test Employee",
+    time1In,
+    time1Out: "",
+    time2In: "",
+    time2Out,
+    otIn: "",
+    otOut: "",
+    regularHours: 0,
+    overtimeHours: 0,
+    totalHours: 0,
+    hours: 0,
+    site: "Test Site",
+  };
+}
+
+test("builds the payroll edit Worked and Less Lunch display values", () => {
+  assert.deepEqual(
+    buildPayrollLogBiometricBreakdown(buildDailyLog("07:49", "16:29")),
+    { workedHours: 8.67, lunchDeductionHours: 1 },
+  );
+  assert.deepEqual(
+    buildPayrollLogBiometricBreakdown(buildDailyLog("07:29", "16:29")),
+    { workedHours: 9, lunchDeductionHours: 1 },
+  );
+  assert.deepEqual(
+    buildPayrollLogBiometricBreakdown(buildDailyLog("07:39", "16:42")),
+    { workedHours: 9.05, lunchDeductionHours: 1 },
+  );
+});
+
+test("migrates legacy raw-hour overrides without replacing genuine HR edits", () => {
+  const log = buildDailyLog("07:49", "16:29");
+  assert.equal(
+    Math.round(normalizeLegacyRawRegularHours(log, 8.67) * 100) / 100,
+    7.67,
+  );
+  assert.equal(normalizeLegacyRawRegularHours(log, 7.5), 7.5);
+});
 
 test("deducts lunch from the biometric span before displaying payable hours", () => {
   assert.deepEqual(

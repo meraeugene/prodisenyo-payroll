@@ -15,6 +15,7 @@ import {
   compareStep2Rows,
   matchesSearchText,
 } from "@/lib/utils";
+import { normalizeLegacyRawRegularHours } from "@/features/payroll/utils/payrollLogHours";
 import type { DailyLogRow, Step2Sort } from "@/types";
 import { normalizePeriodLabel } from "@/features/payroll/utils/payrollDateHelpers";
 import {
@@ -545,8 +546,14 @@ export function applyLogHourOverrides(
         : typeof override?.overtimeHours === "number"
           ? override.overtimeHours
           : calculateDailyWorkMinutes(log).overtimeMinutes / 60;
+    const migratedRegularHours = normalizeLegacyRawRegularHours(
+      log,
+      regularHours,
+    );
     const normalizedRegularHours =
-      Number.isFinite(regularHours) && regularHours >= 0 ? regularHours : 0;
+      Number.isFinite(migratedRegularHours) && migratedRegularHours >= 0
+        ? migratedRegularHours
+        : 0;
     const normalizedOvertimeHours =
       Number.isFinite(overtimeHours) && overtimeHours >= 0 ? overtimeHours : 0;
 

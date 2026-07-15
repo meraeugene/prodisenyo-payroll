@@ -47,7 +47,10 @@ import {
   parseOvertimeRequestNotes,
 } from "@/features/payroll/utils/overtimeRequestNotes";
 import { isIsoDateWithinRange } from "@/features/payroll/utils/payrollDateHelpers";
-import { computeSameDayOvertimeMinutes } from "@/lib/utils";
+import {
+  buildPayrollLogBiometricBreakdown,
+  normalizeLegacyRawRegularHours,
+} from "@/features/payroll/utils/payrollLogHours";
 import {
   allocateCombinedBranchPay,
   buildDateSpanFromDates,
@@ -207,7 +210,10 @@ export default function PayrollEditModal({
 
   function getEditableRegularHours(log: DailyLogRow): number {
     const key = getLogOverrideKey(log);
-    return payroll.logHourOverrides[key]?.regularHours ?? log.regularHours;
+    return normalizeLegacyRawRegularHours(
+      log,
+      payroll.logHourOverrides[key]?.regularHours ?? log.regularHours,
+    );
   }
 
   function getEditableOvertimeHours(log: DailyLogRow): number {
@@ -365,7 +371,7 @@ export default function PayrollEditModal({
   );
   const overtimeLogs = currentLogsForPay.filter(
     (log) =>
-      computeSameDayOvertimeMinutes(log.otIn, log.otOut) > 0 &&
+      log.overtimeHours > 0 &&
       !payableHolidayDateSet.has(log.date),
   );
   const hasHoursReviewWarning =
@@ -1348,9 +1354,9 @@ export default function PayrollEditModal({
                 )}
                 {overtimeLogs.length > 0 && (
                   <p className="mt-1 text-xs font-semibold text-emerald-700">
-                    Overtime is only paid from OT In and OT Out records.
-                    Extra regular-shift minutes stay unpaid unless HR confirms
-                    the overtime below.
+                    Payable main-shift time above 8 hours is classified as
+                    overtime. Separate OT In and OT Out records are included
+                    when they do not overlap the regular shift.
                   </p>
                 )}
                 {highOvertimeHoursLogs.length > 0 && (
@@ -1361,7 +1367,7 @@ export default function PayrollEditModal({
                 )}
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[980px] text-sm">
+                <table className="w-full min-w-[1180px] text-sm">
                   <thead>
                     <tr className="border-b border-apple-mist">
                       {[
@@ -1373,14 +1379,18 @@ export default function PayrollEditModal({
                         "Time2 Out",
                         "OT In",
                         "OT Out",
-                        "Regular Hours",
-                        "OT Hours",
-                        "Total Hours",
+                        "Worked",
+                        "Less Lunch",
+                        "Regular",
+                        "OT",
+                        "Payable",
                       ].map((h) => (
                         <th
                           key={h}
                           className={`px-3 py-2.5 text-2xs font-semibold uppercase tracking-widest text-apple-steel ${
-                            h.includes("Hours") ? "text-right" : "text-left"
+                            ["Worked", "Less Lunch", "Regular", "OT", "Payable"].includes(h)
+                              ? "text-right"
+                              : "text-left"
                           }`}
                         >
                           {h}
@@ -1392,7 +1402,7 @@ export default function PayrollEditModal({
                     {allReportLogsCount === 0 ? (
                       <tr>
                         <td
-                          colSpan={11}
+                          colSpan={13}
                           className="px-3 py-5 text-center text-sm text-apple-smoke"
                         >
                           No attendance logs found for this worker.
@@ -1408,6 +1418,8 @@ export default function PayrollEditModal({
                         const editableTotalHours = round2(
                           editableRegularHours + editableOvertimeHours,
                         );
+                        const biometricBreakdown =
+                          buildPayrollLogBiometricBreakdown(log);
                         const isUnderRequiredHours =
                           editableRegularHours > 0 &&
                           editableRegularHours < FULL_WORKDAY_HOURS;
@@ -1415,8 +1427,7 @@ export default function PayrollEditModal({
                           editableTotalHours >= OVERTIME_ALERT_HOURS &&
                           !isPaidHoliday;
                         const isOvertimeDay =
-                          computeSameDayOvertimeMinutes(log.otIn, log.otOut) >
-                            0 && !isPaidHoliday;
+                          editableOvertimeHours > 0 && !isPaidHoliday;
                         const otPunchStarted = Boolean(log.otIn || log.otOut);
                         const shouldShowOtMissed =
                           otPunchStarted || getEditableOvertimeHours(log) > 0;
@@ -1503,6 +1514,16 @@ export default function PayrollEditModal({
                                 isPaidHoliday,
                                 showMissedWhenEmpty: shouldShowOtMissed,
                               })}
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-sm font-mono font-semibold text-apple-charcoal">
+                              {formatPayrollNumber(
+                                biometricBreakdown.workedHours,
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-sm font-mono font-semibold text-amber-700">
+                              -{formatPayrollNumber(
+                                biometricBreakdown.lunchDeductionHours,
+                              )}
                             </td>
                             <td className="px-3 py-2.5 text-right">
                               <input
