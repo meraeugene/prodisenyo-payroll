@@ -739,7 +739,7 @@ export default function PayrollEditModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-0 sm:p-4">
-      <div className="flex h-[100dvh] w-full max-w-6xl flex-col overflow-hidden rounded-none border border-apple-mist bg-white shadow-apple-xs sm:h-auto sm:max-h-[88vh] sm:rounded-lg">
+      <div className="flex h-[100dvh] w-full flex-col overflow-hidden rounded-none border border-apple-mist bg-white shadow-apple-xs sm:h-auto sm:max-h-[92vh] sm:w-[calc(100vw-2rem)] sm:max-w-[1500px] sm:rounded-lg">
         <div className="sticky top-0 z-10 border-b border-apple-mist bg-white px-5 py-4 sm:px-7 flex items-start justify-between gap-3">
           <div>
             <p className="text-2xs font-semibold  uppercase tracking-widest">
@@ -1374,7 +1374,7 @@ export default function PayrollEditModal({
                 )}
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1180px] text-sm">
+                <table className="w-full min-w-[1160px] text-sm">
                   <thead>
                     <tr className="border-b border-apple-mist">
                       {[
