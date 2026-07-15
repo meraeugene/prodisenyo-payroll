@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Building2,
   Calculator,
@@ -30,7 +30,8 @@ import {
 import SignOutButton from "@/components/auth/SignOutButton";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import { useAppState } from "@/features/app/AppStateProvider";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { useDashboardNavState } from "@/features/navigation/hooks/useDashboardNavState";
+import { useSidebarNotificationCounts } from "@/features/navigation/hooks/useSidebarNotificationCounts";
 import { getProfileAvatarPublicUrl } from "@/lib/supabase/storage";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/types/database";
@@ -207,14 +208,9 @@ function renderSidebarSectionLabel(params: {
 export default function DashboardShell({
   children,
   profile,
-  navState,
 }: {
   children: React.ReactNode;
-  profile: ProfileCardData | null;
-  navState: {
-    hasSavedAttendance: boolean;
-    hasSavedPayroll: boolean;
-  };
+  profile: (ProfileCardData & { id: string }) | null;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -230,18 +226,13 @@ export default function DashboardShell({
   const isPayrollManager = profile?.role === "payroll_manager";
   const isEngineer = profile?.role === "engineer";
   const isEmployee = profile?.role === "employee";
+  const navState = useDashboardNavState(profile?.id ?? null, profile?.role ?? null);
   const canSeeWorkflowNav =
     isCeo ||
     (isPayrollManager &&
       !workspaceReset &&
       (navState.hasSavedAttendance || hasAttendanceData || isWorkflowRoute));
-  const [pendingOvertimeCount, setPendingOvertimeCount] = useState(0);
-  const [pendingPayrollReportCount, setPendingPayrollReportCount] = useState(0);
-  const [pendingEstimateReviewCount, setPendingEstimateReviewCount] =
-    useState(0);
-  const previousPendingCountRef = useRef<number | null>(null);
-  const previousEstimateReviewCountRef = useRef<number | null>(null);
-  const canPlayNotificationSoundRef = useRef(false);
+  const notificationCounts = useSidebarNotificationCounts(isCeo);
 
   useEffect(() => {
     const isMobile =
@@ -284,136 +275,6 @@ export default function DashboardShell({
 
     setCollapsed(false);
   }, [pathname]);
-
-  useEffect(() => {
-    function enableSound() {
-      canPlayNotificationSoundRef.current = true;
-    }
-
-    window.addEventListener("pointerdown", enableSound, { once: true });
-    window.addEventListener("keydown", enableSound, { once: true });
-
-    return () => {
-      window.removeEventListener("pointerdown", enableSound);
-      window.removeEventListener("keydown", enableSound);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isCeo) {
-      setPendingOvertimeCount(0);
-      setPendingPayrollReportCount(0);
-      setPendingEstimateReviewCount(0);
-      previousPendingCountRef.current = null;
-      previousEstimateReviewCountRef.current = null;
-      return;
-    }
-
-    let cancelled = false;
-    const supabase = createSupabaseBrowserClient();
-
-    async function loadPendingOvertimeCount() {
-      const [
-        {
-          count: pendingPayrollOvertimeCount,
-          error: pendingPayrollOvertimeError,
-        },
-        { count: pendingRequestFormCount, error: pendingRequestFormError },
-        { count: payrollReportCount, error: payrollReportError },
-        { count: estimateReviewCount, error: estimateReviewError },
-      ] = await Promise.all([
-        supabase
-          .from("payroll_adjustments")
-          .select("id", { count: "exact", head: true })
-          .eq("adjustment_type", "overtime")
-          .eq("status", "pending"),
-        supabase
-          .from("overtime_requests")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "pending"),
-        supabase
-          .from("payroll_runs")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "submitted"),
-        supabase
-          .from("project_estimates")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "submitted"),
-      ]);
-
-      if (
-        cancelled ||
-        pendingPayrollOvertimeError ||
-        pendingRequestFormError ||
-        payrollReportError ||
-        estimateReviewError
-      ) {
-        return;
-      }
-
-      const nextCount =
-        (pendingPayrollOvertimeCount ?? 0) + (pendingRequestFormCount ?? 0);
-      const previousCount = previousPendingCountRef.current;
-      const nextEstimateCount = estimateReviewCount ?? 0;
-      const previousEstimateCount = previousEstimateReviewCountRef.current;
-      setPendingOvertimeCount(nextCount);
-      setPendingPayrollReportCount(payrollReportCount ?? 0);
-      setPendingEstimateReviewCount(nextEstimateCount);
-
-      if (
-        previousCount !== null &&
-        nextCount > previousCount &&
-        canPlayNotificationSoundRef.current
-      ) {
-        const audio = new Audio("/sounds/overtime-approval.mp3");
-        audio.volume = 0.9;
-        void audio.play().catch(() => undefined);
-      }
-
-      if (
-        previousEstimateCount !== null &&
-        nextEstimateCount > previousEstimateCount &&
-        canPlayNotificationSoundRef.current
-      ) {
-        const audio = new Audio("/sounds/overtime-approval.mp3");
-        audio.volume = 0.9;
-        void audio.play().catch(() => undefined);
-      }
-
-      previousPendingCountRef.current = nextCount;
-      previousEstimateReviewCountRef.current = nextEstimateCount;
-    }
-
-    void loadPendingOvertimeCount();
-
-    const intervalId = window.setInterval(() => {
-      void loadPendingOvertimeCount();
-    }, 30000);
-
-    function handleWindowFocus() {
-      void loadPendingOvertimeCount();
-    }
-
-    function handlePendingCountChanged() {
-      void loadPendingOvertimeCount();
-    }
-
-    window.addEventListener("focus", handleWindowFocus);
-    window.addEventListener(
-      "payroll:pending-count-changed",
-      handlePendingCountChanged,
-    );
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
-      window.removeEventListener("focus", handleWindowFocus);
-      window.removeEventListener(
-        "payroll:pending-count-changed",
-        handlePendingCountChanged,
-      );
-    };
-  }, [isCeo]);
 
   return (
     <div className="min-h-screen bg-white">
@@ -517,11 +378,11 @@ export default function DashboardShell({
                       onNavigate: () => setOpen(false),
                       badgeCount:
                         item.href === "/overtime-approvals"
-                          ? pendingOvertimeCount
+                          ? notificationCounts.overtime
                           : item.href === "/payroll-reports"
-                            ? pendingPayrollReportCount
+                            ? notificationCounts.payrollReports
                             : item.href === "/estimate-reviews"
-                              ? pendingEstimateReviewCount
+                              ? notificationCounts.estimateReviews
                               : 0,
                     }),
                   )}

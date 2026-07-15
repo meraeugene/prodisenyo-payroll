@@ -18,10 +18,6 @@ import {
   type RoleCode,
 } from "@/lib/payrollConfig";
 import { calculatePayroll, roundPayrollCalculation } from "@/lib/payrollEngine";
-import {
-  calculatePaidRegularHours,
-  UNPAID_BREAK_HOURS_PER_WORKDAY,
-} from "@/lib/payrollHours";
 import type { DailyLogRow } from "@/types";
 import type { UsePayrollStateResult } from "@/features/payroll/hooks/usePayrollState";
 import type {
@@ -299,12 +295,8 @@ export default function PayrollEditModal({
   const totalWorkedHours = round2(
     currentLogsForPay.reduce((sum, log) => sum + log.totalHours, 0),
   );
-  const actualRegularHours = currentLogsForPay.reduce(
-    (sum, log) => sum + log.regularHours,
-    0,
-  );
   const regularWorkedHours = currentLogsForPay.reduce(
-    (sum, log) => sum + calculatePaidRegularHours(log.regularHours),
+    (sum, log) => sum + log.regularHours,
     0,
   );
   const sitePayBreakdown = loggedSites.map((site) => {
@@ -312,7 +304,7 @@ export default function PayrollEditModal({
       (log) => extractSiteName(log.site) === site,
     );
     const siteHours = siteLogs.reduce(
-      (sum, log) => sum + calculatePaidRegularHours(log.regularHours),
+      (sum, log) => sum + log.regularHours,
       0,
     );
     const siteRateKey = buildEmployeeBranchRateKey(
@@ -359,10 +351,6 @@ export default function PayrollEditModal({
         FULL_WORKDAY_HOURS,
   );
   const daysWorked = currentLogsForPay.filter((log) => log.totalHours > 0).length;
-  const unpaidBreakHours = round2(
-    currentLogsForPay.filter((log) => log.regularHours > 0).length *
-      UNPAID_BREAK_HOURS_PER_WORKDAY,
-  );
   const paidHolidayBonusDays = payroll.payableHolidayDays;
   const underHoursLogs = currentLogsForPay.filter(
     (log) =>
@@ -1679,22 +1667,6 @@ export default function PayrollEditModal({
                   </span>
                   <span className="font-mono font-semibold text-apple-charcoal text-right">
                     {formatPayrollNumber(totalWorkedHours)} hrs
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-apple-charcoal">
-                    Actual Regular Hours
-                  </span>
-                  <span className="font-mono font-semibold text-apple-charcoal text-right">
-                    {formatPayrollNumber(actualRegularHours)} hrs
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-apple-charcoal">
-                    Unpaid Break ({formatPayrollNumber(unpaidBreakHours)} hrs)
-                  </span>
-                  <span className="font-mono font-semibold text-rose-600 text-right">
-                    -{formatPayrollNumber(unpaidBreakHours)} hrs
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3 text-sm">

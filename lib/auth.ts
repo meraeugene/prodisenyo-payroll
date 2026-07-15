@@ -1,7 +1,12 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import type { AppRole, Database } from "@/types/database";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  readRequestProfile,
+  readRequestUser,
+} from "@/lib/supabase/requestAuthContext";
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 
@@ -23,6 +28,9 @@ export function getRoleHomePath(role: AppRole | null | undefined) {
 }
 
 export const getCurrentUser = cache(async () => {
+  const requestUser = readRequestUser(await headers());
+  if (requestUser) return requestUser;
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -32,6 +40,9 @@ export const getCurrentUser = cache(async () => {
 });
 
 export const getCurrentProfile = cache(async (): Promise<ProfileRow | null> => {
+  const requestProfile = readRequestProfile(await headers());
+  if (requestProfile) return requestProfile;
+
   const user = await getCurrentUser();
   if (!user) return null;
 

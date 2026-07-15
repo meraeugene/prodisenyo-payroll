@@ -41,6 +41,8 @@ const EVENING_OVERTIME_START_MINUTES = 18 * 60;
 const END_OF_DAY_MINUTES = 24 * 60;
 const MISFILED_TIME1_OUT_IN_START_MINUTES = 10 * 60;
 const MISFILED_TIME1_OUT_IN_END_MINUTES = 12 * 60 + 59;
+const UNPAID_LUNCH_MINUTES = 60;
+const MAX_REGULAR_WORK_MINUTES = 8 * 60;
 
 interface DailyWorkTimeFields {
   time1In?: string | null;
@@ -157,13 +159,13 @@ function resolveRegularOutMinutes(
   return otInMinutes;
 }
 
-function calculateRegularSpanMinutes(times: {
+function calculateRegularSpan(times: {
   time1In: string;
   time1Out: string;
   time2In: string;
   time2Out: string;
   otIn: string;
-}): number {
+}): { startMinutes: number; endMinutes: number; spanMinutes: number } | null {
   const regularInMinutes = earliestValidMinutes(times.time1In, times.time2In);
   const regularOutMinutes = resolveRegularOutMinutes(
     times.time1Out,
@@ -171,12 +173,16 @@ function calculateRegularSpanMinutes(times: {
     times.otIn,
   );
 
-  if (regularInMinutes === null || regularOutMinutes === null) return 0;
+  if (regularInMinutes === null || regularOutMinutes === null) return null;
 
   const regularSpanMinutes = regularOutMinutes - regularInMinutes;
-  if (regularSpanMinutes <= 0 || regularSpanMinutes > 16 * 60) return 0;
+  if (regularSpanMinutes <= 0 || regularSpanMinutes > 16 * 60) return null;
 
-  return regularSpanMinutes;
+  return {
+    startMinutes: regularInMinutes,
+    endMinutes: regularOutMinutes,
+    spanMinutes: regularSpanMinutes,
+  };
 }
 
 function calculateDailyWorkMinutes(times: {
@@ -186,20 +192,56 @@ function calculateDailyWorkMinutes(times: {
   time2Out?: string | null;
   otIn?: string | null;
   otOut?: string | null;
-}): { regularMinutes: number; overtimeMinutes: number; totalMinutes: number } {
+}): {
+  rawRegularMinutes: number;
+  lunchDeductionMinutes: number;
+  regularMinutes: number;
+  overtimeMinutes: number;
+  totalMinutes: number;
+} {
   const { time1In, time1Out, time2In, time2Out, otIn, otOut } =
     normalizeBiometricDailyTimes(times);
 
-  const regularMinutes = calculateRegularSpanMinutes({
+  const regularSpan = calculateRegularSpan({
     time1In,
     time1Out,
     time2In,
     time2Out,
     otIn,
   });
-  const overtimeMinutes = boundedForwardPairMinutes(otIn, otOut);
+  const rawRegularMinutes = regularSpan?.spanMinutes ?? 0;
+  const lunchDeductionMinutes = Math.min(
+    rawRegularMinutes,
+    UNPAID_LUNCH_MINUTES,
+  );
+  const payableMainShiftMinutes = Math.max(
+    0,
+    rawRegularMinutes - lunchDeductionMinutes,
+  );
+  const regularMinutes = Math.min(
+    payableMainShiftMinutes,
+    MAX_REGULAR_WORK_MINUTES,
+  );
+  const derivedOvertimeMinutes = Math.max(
+    0,
+    payableMainShiftMinutes - MAX_REGULAR_WORK_MINUTES,
+  );
+
+  const explicitOvertimeMinutes = boundedForwardPairMinutes(otIn, otOut);
+  const explicitOtStart = timeToMinutes(otIn);
+  const explicitOtEnd = timeToMinutes(otOut);
+  const explicitOtOverlapsRegularSpan =
+    explicitOvertimeMinutes > 0 &&
+    regularSpan !== null &&
+    explicitOtStart < regularSpan.endMinutes &&
+    explicitOtEnd > regularSpan.startMinutes;
+  const overtimeMinutes =
+    derivedOvertimeMinutes +
+    (explicitOtOverlapsRegularSpan ? 0 : explicitOvertimeMinutes);
 
   return {
+    rawRegularMinutes,
+    lunchDeductionMinutes,
     regularMinutes,
     overtimeMinutes,
     totalMinutes: regularMinutes + overtimeMinutes,

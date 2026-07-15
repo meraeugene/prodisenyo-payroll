@@ -20,45 +20,6 @@ export interface BranchSummary {
   employeeCount: number;
 }
 
-const MAX_SHIFT_MINUTES = 16 * 60;
-
-function toMinutes(time: string): number {
-  const [hourText, minuteText] = time.split(":");
-  const hours = Number(hourText);
-  const minutes = Number(minuteText);
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return -1;
-  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return -1;
-  return hours * 60 + minutes;
-}
-
-function forwardPairMinutes(inTime: string, outTime: string): number {
-  if (!inTime || !outTime) return 0;
-  const inMinutes = toMinutes(inTime);
-  const outMinutes = toMinutes(outTime);
-  if (inMinutes < 0 || outMinutes < 0) return 0;
-  if (outMinutes <= inMinutes) return 0;
-  return outMinutes - inMinutes;
-}
-
-export function inferMinutesFromPunches(times: string[]): number {
-  const punches = times.filter(Boolean);
-  if (punches.length < 2) return 0;
-
-  let best = 0;
-
-  for (let i = 0; i < punches.length; i += 1) {
-    for (let j = 0; j < punches.length; j += 1) {
-      if (i === j) continue;
-      const diff = forwardPairMinutes(punches[i], punches[j]);
-      if (diff > best && diff <= MAX_SHIFT_MINUTES) {
-        best = diff;
-      }
-    }
-  }
-
-  return best;
-}
-
 export function buildDailyRows(records: AttendanceRecord[]): DailyLogRow[] {
   const grouped = new Map<string, DailyLogRow>();
 
@@ -103,21 +64,8 @@ export function buildDailyRows(records: AttendanceRecord[]): DailyLogRow[] {
     const normalizedTimes = normalizeBiometricDailyTimes(row);
     const displayRow = { ...row, ...normalizedTimes };
     const dailyMinutes = calculateDailyWorkMinutes(displayRow);
-    const strictMinutes = dailyMinutes.totalMinutes;
-    const inferredMinutes =
-      strictMinutes === 0
-        ? inferMinutesFromPunches([
-            displayRow.time1In,
-            displayRow.time1Out,
-            displayRow.time2In,
-            displayRow.time2Out,
-            displayRow.otIn,
-            displayRow.otOut,
-          ])
-        : 0;
-
-    const minutes = strictMinutes || inferredMinutes;
-    const totalHours = Math.round((minutes / 60) * 100) / 100;
+    const totalHours =
+      Math.round((dailyMinutes.totalMinutes / 60) * 100) / 100;
 
     return {
       ...displayRow,

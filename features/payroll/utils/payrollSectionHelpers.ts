@@ -1,6 +1,5 @@
 import type { PayrollRow } from "@/lib/payrollEngine";
 import { calculatePayroll, roundPayrollCalculation } from "@/lib/payrollEngine";
-import { calculatePaidRegularHours } from "@/lib/payrollHours";
 import { matchesSearchText } from "@/lib/utils";
 import {
   DEFAULT_OVERTIME_MULTIPLIER,
@@ -254,7 +253,7 @@ export function buildGroupedEmployeeCompensation(
     const siteName = extractSiteName(record.site) || record.site || "Unknown Site";
     hoursBySite.set(
       siteName,
-      (hoursBySite.get(siteName) ?? 0) + calculatePaidRegularHours(record.hours),
+      (hoursBySite.get(siteName) ?? 0) + record.hours,
     );
   });
 

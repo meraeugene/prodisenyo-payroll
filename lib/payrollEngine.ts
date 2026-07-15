@@ -6,10 +6,7 @@ import {
   normalizeRoleCode,
   type RoleCode,
 } from "@/lib/payrollConfig";
-import {
-  calculatePaidRegularHours,
-  calculateRegularPay,
-} from "@/lib/payrollHours";
+import { calculateRegularPay } from "@/lib/payrollHours";
 
 export type PayrollDeductionsInput =
   | number
@@ -253,7 +250,7 @@ export function generatePayroll(
     const numericHours = Number(record.hours);
     if (!Number.isFinite(numericHours) || numericHours < 0) continue;
 
-    const paidRegularHours = calculatePaidRegularHours(numericHours);
+    const paidRegularHours = numericHours;
     const site = normalizeWhitespace(record.site) || "Unknown Site";
     const date = normalizeWhitespace(record.date);
     const key = `${role}|||${workerName}|||${site}`;

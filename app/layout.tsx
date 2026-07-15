@@ -1,13 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "sonner/dist/styles.css";
-import { Geist } from "next/font/google";
-import { cn } from "@/lib/utils";
 import { Toaster } from "sonner";
 import { AppStateProvider } from "@/features/app/AppStateProvider";
 import PwaRegister from "@/features/app/components/PwaRegister";
-
-const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: {
@@ -40,11 +36,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html
-      lang="en"
-      className={cn("font-sans", geist.variable)}
-      data-theme="prodisenyo"
-    >
+    <html lang="en" className="font-sans" data-theme="prodisenyo">
       <body className="min-h-screen bg-apple-snow antialiased">
         <PwaRegister />
         <AppStateProvider>

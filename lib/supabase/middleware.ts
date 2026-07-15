@@ -2,6 +2,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import type { Database } from "@/types/database";
 import { getSupabaseBrowserEnv } from "@/lib/env";
+import {
+  INTERNAL_PROFILE_HEADER,
+  INTERNAL_USER_HEADER,
+  writeRequestAuthContext,
+} from "@/lib/supabase/requestAuthContext";
 
 const SUPABASE_AUTH_COOKIE_LIFETIME_SECONDS = 60 * 60 * 24 * 365;
 
@@ -107,11 +112,21 @@ function isAllowedEmployeePath(pathname: string) {
 }
 
 export async function updateSession(request: NextRequest) {
-  const response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.delete(INTERNAL_USER_HEADER);
+  requestHeaders.delete(INTERNAL_PROFILE_HEADER);
+  const cookieMutations: CookieMutation[] = [];
+
+  function applyCookies<T extends NextResponse>(response: T): T {
+    cookieMutations.forEach(({ name, value, options }) => {
+      response.cookies.set(name, value, options);
+    });
+    return response;
+  }
+
+  function redirect(url: URL) {
+    return applyCookies(NextResponse.redirect(url));
+  }
 
   const { url, anonKey } = getSupabaseBrowserEnv();
   const supabase = createServerClient<Database>(url, anonKey, {
@@ -128,7 +143,7 @@ export async function updateSession(request: NextRequest) {
       setAll(cookiesToSet: CookieMutation[]) {
         cookiesToSet.forEach(({ name, value, options }) => {
           request.cookies.set(name, value);
-          response.cookies.set(name, value, options);
+          cookieMutations.push({ name, value, options });
         });
       },
     },
@@ -144,17 +159,24 @@ export async function updateSession(request: NextRequest) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/auth/login";
     redirectUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(redirectUrl);
+    return redirect(redirectUrl);
   }
+
+  let authenticatedProfile: Database["public"]["Tables"]["profiles"]["Row"] | null = null;
 
   if (user) {
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("role")
+      .select(
+        "id, username, email, full_name, avatar_path, role, is_active, created_at, updated_at",
+      )
       .eq("id", user.id)
       .maybeSingle();
 
-    const currentRole = (profile as { role?: string } | null)?.role ?? null;
+    authenticatedProfile = profileError
+      ? null
+      : (profile as Database["public"]["Tables"]["profiles"]["Row"] | null);
+    const currentRole = authenticatedProfile?.role ?? null;
 
     if (!profileError && pathname === "/auth/login") {
       const redirectUrl = request.nextUrl.clone();
@@ -170,7 +192,7 @@ export async function updateSession(request: NextRequest) {
                 : "/dashboard";
       redirectUrl.searchParams.delete("next");
       redirectUrl.searchParams.delete("required");
-      return NextResponse.redirect(redirectUrl);
+      return redirect(redirectUrl);
     }
 
     if (
@@ -181,7 +203,7 @@ export async function updateSession(request: NextRequest) {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = PAYROLL_MANAGER_REDIRECT_PATH;
       redirectUrl.searchParams.delete("required");
-      return NextResponse.redirect(redirectUrl);
+      return redirect(redirectUrl);
     }
 
     if (
@@ -192,7 +214,7 @@ export async function updateSession(request: NextRequest) {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = PAYROLL_MANAGER_REDIRECT_PATH;
       redirectUrl.searchParams.delete("required");
-      return NextResponse.redirect(redirectUrl);
+      return redirect(redirectUrl);
     }
 
     if (
@@ -207,7 +229,7 @@ export async function updateSession(request: NextRequest) {
         const redirectUrl = request.nextUrl.clone();
         redirectUrl.pathname = "/upload-attendance";
         redirectUrl.searchParams.set("required", "documents");
-        return NextResponse.redirect(redirectUrl);
+        return redirect(redirectUrl);
       }
 
       const { data: latestImport, error: importError } = await supabase
@@ -222,7 +244,7 @@ export async function updateSession(request: NextRequest) {
         const redirectUrl = request.nextUrl.clone();
         redirectUrl.pathname = "/upload-attendance";
         redirectUrl.searchParams.set("required", "documents");
-        return NextResponse.redirect(redirectUrl);
+        return redirect(redirectUrl);
       }
     }
 
@@ -230,7 +252,7 @@ export async function updateSession(request: NextRequest) {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = CEO_REDIRECT_PATH;
       redirectUrl.searchParams.delete("required");
-      return NextResponse.redirect(redirectUrl);
+      return redirect(redirectUrl);
     }
 
     if (
@@ -241,7 +263,7 @@ export async function updateSession(request: NextRequest) {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = ENGINEER_REDIRECT_PATH;
       redirectUrl.searchParams.delete("required");
-      return NextResponse.redirect(redirectUrl);
+      return redirect(redirectUrl);
     }
 
     if (
@@ -252,9 +274,15 @@ export async function updateSession(request: NextRequest) {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = EMPLOYEE_REDIRECT_PATH;
       redirectUrl.searchParams.delete("required");
-      return NextResponse.redirect(redirectUrl);
+      return redirect(redirectUrl);
     }
   }
 
-  return response;
+  writeRequestAuthContext(requestHeaders, user, authenticatedProfile);
+
+  return applyCookies(
+    NextResponse.next({
+      request: { headers: requestHeaders },
+    }),
+  );
 }
