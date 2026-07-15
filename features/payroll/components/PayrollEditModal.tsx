@@ -298,8 +298,15 @@ export default function PayrollEditModal({
         siteName,
       )
     ];
-  const totalWorkedHours = round2(
+  const payableTotalHours = round2(
     currentLogsForPay.reduce((sum, log) => sum + log.totalHours, 0),
+  );
+  const actualWorkedHours = round2(
+    payroll.editingPayrollLogs.reduce(
+      (sum, log) =>
+        sum + buildPayrollLogBiometricBreakdown(log).workedHours,
+      0,
+    ),
   );
   const regularWorkedHours = currentLogsForPay.reduce(
     (sum, log) => sum + log.regularHours,
@@ -395,7 +402,7 @@ export default function PayrollEditModal({
       : 0;
   const paidHolidayPay = round2(paidHolidayBonusDays * FIXED_PAY_RATE_PER_DAY);
   const belowFullDayThreshold =
-    totalWorkedHours > 0 && branchPayAllocation.totalPayableHours === 0;
+    payableTotalHours > 0 && branchPayAllocation.totalPayableHours === 0;
   const cashAdvanceAmount = cashAdvanceEntries.reduce(
     (sum, entry) => sum + entry.amount,
     0,
@@ -1641,7 +1648,7 @@ export default function PayrollEditModal({
                   },
                   {
                     label: "Actual Total Hours",
-                    value: `${formatPayrollNumber(totalWorkedHours)} hrs`,
+                    value: `${formatPayrollNumber(actualWorkedHours)} hrs`,
                   },
                   {
                     label: "Paid Regular Hours",
@@ -1687,7 +1694,7 @@ export default function PayrollEditModal({
                     Actual Total Hours
                   </span>
                   <span className="font-mono font-semibold text-apple-charcoal text-right">
-                    {formatPayrollNumber(totalWorkedHours)} hrs
+                    {formatPayrollNumber(actualWorkedHours)} hrs
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3 text-sm">
