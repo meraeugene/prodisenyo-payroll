@@ -41,6 +41,7 @@ function validateRole(role: AppRole) {
       APP_ROLES.ADMIN,
       APP_ROLES.PAYROLL_MANAGER,
       APP_ROLES.ENGINEER,
+      APP_ROLES.PURCHASER,
       APP_ROLES.EMPLOYEE,
       APP_ROLES.PURCHASER,
     ].includes(role)

@@ -17,6 +17,7 @@ alter type public.app_role add value if not exists 'admin';
 alter type public.app_role add value if not exists 'ceo';
 alter type public.app_role add value if not exists 'payroll_manager';
 alter type public.app_role add value if not exists 'engineer';
+alter type public.app_role add value if not exists 'purchaser';
 alter type public.app_role add value if not exists 'employee';
 
 do $$

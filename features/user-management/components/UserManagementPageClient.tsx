@@ -24,6 +24,7 @@ const ROLE_OPTIONS: Array<{ value: AppRole; label: string }> = [
   { value: "payroll_manager", label: "Payroll Manager" },
   { value: "purchaser", label: "Purchaser" },
   { value: "engineer", label: "Engineer" },
+  { value: "purchaser", label: "Purchaser" },
   { value: "employee", label: "Employee" },
   { value: "ceo", label: "CEO" },
 ];
@@ -43,6 +44,7 @@ function formatRoleLabel(role: AppRole) {
   if (role === "payroll_manager") return "Payroll Manager";
   if (role === "purchaser") return "Purchaser";
   if (role === "employee") return "Employee";
+  if (role === "purchaser") return "Purchaser";
   return "Engineer";
 }
 
@@ -261,7 +263,7 @@ export default function UserManagementPageClient({
       <DashboardPageHero
         eyebrow="Admin"
         title="User Management"
-        description="Create, update, and manage user accounts for payroll managers, engineers, employees, and CEO users."
+        description="Create, update, and manage user accounts for payroll managers, engineers, purchasers, employees, and CEO users."
       />
 
       <section className="grid gap-4 2xl:grid-cols-[420px_minmax(0,1fr)]">

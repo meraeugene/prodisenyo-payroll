@@ -10,6 +10,7 @@ export function roleLabel(role: ProfileRow["role"] | null) {
   if (role === "payroll_manager") return "Payroll Manager";
   if (role === "purchaser") return "Purchaser";
   if (role === "engineer") return "Engineer";
+  if (role === "purchaser") return "Purchaser";
   return "Signed-in user";
 }
 

@@ -24,5 +24,6 @@ export function formatOvertimeRequesterRole(role: AppRole): string {
   if (role === "payroll_manager") return "Payroll Manager";
   if (role === "engineer") return "Engineer";
   if (role === "employee") return "Employee";
+  if (role === "purchaser") return "Purchaser";
   return "CEO";
 }
