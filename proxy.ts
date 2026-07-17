@@ -36,5 +36,6 @@ export const config = {
     "/purchasing-approvals/:path*",
     "/purchaser-dashboard/:path*",
     "/settings/:path*",
+    "/engineer/:path*",
   ],
 };

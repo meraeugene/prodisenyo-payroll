@@ -11,7 +11,7 @@ const nullable = (value: unknown) => text(value) || null;
 const dateOrNull = (value: unknown) => /^\d{4}-\d{2}-\d{2}$/.test(text(value)) ? text(value) : null;
 
 function refreshOperations() {
-  ["/operations", "/material-approvals", "/purchasing", "/request-material", "/home"].forEach(path => revalidatePath(path));
+  ["/operations", "/material-approvals", "/purchasing", "/request-material", "/home", "/engineer", "/engineer/projects", "/engineer/tasks", "/engineer/material-requests", "/engineer/notifications"].forEach(path => revalidatePath(path));
 }
 
 export async function createOperationsProjectAction(input: {
@@ -45,12 +45,16 @@ export async function createOperationsTaskAction(input: { projectId: string; tit
   const { user } = await requireRole(APP_ROLES.CEO); const title = text(input.title);
   if (!text(input.projectId) || !title) throw new Error("Project and task title are required.");
   const { data, error } = await db().from("operations_tasks").insert({ project_id: input.projectId, title, description: nullable(input.description), assignee_id: nullable(input.assigneeId), milestone_id: nullable(input.milestoneId), due_date: dateOrNull(input.dueDate), created_by: user.id }).select("*").single();
-  if (error) throw new Error(error.message); refreshOperations(); return data;
+  if (error) throw new Error(error.message);
+  if (data?.assignee_id) {
+    await db().from("operations_notifications").insert({ recipient_id: data.assignee_id, actor_id: user.id, type: "task_assigned", title: `New task: ${title}`, body: nullable(input.description), href: "/engineer/tasks", entity_type: "task", entity_id: data.id, dedupe_key: `task-assigned-${data.id}` });
+  }
+  refreshOperations(); return data;
 }
 
 export async function updateOperationsTaskStatusAction(taskId: string, status: string) {
   const { user, profile } = await requireRole([APP_ROLES.CEO, APP_ROLES.ENGINEER]);
-  if (!["todo","in_progress","blocked","completed"].includes(status)) throw new Error("Invalid task status.");
+  if (!["todo","in_progress","waiting_approval","blocked","completed"].includes(status)) throw new Error("Invalid task status.");
   const database = db();
   const { data: task } = await database.from("operations_tasks").select("assignee_id, project_id").eq("id", taskId).single();
   if (profile.role === APP_ROLES.ENGINEER && task?.assignee_id !== user.id) throw new Error("You can only update tasks assigned to you.");
@@ -98,9 +102,11 @@ export async function decideMaterialRequestAction(input: { requestId: string; de
   if (input.decision === "approved" && !text(input.purchaserId)) throw new Error("Assign a purchaser.");
   if (input.decision === "rejected" && !text(input.reason)) throw new Error("Rejection reason is required.");
   const status = input.decision === "approved" ? "assigned" : "rejected";
+  const { data: request } = await database.from("material_requests").select("requested_by,material_name").eq("id", input.requestId).maybeSingle();
   const { error } = await database.from("material_requests").update({ status, assigned_purchaser_id: input.decision === "approved" ? input.purchaserId : null, decision_by: user.id, decision_at: new Date().toISOString(), rejection_reason: input.decision === "rejected" ? text(input.reason) : null }).eq("id", input.requestId).eq("status", "pending");
   if (error) throw new Error(error.message);
   await database.from("material_request_history").insert({ request_id: input.requestId, actor_id: user.id, status, notes: nullable(input.reason) });
+  if (request?.requested_by) await database.from("operations_notifications").insert({ recipient_id: request.requested_by, actor_id: user.id, type: input.decision === "approved" ? "material_approved" : "material_rejected", title: `${request.material_name} ${input.decision}`, body: nullable(input.reason), href: "/engineer/material-requests", entity_type: "material_request", entity_id: input.requestId, dedupe_key: `material-${input.requestId}-${input.decision}` });
   refreshOperations();
 }
 
