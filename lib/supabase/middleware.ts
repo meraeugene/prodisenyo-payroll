@@ -30,10 +30,13 @@ const PROTECTED_PREFIXES = [
   "/payroll-analytics",
   "/payroll-reports",
   "/add-user",
-  "/request-material",
   "/request-overtime",
   "/reset-data",
   "/settings",
+  "/projects",
+  "/overview",
+  "/material-approvals",
+  "/purchasing-approvals",
 ] as const;
 
 const HR_SUBMISSION_REQUIRED_PREFIXES = [
@@ -54,18 +57,25 @@ const CEO_ALLOWED_PREFIXES = [
   "/add-user",
   "/reset-data",
   "/settings",
+  "/projects",
+  "/material-approvals",
+  "/purchasing-approvals",
 ] as const;
 
-const CEO_ONLY_PREFIXES = ["/overtime-approvals", "/payroll-reports"] as const;
-const CEO_REDIRECT_PATH = "/home";
+const CEO_ONLY_PREFIXES = [
+  "/overtime-approvals",
+  "/payroll-reports",
+  "/material-approvals",
+  "/purchasing-approvals",
+  "/budget-tracker",
+] as const;
+const CEO_REDIRECT_PATH = "/projects";
 const PAYROLL_MANAGER_REDIRECT_PATH = "/home";
-const ENGINEER_REDIRECT_PATH = "/home";
+const ENGINEER_REDIRECT_PATH = "/projects";
 const EMPLOYEE_REDIRECT_PATH = "/home";
 const ENGINEER_ALLOWED_PREFIXES = [
-  "/home",
-  "/budget-tracker",
+  "/projects",
   "/cost-estimator",
-  "/request-material",
   "/request-overtime",
   "/settings",
 ] as const;

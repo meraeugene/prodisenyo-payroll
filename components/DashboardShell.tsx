@@ -8,7 +8,6 @@ import { useEffect, useState } from "react";
 import {
   Building2,
   Calculator,
-  ClipboardList,
   ChevronsLeft,
   ChevronsRight,
   ChevronRight,
@@ -26,6 +25,9 @@ import {
   UserRoundSearch,
   Wallet,
   X,
+  FolderKanban,
+  ClipboardCheck,
+  BadgeDollarSign,
 } from "lucide-react";
 import SignOutButton from "@/components/auth/SignOutButton";
 import ProfileAvatar from "@/components/ProfileAvatar";
@@ -54,8 +56,11 @@ const PAYROLL_MANAGER_REQUEST_ITEMS = [
 ] as const;
 
 const CEO_GENERAL_ITEMS = [
-  { href: "/home", label: "Home", icon: House },
+  { href: "/projects", label: "Home", icon: House },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+] as const;
+
+const CEO_MANAGEMENT_ITEMS = [
   { href: "/budget-tracker", label: "Budget Tracker", icon: Receipt },
 ] as const;
 
@@ -74,6 +79,16 @@ const CEO_REVIEW_ITEMS = [
     href: "/estimate-reviews",
     label: "Estimate Reviews",
     icon: Calculator,
+  },
+  {
+    href: "/material-approvals",
+    label: "Material Approval",
+    icon: ClipboardCheck,
+  },
+  {
+    href: "/purchasing-approvals",
+    label: "Purchasing Approval",
+    icon: BadgeDollarSign,
   },
 ] as const;
 
@@ -95,20 +110,16 @@ const CEO_ADMIN_ITEMS = [
   { href: "/reset-data", label: "Reset Data", icon: Trash2 },
 ] as const;
 
-const ENGINEER_GENERAL_ITEMS = [{ href: "/home", label: "Home", icon: House }];
+const ENGINEER_GENERAL_ITEMS = [
+  { href: "/projects", label: "Home", icon: House },
+] as const;
 
 const ENGINEER_PLANNING_ITEMS = [
-  { href: "/budget-tracker", label: "Budget Tracker", icon: Receipt },
   { href: "/cost-estimator", label: "Cost Estimator", icon: Calculator },
 ] as const;
 
 const ENGINEER_REQUEST_ITEMS = [
   { href: "/request-overtime", label: "Request Overtime", icon: Clock3 },
-  {
-    href: "/request-material",
-    label: "Request Material",
-    icon: ClipboardList,
-  },
 ] as const;
 
 const EMPLOYEE_NAV_ITEMS = [
@@ -367,6 +378,19 @@ export default function DashboardShell({
               {isCeo ? (
                 <>
                   {renderSidebarSectionLabel({
+                    label: "Management",
+                    collapsed,
+                  })}
+                  {CEO_MANAGEMENT_ITEMS.map((item) =>
+                    renderSidebarLink({
+                      item,
+                      pathname,
+                      collapsed,
+                      onNavigate: () => setOpen(false),
+                    }),
+                  )}
+
+                  {renderSidebarSectionLabel({
                     label: "Reviews",
                     collapsed,
                   })}
@@ -404,6 +428,7 @@ export default function DashboardShell({
                     }),
                   )}
 
+
                   {renderSidebarSectionLabel({
                     label: "Requests",
                     collapsed,
@@ -437,19 +462,6 @@ export default function DashboardShell({
                       )}
                     </>
                   ) : null}
-
-                  {renderSidebarSectionLabel({
-                    label: "Planning",
-                    collapsed,
-                  })}
-                  {BUDGET_NAV_ITEMS.map((item) =>
-                    renderSidebarLink({
-                      item,
-                      pathname,
-                      collapsed,
-                      onNavigate: () => setOpen(false),
-                    }),
-                  )}
 
                   {renderSidebarSectionLabel({
                     label: "Requests",

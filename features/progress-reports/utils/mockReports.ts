@@ -1,0 +1,40 @@
+import type { ProgressReportRecord } from "../types";
+
+export const MOCK_REPORTS: ProgressReportRecord[] = [
+  {
+    id: "rep-1",
+    projectName: "Grand Horizon Towers",
+    reporterName: "Engineer User",
+    date: "2026-07-17",
+    content: "Slab reinforcement inspection completed for structural zone A. Concrete pouring set for tomorrow. MEP piping layouts are 90% installed on grid B-2.",
+    challenges: "Small displacement on rebar spacing on grid B-2. Instructed rebar team to correct spacing immediately. Corrected within 2 hours.",
+    completionPercentage: 42,
+    status: "submitted",
+    weatherCondition: "sunny",
+    photos: ["https://images.unsplash.com/photo-1541888946425-d81bb19240f5?auto=format&fit=crop&w=400&q=80"],
+  },
+  {
+    id: "rep-2",
+    projectName: "Vista Verde Residences",
+    reporterName: "Engineer User",
+    date: "2026-07-16",
+    content: "Completed formwork and shoring for the structural columns of Sector 3. Ready for cement pouring. Excavation safety nets installed.",
+    challenges: "None. Work progressed smoothly under clear skies.",
+    completionPercentage: 55,
+    status: "reviewed",
+    weatherCondition: "cloudy",
+    photos: ["https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=400&q=80"],
+  },
+  {
+    id: "rep-3",
+    projectName: "Skyline Business Park",
+    reporterName: "Engineer User",
+    date: "2026-07-15",
+    content: "Masonry partition walls starting on the ground floor lobby. Structural steel painting is ongoing.",
+    challenges: "Material delivery of masonry blocks was delayed due to trucking routing issues. Adjusted crew schedules to focus on painting work.",
+    completionPercentage: 25,
+    status: "reviewed",
+    weatherCondition: "rainy",
+    photos: ["https://images.unsplash.com/photo-1590069261209-f8e9b8642343?auto=format&fit=crop&w=400&q=80"],
+  },
+];

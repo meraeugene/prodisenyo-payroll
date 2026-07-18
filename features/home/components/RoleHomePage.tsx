@@ -14,10 +14,15 @@ import {
   Upload,
   UserRoundSearch,
   Users,
+  ListTodo,
+  FileText,
+  ClipboardCheck,
+  BadgeDollarSign,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { AppRole } from "@/types/database";
 import RoleHintTypewriter from "@/features/home/components/RoleHintTypewriter";
+import ProjectsPageClient from "@/features/projects/components/ProjectsPageClient";
 
 type FeatureCard = {
   href: string;
@@ -40,6 +45,12 @@ const FEATURE_ICONS: Record<string, LucideIcon> = {
   "/settings": Settings,
   "/cost-estimator": Calculator,
   "/request-material": ClipboardList,
+  "/my-tasks": ListTodo,
+  "/projects": FolderKanban,
+  "/progress-reports": FileText,
+  "/overview": LayoutDashboard,
+  "/material-approvals": ClipboardCheck,
+  "/purchasing-approvals": BadgeDollarSign,
 };
 
 const ROLE_FEATURES: Record<AppRole, FeatureCard[]> = {
@@ -48,6 +59,21 @@ const ROLE_FEATURES: Record<AppRole, FeatureCard[]> = {
       href: "/dashboard",
       title: "Dashboard",
       description: "Monitor company-wide payroll and review queues.",
+    },
+    {
+      href: "/projects",
+      title: "Projects Portfolio",
+      description: "High-level overview of all company projects, budgets, and schedules.",
+    },
+    {
+      href: "/material-approvals",
+      title: "Material Approvals",
+      description: "Approve or reject material requests submitted by site engineers.",
+    },
+    {
+      href: "/purchasing-approvals",
+      title: "Purchasing Approvals",
+      description: "Review and approve purchase orders and vendor payments.",
     },
     {
       href: "/budget-tracker",
@@ -69,16 +95,6 @@ const ROLE_FEATURES: Record<AppRole, FeatureCard[]> = {
       title: "Estimate Reviews",
       description: "Check project estimate submissions for approval.",
     },
-    {
-      href: "/add-user",
-      title: "User Management",
-      description: "Create and manage employee system accounts.",
-    },
-    {
-      href: "/reset-data",
-      title: "Reset Data",
-      description: "Clear workspace payroll and attendance data safely.",
-    },
   ],
   payroll_manager: [
     {
@@ -86,16 +102,10 @@ const ROLE_FEATURES: Record<AppRole, FeatureCard[]> = {
       title: "Upload Attendance",
       description: "Upload and prepare site attendance files.",
     },
-
     {
       href: "/request-overtime",
       title: "Request Overtime",
       description: "Submit overtime requests for team members.",
-    },
-    {
-      href: "/budget-tracker",
-      title: "Budget Tracker",
-      description: "Track project budget usage and spending status.",
     },
     {
       href: "/settings",
@@ -105,30 +115,19 @@ const ROLE_FEATURES: Record<AppRole, FeatureCard[]> = {
   ],
   engineer: [
     {
-      href: "/budget-tracker",
-      title: "Budget Tracker",
-      description: "Track project budget usage and spending status.",
+      href: "/overview",
+      title: "Overview Dashboard",
+      description: "A comprehensive project overview dashboard featuring status trackers and alerts.",
+    },
+    {
+      href: "/projects",
+      title: "Projects Workspace",
+      description: "Manage tasks, log progress reports, and submit material requests for your assigned projects.",
     },
     {
       href: "/cost-estimator",
       title: "Cost Estimator",
       description: "Prepare project estimates and cost breakdowns.",
-    },
-    {
-      href: "/request-overtime",
-      title: "Request Overtime",
-      description: "Submit overtime requests when needed.",
-    },
-    {
-      href: "/request-material",
-      title: "Request Material",
-      description: "Create and track material requests for projects.",
-    },
-
-    {
-      href: "/settings",
-      title: "Settings",
-      description: "Manage account settings and preferences.",
     },
   ],
   employee: [
@@ -223,6 +222,10 @@ export default function RoleHomePage({
   fullName: string | null;
   username: string;
 }) {
+  if (role === "engineer") {
+    return <ProjectsPageClient role="engineer" fullName={fullName} />;
+  }
+
   const firstName = getFirstName(fullName, username);
   const greeting = getGreetingMessage(getPhilippineHour());
   const dateLabel = getDateLabel();
