@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -21,8 +20,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { AppRole } from "@/types/database";
-import RoleHintTypewriter from "@/features/home/components/RoleHintTypewriter";
-import ProjectsPageClient from "@/features/projects/components/ProjectsPageClient";
+import RoleGreetingHero from "@/features/home/components/RoleGreetingHero";
 
 type FeatureCard = {
   href: string;
@@ -36,8 +34,10 @@ const FEATURE_ICONS: Record<string, LucideIcon> = {
   "/review-attendance": UserRoundSearch,
   "/generate-payroll": FolderKanban,
   "/budget-tracker": Receipt,
+  "/payroll-approvals": LineChart,
   "/payroll-reports": LineChart,
   "/overtime-approvals": Clock3,
+  "/estimate-approvals": Calculator,
   "/estimate-reviews": Calculator,
   "/add-user": Users,
   "/reset-data": Trash2,
@@ -49,11 +49,30 @@ const FEATURE_ICONS: Record<string, LucideIcon> = {
   "/projects": FolderKanban,
   "/progress-reports": FileText,
   "/overview": LayoutDashboard,
+  "/projects?section=material-approvals": ClipboardCheck,
   "/material-approvals": ClipboardCheck,
+  "/projects?section=purchasing-approvals": BadgeDollarSign,
   "/purchasing-approvals": BadgeDollarSign,
 };
 
 const ROLE_FEATURES: Record<AppRole, FeatureCard[]> = {
+  admin: [
+    {
+      href: "/add-user",
+      title: "User Management",
+      description: "Create, update, and manage application user accounts.",
+    },
+    {
+      href: "/reset-data",
+      title: "Reset Data",
+      description: "Clear workspace records when a clean setup is needed.",
+    },
+    {
+      href: "/settings",
+      title: "Settings",
+      description: "Manage account settings and preferences.",
+    },
+  ],
   ceo: [
     {
       href: "/dashboard",
@@ -66,12 +85,12 @@ const ROLE_FEATURES: Record<AppRole, FeatureCard[]> = {
       description: "High-level overview of all company projects, budgets, and schedules.",
     },
     {
-      href: "/material-approvals",
+      href: "/projects?section=material-approvals",
       title: "Material Approvals",
       description: "Approve or reject material requests submitted by site engineers.",
     },
     {
-      href: "/purchasing-approvals",
+      href: "/projects?section=purchasing-approvals",
       title: "Purchasing Approvals",
       description: "Review and approve purchase orders and vendor payments.",
     },
@@ -81,8 +100,8 @@ const ROLE_FEATURES: Record<AppRole, FeatureCard[]> = {
       description: "Track project budget usage and spending status.",
     },
     {
-      href: "/payroll-reports",
-      title: "Payroll Reports",
+      href: "/payroll-approvals",
+      title: "Payroll Approvals",
       description: "Review submitted payroll runs and approvals.",
     },
     {
@@ -91,8 +110,8 @@ const ROLE_FEATURES: Record<AppRole, FeatureCard[]> = {
       description: "Approve or reject pending overtime requests.",
     },
     {
-      href: "/estimate-reviews",
-      title: "Estimate Reviews",
+      href: "/estimate-approvals",
+      title: "Estimate Approvals",
       description: "Check project estimate submissions for approval.",
     },
   ],
@@ -182,6 +201,14 @@ function getDateLabel() {
 }
 
 function getRoleHints(role: AppRole) {
+  if (role === "admin") {
+    return [
+      "Manage user accounts and platform administration.",
+      "Keep administrative tools separate from executive workflows.",
+      "Review account access before changing workspace data.",
+    ];
+  }
+
   if (role === "ceo") {
     return [
       "Review approvals and reports with a quick daily check.",
@@ -222,10 +249,6 @@ export default function RoleHomePage({
   fullName: string | null;
   username: string;
 }) {
-  if (role === "engineer") {
-    return <ProjectsPageClient role="engineer" fullName={fullName} />;
-  }
-
   const firstName = getFirstName(fullName, username);
   const greeting = getGreetingMessage(getPhilippineHour());
   const dateLabel = getDateLabel();
@@ -234,40 +257,11 @@ export default function RoleHomePage({
 
   return (
     <main className="space-y-6 p-0 sm:p-6">
-      <section className="relative overflow-visible rounded-none bg-[linear-gradient(140deg,#114023,#1f6a37,#2e8b57)] p-4 text-white shadow-[0_16px_34px_rgba(22,101,52,0.2)] sm:rounded-[18px] sm:px-6 sm:p-6">
-        <div className="pointer-events-none absolute -bottom-16 -left-[118px] w-full  ">
-          <Image
-            src="/login-robot.png"
-            alt="Workflow robot"
-            width={420}
-            height={420}
-            priority
-            className="object-contain drop-shadow-[0_14px_26px_rgba(0,0,0,0.22)]"
-          />
-        </div>
-
-        <div className="pl-[122px] sm:pl-[170px]">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/60 sm:text-[11px]">
-            {dateLabel}
-          </p>
-          <h1 className="mt-1 text-[24px] font-semibold leading-tight tracking-[-0.035em] text-white sm:text-4xl">
-            {greeting}, {firstName}!
-          </h1>
-
-          <div className="relative mt-2 max-w-lg rounded-[18px] bg-white px-3 py-2 text-apple-charcoal shadow-[0_10px_22px_rgba(15,23,42,0.15)] sm:px-4 sm:py-3">
-            <span
-              aria-hidden="true"
-              className="absolute -left-1 top-1/2 h-3 w-3 -translate-y-1/2 rotate-45 bg-white"
-            />
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-700/80">
-              Prody
-            </p>
-            <p className="mt-1 min-h-[2.5rem] text-xs leading-5 text-apple-steel sm:min-h-full sm:text-sm">
-              <RoleHintTypewriter messages={roleHints} />
-            </p>
-          </div>
-        </div>
-      </section>
+      <RoleGreetingHero
+        dateLabel={dateLabel}
+        title={`${greeting}, ${firstName}!`}
+        messages={roleHints}
+      />
 
       <section className="px-4 pb-4 sm:p-0">
         <div className="mb-4">

@@ -6,7 +6,12 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
-export type AppRole = "ceo" | "payroll_manager" | "engineer" | "employee";
+export type AppRole =
+  | "admin"
+  | "ceo"
+  | "payroll_manager"
+  | "engineer"
+  | "employee";
 export type PayrollRunStatus = "draft" | "submitted" | "approved" | "rejected";
 export type AdjustmentStatus = "pending" | "approved" | "rejected";
 export type EstimateStatus = "draft" | "submitted" | "approved" | "rejected";

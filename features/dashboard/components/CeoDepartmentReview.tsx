@@ -30,9 +30,6 @@ export default function CeoDepartmentReview({
           <p className="text-[15px] font-semibold text-apple-charcoal">
             Department Cards
           </p>
-          <p className="mt-1 text-sm text-apple-steel">
-            Department totals for the selected payroll.
-          </p>
         </div>
       </div>
 

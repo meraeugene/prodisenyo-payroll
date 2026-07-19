@@ -22,12 +22,14 @@ const PROTECTED_PREFIXES = [
   "/upload-attendance",
   "/budget-tracker",
   "/cost-estimator",
+  "/estimate-approvals",
   "/estimate-reviews",
   "/overtime-approvals",
   "/review-attendance",
   "/generate-payroll",
   "/attendance-analytics",
   "/payroll-analytics",
+  "/payroll-approvals",
   "/payroll-reports",
   "/add-user",
   "/request-overtime",
@@ -49,27 +51,37 @@ const CEO_ALLOWED_PREFIXES = [
   "/home",
   "/dashboard",
   "/budget-tracker",
+  "/estimate-approvals",
   "/estimate-reviews",
   "/overtime-approvals",
   "/attendance-analytics",
   "/payroll-analytics",
+  "/payroll-approvals",
   "/payroll-reports",
-  "/add-user",
-  "/reset-data",
   "/settings",
   "/projects",
   "/material-approvals",
   "/purchasing-approvals",
 ] as const;
 
+const ADMIN_ALLOWED_PREFIXES = [
+  "/add-user",
+  "/reset-data",
+  "/settings",
+] as const;
+
 const CEO_ONLY_PREFIXES = [
+  "/estimate-approvals",
+  "/estimate-reviews",
   "/overtime-approvals",
+  "/payroll-approvals",
   "/payroll-reports",
   "/material-approvals",
   "/purchasing-approvals",
   "/budget-tracker",
 ] as const;
 const CEO_REDIRECT_PATH = "/projects";
+const ADMIN_REDIRECT_PATH = "/add-user";
 const PAYROLL_MANAGER_REDIRECT_PATH = "/home";
 const ENGINEER_REDIRECT_PATH = "/projects";
 const EMPLOYEE_REDIRECT_PATH = "/home";
@@ -99,6 +111,12 @@ function requiresHrSubmission(pathname: string) {
 
 function isAllowedCeoPath(pathname: string) {
   return CEO_ALLOWED_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+}
+
+function isAllowedAdminPath(pathname: string) {
+  return ADMIN_ALLOWED_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
 }
@@ -191,7 +209,9 @@ export async function updateSession(request: NextRequest) {
     if (!profileError && pathname === "/auth/login") {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname =
-        currentRole === "ceo"
+        currentRole === "admin"
+          ? ADMIN_REDIRECT_PATH
+          : currentRole === "ceo"
           ? CEO_REDIRECT_PATH
           : currentRole === "payroll_manager"
             ? PAYROLL_MANAGER_REDIRECT_PATH
@@ -261,6 +281,17 @@ export async function updateSession(request: NextRequest) {
     if (!profileError && currentRole === "ceo" && !isAllowedCeoPath(pathname)) {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = CEO_REDIRECT_PATH;
+      redirectUrl.searchParams.delete("required");
+      return redirect(redirectUrl);
+    }
+
+    if (
+      !profileError &&
+      currentRole === "admin" &&
+      !isAllowedAdminPath(pathname)
+    ) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = ADMIN_REDIRECT_PATH;
       redirectUrl.searchParams.delete("required");
       return redirect(redirectUrl);
     }

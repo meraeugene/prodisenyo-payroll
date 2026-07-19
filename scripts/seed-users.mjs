@@ -88,13 +88,14 @@ async function readSeedUsers() {
       throw new Error(`User ${username} is missing password.`);
     }
     if (
+      role !== "admin" &&
       role !== "ceo" &&
       role !== "payroll_manager" &&
       role !== "engineer" &&
       role !== "employee"
     ) {
       throw new Error(
-        `User ${username} has invalid role "${role}". Expected "ceo", "payroll_manager", "engineer", or "employee".`,
+        `User ${username} has invalid role "${role}". Expected "admin", "ceo", "payroll_manager", "engineer", or "employee".`,
       );
     }
 

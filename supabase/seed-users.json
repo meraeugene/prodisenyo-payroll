@@ -1,5 +1,11 @@
 [
   {
+    "username": "admin",
+    "password": "ChangeMe123!",
+    "full_name": "System Administrator",
+    "role": "admin"
+  },
+  {
     "username": "ceo",
     "password": "ChangeMe123!",
     "full_name": "Company CEO",

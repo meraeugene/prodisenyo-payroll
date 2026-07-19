@@ -5,6 +5,7 @@ type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 export const MAX_AVATAR_FILE_SIZE = 2 * 1024 * 1024;
 
 export function roleLabel(role: ProfileRow["role"] | null) {
+  if (role === "admin") return "Administrator";
   if (role === "ceo") return "Chief Executive Officer";
   if (role === "payroll_manager") return "Payroll Manager";
   if (role === "engineer") return "Engineer";

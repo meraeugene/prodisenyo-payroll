@@ -33,7 +33,7 @@ async function clearTable(database: any, table: string) {
 }
 
 export async function resetWorkspaceDataAction() {
-  await requireRole(APP_ROLES.CEO);
+  await requireRole(APP_ROLES.ADMIN);
   const database = createSupabaseAdminClient() as any;
 
   for (const table of TABLES_TO_CLEAR) {
@@ -45,12 +45,14 @@ export async function resetWorkspaceDataAction() {
   revalidatePath("/review-attendance");
   revalidatePath("/generate-payroll");
   revalidatePath("/payroll-reports");
+  revalidatePath("/payroll-approvals");
   revalidatePath("/overtime-approvals");
   revalidatePath("/budget-tracker");
   revalidatePath("/cost-estimator");
   revalidatePath("/request-overtime");
   revalidatePath("/request-material");
   revalidatePath("/estimate-reviews");
+  revalidatePath("/estimate-approvals");
 
   return {
     clearedTables: TABLES_TO_CLEAR.length,

@@ -1,7 +1,5 @@
-import { APP_ROLES, requireRole } from "@/lib/auth";
-import PurchasingApprovalsPageClient from "@/features/purchasing-approvals/components/PurchasingApprovalsPageClient";
+import { redirect } from "next/navigation";
 
 export default async function Page() {
-  await requireRole(APP_ROLES.CEO);
-  return <PurchasingApprovalsPageClient />;
+  redirect("/projects?section=purchasing-approvals");
 }

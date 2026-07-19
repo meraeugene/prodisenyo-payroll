@@ -116,7 +116,10 @@ export function useDashboardPage() {
   const [activeSummaryCard, setActiveSummaryCard] =
     useState<PayrollSummaryCardKey | null>(null);
 
-  const payrollRows = useMemo(() => data?.payrollRows ?? [], [data?.payrollRows]);
+  const payrollRows = useMemo(
+    () => data?.payrollRows ?? [],
+    [data?.payrollRows],
+  );
   const payrollAttendanceInputs = useMemo(
     () => data?.payrollAttendanceInputs ?? [],
     [data?.payrollAttendanceInputs],
@@ -158,7 +161,7 @@ export function useDashboardPage() {
       {
         key: "gross",
         title: "Gross Payroll",
-        badge: "Based on uploaded attendance",
+        badge: "",
         helper:
           "Starts from net payroll analytics, then applies the current 12% uplift used on the dashboard.",
         formula: `Gross payroll = Net payroll (${PESO_SIGN} ${formatPayrollNumber(netPayroll)}) x 1.12`,
@@ -172,7 +175,7 @@ export function useDashboardPage() {
       {
         key: "deductions",
         title: "Deductions",
-        badge: "Derived from current payroll",
+        badge: "",
         helper:
           "This card shows the gap between the gross payroll card and the synced net payroll card.",
         formula: `Deductions = Gross payroll (${PESO_SIGN} ${formatPayrollNumber(grossPayroll)}) - Net payroll (${PESO_SIGN} ${formatPayrollNumber(netPayroll)})`,
@@ -186,7 +189,7 @@ export function useDashboardPage() {
       {
         key: "net",
         title: "Net Payroll Released",
-        badge: "Synced with payroll analytics",
+        badge: "",
         helper:
           "This card mirrors the net payroll total coming from the payroll analytics dataset for the selected period.",
         formula: `Net payroll released = Synced payroll analytics total (${PESO_SIGN} ${formatPayrollNumber(totalPayroll)})`,
@@ -204,7 +207,8 @@ export function useDashboardPage() {
   const activeSummaryCardDetails =
     summaryCards.find((card) => card.key === activeSummaryCard) ?? null;
 
-  const attendancePeriod = data?.attendancePeriod ?? "No recorded payroll period yet";
+  const attendancePeriod =
+    data?.attendancePeriod ?? "No recorded payroll period yet";
   const activityRows = data?.recentActivity ?? [];
   const selectedRun = data?.selectedRun ?? null;
   const selectedPayrollItems = data?.selectedPayrollItems ?? [];
@@ -213,7 +217,8 @@ export function useDashboardPage() {
   const periodOptions = data?.periodOptions ?? [];
 
   const ceoDailyTrend = useMemo(() => {
-    const storedDailyPoints = buildDailyPaidPointsFromStoredTotals(ceoDailyTotals);
+    const storedDailyPoints =
+      buildDailyPaidPointsFromStoredTotals(ceoDailyTotals);
     const totalsByDate = new Map<string, number>(
       storedDailyPoints.map((point) => [point.date, point.total]),
     );
@@ -258,12 +263,15 @@ export function useDashboardPage() {
     return aggregateDailyPaidPoints(ceoDailyTrend, ceoTrendRange);
   }, [ceoDailyTrend, ceoSubmittedRuns, ceoTrendRange]);
 
-  const ceoLatestTrendPoint = ceoPayrollTrend[ceoPayrollTrend.length - 1] ?? null;
-  const ceoPreviousTrendPoint = ceoPayrollTrend[ceoPayrollTrend.length - 2] ?? null;
+  const ceoLatestTrendPoint =
+    ceoPayrollTrend[ceoPayrollTrend.length - 1] ?? null;
+  const ceoPreviousTrendPoint =
+    ceoPayrollTrend[ceoPayrollTrend.length - 2] ?? null;
   const ceoOverallSubmittedPayroll = useMemo(
     () =>
       Math.round(
-        ceoSubmittedRuns.reduce((sum, run) => sum + (run.net_total ?? 0), 0) * 100,
+        ceoSubmittedRuns.reduce((sum, run) => sum + (run.net_total ?? 0), 0) *
+          100,
       ) / 100,
     [ceoSubmittedRuns],
   );
@@ -324,7 +332,9 @@ export function useDashboardPage() {
       const runIdsWithDailyTotals = new Set(
         dailyTotalsRows.map((row) => row.payroll_run_id),
       );
-      const fallbackRuns = runs.filter((run) => !runIdsWithDailyTotals.has(run.id));
+      const fallbackRuns = runs.filter(
+        (run) => !runIdsWithDailyTotals.has(run.id),
+      );
       const fallbackRunIds = fallbackRuns.map((run) => run.id);
       const fallbackImportIds = Array.from(
         new Set(
@@ -376,7 +386,9 @@ export function useDashboardPage() {
       setCeoFallbackRunItems(
         fallbackItemsResult.error
           ? []
-          : ((fallbackItemsResult.data ?? []) as DashboardPayrollRunItemRow[]).map((item) => ({
+          : (
+              (fallbackItemsResult.data ?? []) as DashboardPayrollRunItemRow[]
+            ).map((item) => ({
               payroll_run_id: item.payroll_run_id,
               employee_name: item.employee_name,
               site_name: item.site_name,
@@ -387,7 +399,10 @@ export function useDashboardPage() {
       setCeoFallbackAttendanceLogs(
         fallbackAttendanceResult.error
           ? []
-          : ((fallbackAttendanceResult.data ?? []) as DashboardAttendanceLogRow[]).map((row) => ({
+          : (
+              (fallbackAttendanceResult.data ??
+                []) as DashboardAttendanceLogRow[]
+            ).map((row) => ({
               import_id: row.import_id,
               employee_name: row.employee_name,
               log_date: row.log_date,

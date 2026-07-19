@@ -1,10 +1,5 @@
-import { requireRole } from "@/lib/auth";
-import PayrollReportsPageClient from "@/features/payroll-reports/components/PayrollReportsPageClient";
-import { getPayrollReportsDataAction } from "@/actions/payroll";
+import { redirect } from "next/navigation";
 
 export default async function PayrollReportsPage() {
-  await requireRole("ceo");
-  const initialData = await getPayrollReportsDataAction();
-
-  return <PayrollReportsPageClient initialData={initialData} />;
+  redirect("/payroll-approvals");
 }

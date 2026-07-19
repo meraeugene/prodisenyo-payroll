@@ -15,11 +15,7 @@ export default function PayrollReportsPageClient({
 
   return (
     <div className="p-0 sm:p-6">
-      <DashboardPageHero
-        eyebrow="Payroll Reports"
-        title="Payroll Report Review"
-        description="Pending payroll reports stay here for CEO review. Only approved payroll reports flow into the CEO dashboard totals."
-      />
+      <DashboardPageHero eyebrow="CEO Review" title="Payroll Approval Review" />
 
       <PayrollReportsArchiveSection
         reports={state.sortedReports}

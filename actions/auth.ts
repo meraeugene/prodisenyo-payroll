@@ -35,11 +35,22 @@ function isRoleAllowedNextPath(role: AppRole, pathname: string) {
     return hasAllowedPrefix(pathname, [
       "/dashboard",
       "/budget-tracker",
+      "/estimate-approvals",
       "/estimate-reviews",
       "/overtime-approvals",
       "/attendance-analytics",
       "/payroll-analytics",
+      "/payroll-approvals",
       "/payroll-reports",
+      "/projects",
+      "/material-approvals",
+      "/purchasing-approvals",
+      "/settings",
+    ]);
+  }
+
+  if (role === APP_ROLES.ADMIN) {
+    return hasAllowedPrefix(pathname, [
       "/add-user",
       "/reset-data",
       "/settings",
@@ -62,10 +73,8 @@ function isRoleAllowedNextPath(role: AppRole, pathname: string) {
 
   if (role === APP_ROLES.ENGINEER) {
     return hasAllowedPrefix(pathname, [
-      "/home",
-      "/budget-tracker",
+      "/projects",
       "/cost-estimator",
-      "/request-material",
       "/request-overtime",
       "/settings",
     ]);

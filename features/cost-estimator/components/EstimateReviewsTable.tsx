@@ -72,20 +72,11 @@ export default function EstimateReviewsTable({
     <section className="mt-4 rounded-none border border-apple-mist bg-white p-5 shadow-[0_10px_30px_rgba(24,83,43,0.06)] sm:rounded-[18px]">
       <div className="mb-4">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-apple-steel">
-            Review Queue
-          </p>
           <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
             <Clock3 size={12} />
             {pendingReviewsCount} pending
           </span>
         </div>
-        <h2 className="mt-2 text-xl font-semibold text-apple-charcoal">
-          Submitted And Reviewed Estimates
-        </h2>
-        <p className="mt-2 text-sm text-apple-steel">
-          Review engineer-submitted estimates before final approval.
-        </p>
       </div>
 
       <div className="overflow-x-auto overflow-y-visible rounded-[18px] border border-apple-mist">

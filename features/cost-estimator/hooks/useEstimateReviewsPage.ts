@@ -49,7 +49,7 @@ export function useEstimateReviewsPage({
   >(null);
   const [isPending, setIsPending] = useState(false);
   const { data, isLoading, isValidating, mutate } = useSWR(
-    "estimate-reviews",
+    "estimate-approvals",
     getEstimateReviewsDataAction,
     {
       fallbackData: {

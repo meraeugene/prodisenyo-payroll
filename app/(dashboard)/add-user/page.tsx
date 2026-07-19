@@ -4,7 +4,7 @@ import type { ManagedUserRow } from "@/features/user-management/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export default async function AddUserPage() {
-  const { user } = await requireRole(APP_ROLES.CEO);
+  const { user } = await requireRole(APP_ROLES.ADMIN);
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from("profiles")

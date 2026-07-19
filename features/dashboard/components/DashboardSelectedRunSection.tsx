@@ -19,10 +19,6 @@ export default function DashboardSelectedRunSection({
               ? "Selected Approved Payroll"
               : "No Approved Payroll Selected"}
           </h2>
-          <p className="mt-1 text-sm text-apple-steel">
-            Only CEO-approved payroll reports are reflected here. Use the period
-            selector to switch between approved runs.
-          </p>
         </div>
 
         {selectedRun ? (

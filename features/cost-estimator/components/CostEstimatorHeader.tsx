@@ -103,7 +103,7 @@ export default function CostEstimatorHeader({
             <span>{saveMessage}</span>
           </div>
 
-          {selectedEstimate ? (
+          {selectedEstimate && selectedEstimate.status !== "draft" ? (
             <div className="hidden sm:block">
               <EstimateStatusBadge status={selectedEstimate.status} />
             </div>

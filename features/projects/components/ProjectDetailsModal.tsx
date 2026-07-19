@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ProjectRecord } from "../types";
-import { X, Calendar, DollarSign, User, MapPin, ClipboardList, Briefcase, Activity } from "lucide-react";
+import { X, Calendar, DollarSign, User, MapPin, ClipboardList, Activity, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ProjectDetailsModalProps {
@@ -10,6 +12,25 @@ interface ProjectDetailsModalProps {
 }
 
 export default function ProjectDetailsModal({ project, onClose }: ProjectDetailsModalProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, []);
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-PH", {
       style: "currency",
@@ -32,8 +53,10 @@ export default function ProjectDetailsModal({ project, onClose }: ProjectDetails
     return "bg-slate-50 text-slate-700 border-slate-100";
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
+  if (!mounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex h-screen min-h-screen w-screen items-center justify-center overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="w-full max-w-2xl bg-white border border-apple-mist rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
           <div>
@@ -55,21 +78,14 @@ export default function ProjectDetailsModal({ project, onClose }: ProjectDetails
         </div>
 
         <div className="mt-5 space-y-6">
-          {/* Description */}
-          <div className="space-y-1.5">
-            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Briefcase size={12} /> Project Description
-            </h4>
-            <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100 italic">
-              {project.description}
-            </p>
-          </div>
-
           {/* Project Details Grid */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Client</span>
-              <p className="text-sm font-semibold text-apple-charcoal">{project.client}</p>
+              <div className="flex items-center gap-1.5 text-sm text-apple-charcoal font-semibold">
+                <Building2 size={13} className="text-slate-400" />
+                <span>{project.client}</span>
+              </div>
             </div>
             <div className="space-y-1">
               <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Project Timeline</span>
@@ -148,16 +164,8 @@ export default function ProjectDetailsModal({ project, onClose }: ProjectDetails
             </div>
           </div>
         </div>
-
-        <div className="mt-6 pt-3 border-t border-slate-100 flex justify-end">
-          <button
-            onClick={onClose}
-            className="h-10 px-5 rounded-xl bg-[#1f6a37] text-xs font-semibold text-white hover:bg-emerald-800 transition shadow-sm"
-          >
-            Close Details
-          </button>
-        </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

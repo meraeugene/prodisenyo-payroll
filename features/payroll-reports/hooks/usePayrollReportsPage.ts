@@ -39,7 +39,7 @@ export function usePayrollReportsPage({
   const [activeReportId, setActiveReportId] = useState<string | null>(null);
   const previousPendingReportsCountRef = useRef<number | null>(null);
   const canPlayNotificationSoundRef = useRef(false);
-  const reportsState = useSWR("payroll-reports", getPayrollReportsDataAction, {
+  const reportsState = useSWR("payroll-approvals", getPayrollReportsDataAction, {
     fallbackData: { reports: initialReports },
     refreshInterval: 15000,
     revalidateOnFocus: true,

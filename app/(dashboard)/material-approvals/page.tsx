@@ -1,7 +1,5 @@
-import { APP_ROLES, requireRole } from "@/lib/auth";
-import MaterialApprovalsPageClient from "@/features/material-approvals/components/MaterialApprovalsPageClient";
+import { redirect } from "next/navigation";
 
 export default async function Page() {
-  await requireRole(APP_ROLES.CEO);
-  return <MaterialApprovalsPageClient />;
+  redirect("/projects?section=material-approvals");
 }

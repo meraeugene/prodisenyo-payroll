@@ -50,7 +50,7 @@ export default function DashboardSummaryCardsSection({
               </div>
               <div>
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs text-green-600">
-                  Synced <ArrowUp size={12} />
+                  Updated <ArrowUp size={12} />
                 </span>
               </div>
             </div>

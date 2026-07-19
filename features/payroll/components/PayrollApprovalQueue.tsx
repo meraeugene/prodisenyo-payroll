@@ -56,26 +56,16 @@ export default function PayrollApprovalQueue({
 
   return (
     <section className="flex h-full min-h-0 flex-col">
-      <div
-        className="rounded-none p-5 text-[#1f4f2c] sm:rounded-[14px] sm:p-6"
-        style={{ backgroundColor: "#e6faec" }}
-      >
+      <div className="rounded-none border border-apple-mist bg-white p-5 text-[#1f4f2c] shadow-[0_8px_20px_rgba(24,83,43,0.04)] sm:rounded-[14px] sm:p-6">
         <div className="flex items-center justify-between gap-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#2d6a4f]">
-            CEO Approval Quefceue
-          </p>
+          <h2 className="mt-1 text-xl font-bold text-[#1f4f2c]">
+            Pending Overtime Requests
+          </h2>
           <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
             <Clock3 size={14} />
             {state.pendingCount} pending
           </span>
         </div>
-        <h2 className="mt-1 text-xl font-bold text-[#1f4f2c]">
-          Pending Overtime Requests
-        </h2>
-        <p className="mt-2 text-sm text-[#2d6a4f] sm:text-[15px]">
-          Review overtime requests while payroll stays saved and visible in
-          history.
-        </p>
       </div>
 
       <div className="mt-4 min-h-0 flex-1  ">

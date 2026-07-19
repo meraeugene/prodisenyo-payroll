@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { RefreshCw, Search, X } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  RefreshCw,
+  Search,
+  X,
+} from "lucide-react";
 import { createPortal } from "react-dom";
 import {
   Area,
@@ -18,6 +26,7 @@ import {
   YAxis,
 } from "recharts";
 import EmployeeLogsModal from "@/features/payroll-reports/components/EmployeeLogsModal";
+import { cn } from "@/lib/utils";
 import {
   PayrollReportAnalyticsTooltip,
   PayrollReportDashboardSkeleton,
@@ -39,6 +48,8 @@ import type {
   PayrollRunRow,
   ReportDetailsState,
 } from "@/features/payroll-reports/types";
+
+const PAYROLL_PAGE_SIZE = 10;
 
 function lockBodyScroll() {
   const body = document.body;
@@ -79,6 +90,7 @@ export default function PayrollReportModal({
 }) {
   const [search, setSearch] = useState("");
   const [siteFilter, setSiteFilter] = useState("all");
+  const [payrollPage, setPayrollPage] = useState(1);
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -138,6 +150,43 @@ export default function PayrollReportModal({
       return matchesSearch && matchesSite;
     });
   }, [payrollItems, search, siteFilter]);
+  useEffect(() => {
+    setPayrollPage(1);
+  }, [search, siteFilter]);
+  const payrollPageCount = Math.max(
+    1,
+    Math.ceil(filteredPayrollItems.length / PAYROLL_PAGE_SIZE),
+  );
+  const safePayrollPage = Math.min(payrollPage, payrollPageCount);
+  const paginatedPayrollItems = useMemo(() => {
+    const startIndex = (safePayrollPage - 1) * PAYROLL_PAGE_SIZE;
+    return filteredPayrollItems.slice(
+      startIndex,
+      startIndex + PAYROLL_PAGE_SIZE,
+    );
+  }, [filteredPayrollItems, safePayrollPage]);
+  const payrollRangeStart =
+    filteredPayrollItems.length === 0
+      ? 0
+      : (safePayrollPage - 1) * PAYROLL_PAGE_SIZE + 1;
+  const payrollRangeEnd = Math.min(
+    safePayrollPage * PAYROLL_PAGE_SIZE,
+    filteredPayrollItems.length,
+  );
+  const payrollPageNumbers = useMemo(() => {
+    const pages = Array.from(
+      { length: payrollPageCount },
+      (_, index) => index + 1,
+    );
+    if (payrollPageCount <= 7) return pages;
+
+    const middlePages = pages.filter(
+      (page) => Math.abs(page - safePayrollPage) <= 1,
+    );
+    return Array.from(new Set([1, ...middlePages, payrollPageCount])).sort(
+      (a, b) => a - b,
+    );
+  }, [payrollPageCount, safePayrollPage]);
   const siteSummaries = useMemo(
     () => buildPayrollReportSiteSummaries(payrollItems),
     [payrollItems],
@@ -221,17 +270,15 @@ export default function PayrollReportModal({
                 </button>
               </div>
             ) : (
-              <div className="space-y-5">
+              <div className="flex flex-col gap-5">
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
                   <PayrollReportStatCard
                     label="Employees"
                     value={payrollItems.length.toLocaleString("en-PH")}
-                    helper="Included in this submitted report"
                   />
                   <PayrollReportStatCard
                     label="Total Payroll"
                     value={formatPayrollReportPeso(totalPayroll)}
-                    helper="Submitted payroll amount"
                   />
                   <PayrollReportStatCard
                     label="Hours Worked"
@@ -239,7 +286,6 @@ export default function PayrollReportModal({
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}
-                    helper="Total payroll hours"
                   />
                   <PayrollReportStatCard
                     label="Overtime Hours"
@@ -247,24 +293,18 @@ export default function PayrollReportModal({
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}
-                    helper="Approved overtime included"
                   />
                   <PayrollReportStatCard
                     label="Attendance Logs"
                     value={attendanceLogs.length.toLocaleString("en-PH")}
-                    helper="All report log rows loaded"
                   />
                 </div>
 
-                <div className="space-y-4">
+                <div className="order-3 space-y-4">
                   <div className="overflow-hidden rounded-2xl border border-apple-mist bg-white">
                     <div className="border-b border-apple-mist px-3 py-3 sm:px-4 sm:py-4">
                       <p className="text-xs font-semibold uppercase tracking-wider text-apple-charcoal">
                         Daily Payroll Trend
-                      </p>
-                      <p className="mt-1 text-xs text-apple-steel">
-                        Paid totals and worked hours across this submitted
-                        report.
                       </p>
                     </div>
                     <div className="h-[320px] px-1 py-3 sm:px-3 sm:py-4">
@@ -513,32 +553,21 @@ export default function PayrollReportModal({
                   </div>
                 </div>
 
-                <div className="overflow-hidden rounded-[24px] bg-white shadow-[0_12px_28px_rgba(17,46,26,0.08)]">
+                <div className="order-2 overflow-hidden rounded-[24px] bg-white shadow-[0_12px_28px_rgba(17,46,26,0.08)]">
                   <div className="border-b border-apple-mist px-4 py-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-wider text-apple-charcoal">
                           Employee Payrolls
                         </p>
-                        <p className="mt-1 text-xs text-apple-steel">
-                          Complete employees and payroll values inside this
-                          submitted report.
-                        </p>
                       </div>
                       <div className="w-full sm:w-auto">
-                        <p className="text-[11px] font-semibold text-apple-steel sm:text-right">
+                        <p className="text-sm font-semibold text-apple-steel sm:text-right">
+                          Showing {payrollRangeStart.toLocaleString("en-PH")}-
+                          {payrollRangeEnd.toLocaleString("en-PH")} of{" "}
                           {filteredPayrollItems.length.toLocaleString("en-PH")}{" "}
-                          of {payrollItems.length.toLocaleString("en-PH")}{" "}
-                          employees
+                          filtered employees
                         </p>
-                        <div className="mt-1 flex items-center justify-between gap-2 sm:justify-end">
-                          <p className="text-sm font-semibold text-apple-charcoal">
-                            Total Payroll Generated:
-                          </p>
-                          <p className="text-sm font-semibold text-apple-charcoal">
-                            {formatPayrollReportPeso(filteredPayrollTotal)}
-                          </p>
-                        </div>
                       </div>
                     </div>
                     <div className="mt-3 flex flex-col sm:flex-row items-center gap-2">
@@ -569,7 +598,7 @@ export default function PayrollReportModal({
                       </select>
                     </div>
                   </div>
-                  <div className="max-h-[440px] overflow-auto">
+                  <div className="overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="bg-[rgb(var(--apple-snow))]">
@@ -601,7 +630,7 @@ export default function PayrollReportModal({
                       </thead>
                       <tbody className="divide-y divide-apple-mist">
                         {filteredPayrollItems.length > 0 ? (
-                          filteredPayrollItems.map((item) => (
+                          paginatedPayrollItems.map((item) => (
                             <tr key={item.id}>
                               <td className="px-3 py-2 font-medium whitespace-nowrap text-apple-charcoal">
                                 {item.employee_name}
@@ -650,6 +679,90 @@ export default function PayrollReportModal({
                         )}
                       </tbody>
                     </table>
+                  </div>
+                  <div className="flex flex-col gap-3 border-t border-apple-mist px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-xs font-medium text-apple-steel">
+                      Page {safePayrollPage.toLocaleString("en-PH")} of{" "}
+                      {payrollPageCount.toLocaleString("en-PH")} ·{" "}
+                      {PAYROLL_PAGE_SIZE} employees per page
+                    </p>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setPayrollPage(1)}
+                        disabled={safePayrollPage <= 1}
+                        className="inline-flex h-9 items-center gap-1 rounded-lg border border-apple-mist bg-white px-2.5 text-xs font-semibold text-apple-charcoal transition hover:bg-apple-mist/50 disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label="First payroll page"
+                      >
+                        First
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPayrollPage((page) => Math.max(page - 1, 1))
+                        }
+                        disabled={safePayrollPage <= 1}
+                        className="inline-flex h-9 items-center justify-center rounded-lg border border-apple-mist bg-white px-2.5 text-xs font-semibold text-apple-charcoal transition hover:bg-apple-mist/50 disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label="Previous payroll page"
+                      >
+                        <ChevronLeft size={14} />
+                      </button>
+                      {payrollPageNumbers.map((page, index) => {
+                        const previousPage = payrollPageNumbers[index - 1];
+                        const showGap =
+                          previousPage !== undefined && page - previousPage > 1;
+
+                        return (
+                          <span
+                            key={page}
+                            className="inline-flex items-center gap-1.5"
+                          >
+                            {showGap ? (
+                              <span className="px-1 text-xs font-semibold text-apple-steel">
+                                ...
+                              </span>
+                            ) : null}
+                            <button
+                              type="button"
+                              onClick={() => setPayrollPage(page)}
+                              aria-current={
+                                page === safePayrollPage ? "page" : undefined
+                              }
+                              className={cn(
+                                "inline-flex h-9 min-w-9 items-center justify-center rounded-lg border px-2.5 text-xs font-semibold transition",
+                                page === safePayrollPage
+                                  ? "border-[#1f6a37] bg-[#1f6a37] text-white"
+                                  : "border-apple-mist bg-white text-apple-charcoal hover:bg-apple-mist/50",
+                              )}
+                            >
+                              {page.toLocaleString("en-PH")}
+                            </button>
+                          </span>
+                        );
+                      })}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPayrollPage((page) =>
+                            Math.min(page + 1, payrollPageCount),
+                          )
+                        }
+                        disabled={safePayrollPage >= payrollPageCount}
+                        className="inline-flex h-9 items-center justify-center rounded-lg border border-apple-mist bg-white px-2.5 text-xs font-semibold text-apple-charcoal transition hover:bg-apple-mist/50 disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label="Next payroll page"
+                      >
+                        <ChevronRight size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPayrollPage(payrollPageCount)}
+                        disabled={safePayrollPage >= payrollPageCount}
+                        className="inline-flex h-9 items-center gap-1 rounded-lg border border-apple-mist bg-white px-2.5 text-xs font-semibold text-apple-charcoal transition hover:bg-apple-mist/50 disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label="Last payroll page"
+                      >
+                        Last
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

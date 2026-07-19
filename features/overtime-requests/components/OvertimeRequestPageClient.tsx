@@ -166,11 +166,7 @@ export default function OvertimeRequestPageClient({
 
   return (
     <div className="p-0 sm:p-6 xl:flex xl:flex-col">
-      <DashboardPageHero
-        eyebrow="Overtime Workflow"
-        title="Request Overtime"
-        description="Submit overtime requests for CEO approval. Approved requests are tracked separately from payroll-run overtime adjustments."
-      />
+      <DashboardPageHero eyebrow="Overtime Workflow" title="Request Overtime" />
 
       <div className="mt-4 grid gap-4 overflow-x-hidden xl:min-h-0 xl:flex-1 xl:grid-cols-[1.08fr_0.92fr] xl:items-stretch">
         <section className="rounded-none border border-apple-mist h-fit bg-white p-5 shadow-[0_10px_30px_rgba(24,83,43,0.07)] sm:rounded-[16px]">

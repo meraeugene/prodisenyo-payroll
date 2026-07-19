@@ -8,11 +8,12 @@ begin
     join pg_namespace n on n.oid = t.typnamespace
     where t.typname = 'app_role' and n.nspname = 'public'
   ) then
-    create type public.app_role as enum ('ceo', 'payroll_manager', 'engineer', 'employee');
+    create type public.app_role as enum ('admin', 'ceo', 'payroll_manager', 'engineer', 'employee');
   end if;
 end
 $$;
 
+alter type public.app_role add value if not exists 'admin';
 alter type public.app_role add value if not exists 'ceo';
 alter type public.app_role add value if not exists 'payroll_manager';
 alter type public.app_role add value if not exists 'engineer';
@@ -396,6 +397,21 @@ as $$
   )
 $$;
 
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists(
+    select 1
+    from public.profiles p
+    where p.id = auth.uid()
+      and p.role::text = 'admin'
+  )
+$$;
+
 create or replace function public.is_payroll_manager()
 returns boolean
 language sql
@@ -443,6 +459,8 @@ $$;
 
 drop policy if exists "profiles select own or ceo" on public.profiles;
 drop policy if exists "profiles update own or ceo" on public.profiles;
+drop policy if exists "profiles select own or ceo admin" on public.profiles;
+drop policy if exists "profiles update own or ceo admin" on public.profiles;
 drop policy if exists "sites readable by authenticated users" on public.sites;
 drop policy if exists "sites managed by ceo" on public.sites;
 drop policy if exists "sites managed by payroll managers and ceo" on public.sites;
@@ -480,8 +498,8 @@ drop policy if exists "users can upload their own profile avatar" on storage.obj
 drop policy if exists "users can update their own profile avatar" on storage.objects;
 drop policy if exists "users can delete their own profile avatar" on storage.objects;
 
-create policy "profiles select own or ceo" on public.profiles for select using (auth.uid() = id or public.is_ceo());
-create policy "profiles update own or ceo" on public.profiles for update using (auth.uid() = id or public.is_ceo()) with check (auth.uid() = id or public.is_ceo());
+create policy "profiles select own or ceo admin" on public.profiles for select using (auth.uid() = id or public.is_ceo() or public.is_admin());
+create policy "profiles update own or ceo admin" on public.profiles for update using (auth.uid() = id or public.is_ceo() or public.is_admin()) with check (auth.uid() = id or public.is_ceo() or public.is_admin());
 create policy "sites readable by authenticated users" on public.sites for select using (auth.role() = 'authenticated');
 create policy "sites managed by payroll managers and ceo" on public.sites for all using (public.is_ceo() or public.is_payroll_manager()) with check (public.is_ceo() or public.is_payroll_manager());
 create policy "employees readable by authenticated users" on public.employees for select using (auth.role() = 'authenticated');

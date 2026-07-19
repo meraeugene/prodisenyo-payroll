@@ -38,6 +38,7 @@ function validateRole(role: AppRole) {
   if (
     ![
       APP_ROLES.CEO,
+      APP_ROLES.ADMIN,
       APP_ROLES.PAYROLL_MANAGER,
       APP_ROLES.ENGINEER,
       APP_ROLES.EMPLOYEE,
@@ -91,7 +92,7 @@ function validateUserFields(input: {
 }
 
 export async function createAppUserAction(input: CreateAppUserInput) {
-  await requireRole(APP_ROLES.CEO);
+  await requireRole(APP_ROLES.ADMIN);
   const admin = createSupabaseAdminClient();
 
   const { fullName, username, email, role } = validateUserFields(input);
@@ -174,7 +175,7 @@ export async function createAppUserAction(input: CreateAppUserInput) {
 }
 
 export async function updateAppUserAction(input: UpdateAppUserInput) {
-  const { user } = await requireRole(APP_ROLES.CEO);
+  const { user } = await requireRole(APP_ROLES.ADMIN);
   const admin = createSupabaseAdminClient();
   const userId = normalizeText(input.userId);
   const { fullName, username, email, role } = validateUserFields(input);
@@ -273,7 +274,7 @@ export async function updateAppUserAction(input: UpdateAppUserInput) {
 }
 
 export async function deleteAppUserAction(targetUserId: string) {
-  const { user } = await requireRole(APP_ROLES.CEO);
+  const { user } = await requireRole(APP_ROLES.ADMIN);
   const admin = createSupabaseAdminClient();
   const normalizedUserId = normalizeText(targetUserId);
 

@@ -43,10 +43,7 @@ export default function DashboardTrendSection({
           <h2 className="mt-2 text-xl font-semibold text-apple-charcoal">
             Approved Payroll Movement
           </h2>
-          <p className="mt-1 text-sm text-apple-steel">
-            Daily paid totals across approved payroll reports, with weekly,
-            monthly, and yearly views.
-          </p>
+
           {trendPercent !== null ? (
             <p
               className={cn(
@@ -168,7 +165,7 @@ export default function DashboardTrendSection({
 
       {latestTrendPoint ? (
         <div className="mt-4 rounded-xl border border-apple-mist bg-[rgb(var(--apple-snow))] p-3">
-          <p className="text-xs text-apple-steel">
+          <p className=" text-apple-steel">
             Latest {trendRange} paid total:{" "}
             <span className="font-semibold text-apple-charcoal">
               {PESO_SIGN} {formatPayrollNumber(latestTrendPoint.total)}

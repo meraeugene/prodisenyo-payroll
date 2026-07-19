@@ -275,6 +275,7 @@ async function insertProjectEstimateDraftRecord(params: {
 
 function revalidateEstimatorPages() {
   revalidatePath("/cost-estimator");
+  revalidatePath("/estimate-approvals");
   revalidatePath("/estimate-reviews");
   revalidatePath("/budget-tracker");
 }

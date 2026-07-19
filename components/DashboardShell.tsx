@@ -26,8 +26,6 @@ import {
   Wallet,
   X,
   FolderKanban,
-  ClipboardCheck,
-  BadgeDollarSign,
 } from "lucide-react";
 import SignOutButton from "@/components/auth/SignOutButton";
 import ProfileAvatar from "@/components/ProfileAvatar";
@@ -56,7 +54,8 @@ const PAYROLL_MANAGER_REQUEST_ITEMS = [
 ] as const;
 
 const CEO_GENERAL_ITEMS = [
-  { href: "/projects", label: "Home", icon: House },
+  { href: "/home", label: "Home", icon: House },
+  { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
 ] as const;
 
@@ -66,8 +65,8 @@ const CEO_MANAGEMENT_ITEMS = [
 
 const CEO_REVIEW_ITEMS = [
   {
-    href: "/payroll-reports",
-    label: "Payroll Reports",
+    href: "/payroll-approvals",
+    label: "Payroll Approvals",
     icon: LineChart,
   },
   {
@@ -76,19 +75,9 @@ const CEO_REVIEW_ITEMS = [
     icon: Clock3,
   },
   {
-    href: "/estimate-reviews",
-    label: "Estimate Reviews",
+    href: "/estimate-approvals",
+    label: "Estimate Approvals",
     icon: Calculator,
-  },
-  {
-    href: "/material-approvals",
-    label: "Material Approval",
-    icon: ClipboardCheck,
-  },
-  {
-    href: "/purchasing-approvals",
-    label: "Purchasing Approval",
-    icon: BadgeDollarSign,
   },
 ] as const;
 
@@ -111,7 +100,7 @@ const CEO_ADMIN_ITEMS = [
 ] as const;
 
 const ENGINEER_GENERAL_ITEMS = [
-  { href: "/projects", label: "Home", icon: House },
+  { href: "/projects", label: "Projects", icon: FolderKanban },
 ] as const;
 
 const ENGINEER_PLANNING_ITEMS = [
@@ -133,6 +122,7 @@ type ProfileCardData = Pick<
 >;
 
 function formatRoleLabel(role: ProfileCardData["role"] | null): string {
+  if (role === "admin") return "Administrator";
   if (role === "ceo") return "Chief Executive Officer";
   if (role === "payroll_manager") return "Payroll Manager";
   if (role === "engineer") return "Engineer";
@@ -234,6 +224,7 @@ export default function DashboardShell({
   const isWorkflowRoute =
     pathname === "/review-attendance" || pathname === "/generate-payroll";
   const isCeo = profile?.role === "ceo";
+  const isAdmin = profile?.role === "admin";
   const isPayrollManager = profile?.role === "payroll_manager";
   const isEngineer = profile?.role === "engineer";
   const isEmployee = profile?.role === "employee";
@@ -359,6 +350,8 @@ export default function DashboardShell({
             <nav className="space-y-3">
               {(isCeo
                 ? CEO_GENERAL_ITEMS
+                : isAdmin
+                  ? CEO_ADMIN_ITEMS
                 : isPayrollManager
                   ? PAYROLL_MANAGER_GENERAL_ITEMS
                   : isEngineer
@@ -403,9 +396,9 @@ export default function DashboardShell({
                       badgeCount:
                         item.href === "/overtime-approvals"
                           ? notificationCounts.overtime
-                          : item.href === "/payroll-reports"
+                          : item.href === "/payroll-approvals"
                             ? notificationCounts.payrollReports
-                            : item.href === "/estimate-reviews"
+                            : item.href === "/estimate-approvals"
                               ? notificationCounts.estimateReviews
                               : 0,
                     }),
@@ -478,22 +471,6 @@ export default function DashboardShell({
                 </>
               ) : null}
 
-              {isCeo ? (
-                <>
-                  {renderSidebarSectionLabel({
-                    label: "Admin",
-                    collapsed,
-                  })}
-                  {CEO_ADMIN_ITEMS.map((item) =>
-                    renderSidebarLink({
-                      item,
-                      pathname,
-                      collapsed,
-                      onNavigate: () => setOpen(false),
-                    }),
-                  )}
-                </>
-              ) : null}
             </nav>
 
             <div className="mt-auto space-y-1 pt-3">

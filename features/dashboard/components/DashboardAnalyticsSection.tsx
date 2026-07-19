@@ -41,9 +41,6 @@ export default function DashboardAnalyticsSection({
             <p className="text-[15px] font-semibold text-apple-charcoal">
               Analytics Overview
             </p>
-            <p className="mt-1 text-sm text-apple-steel">
-              Historical charts from Supabase attendance and approved payroll.
-            </p>
           </div>
           {periodOptions.length > 0 ? (
             <div className="flex w-full flex-col items-start gap-2 md:w-auto md:flex-row md:flex-wrap md:items-center">
@@ -70,9 +67,6 @@ export default function DashboardAnalyticsSection({
             <div className="mb-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-apple-charcoal">
                 Employees per Branch
-              </p>
-              <p className="mt-1 text-xs text-apple-steel">
-                Attendance Analytics
               </p>
             </div>
 
@@ -130,7 +124,6 @@ export default function DashboardAnalyticsSection({
               <p className="text-xs font-semibold uppercase tracking-wider text-apple-charcoal">
                 Payroll Distribution by Project
               </p>
-              <p className="mt-1 text-xs text-apple-steel">Payroll Analytics</p>
             </div>
 
             <div className="grid gap-4 md:h-[260px] md:grid-cols-[minmax(0,1fr)_160px]">

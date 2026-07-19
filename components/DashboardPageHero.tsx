@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 interface DashboardPageHeroProps {
   eyebrow: string;
   title: string;
-  description: string;
+  description?: string;
   isUploadAttendance?: boolean;
   actions?: ReactNode;
 }

@@ -27,11 +27,7 @@ export default function EstimateReviewsPageClient({
 
   return (
     <div className="p-0 sm:p-6">
-      <DashboardPageHero
-        eyebrow="CEO Review"
-        title="Estimate Reviews"
-        description="Review engineer-submitted project estimates before bidding and push approved totals into Budget Tracker as new projects."
-      />
+      <DashboardPageHero eyebrow="CEO Review" title="Estimate Approvals" />
 
       <EstimateReviewsTable
         estimates={state.sortedEstimates}

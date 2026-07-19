@@ -217,14 +217,15 @@ export default function CostEstimatorItemModal({
               <label className="mt-4 mb-2 block text-sm font-semibold text-apple-charcoal">
                 Description <span className="text-rose-500">*</span>
               </label>
-              <input
+              <textarea
                 value={form.displayName}
                 onChange={(event) =>
                   onFieldChange("displayName", event.target.value)
                 }
                 placeholder="e.g. Tiles, kitchen cabinets, window glass set"
                 disabled={isReadOnly}
-                className={`w-full rounded-[12px] border bg-[rgb(var(--apple-snow))] px-4 py-3 text-sm outline-none focus:border-[#1f6a37] ${
+                rows={5}
+                className={`min-h-[130px] w-full resize-none rounded-[12px] border bg-[rgb(var(--apple-snow))] px-4 py-3 text-sm leading-6 outline-none focus:border-[#1f6a37] ${
                   errors.displayName ? "border-rose-300" : "border-apple-mist"
                 }`}
               />
@@ -241,24 +242,6 @@ export default function CostEstimatorItemModal({
                 <span className="inline-flex items-center rounded-full border border-apple-mist bg-white px-3 py-1 text-xs font-semibold text-apple-steel">
                   {editingMaterials.length} in progress
                 </span>
-              </div>
-
-              <div className="mt-5 flex min-h-0 flex-1 flex-col">
-                <label className="mb-2 block text-sm font-semibold text-apple-charcoal">
-                  Notes{" "}
-                  <span className="font-normal text-apple-steel">
-                    (Optional)
-                  </span>
-                </label>
-                <textarea
-                  value={form.notes}
-                  onChange={(event) =>
-                    onFieldChange("notes", event.target.value)
-                  }
-                  placeholder="Add notes like brand, dimensions, color, supplier, or special installation details."
-                  disabled={isReadOnly}
-                  className="min-h-[140px] flex-1 resize-none rounded-[12px] border border-apple-mist bg-[rgb(var(--apple-snow))] px-4 py-3 text-sm outline-none focus:border-[#1f6a37]"
-                />
               </div>
             </section>
           )}
@@ -286,21 +269,13 @@ export default function CostEstimatorItemModal({
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-apple-steel">
                           Item materials
                         </p>
-                        <div className="mt-3 grid gap-4 rounded-[16px] border border-apple-mist bg-[rgb(var(--apple-snow))] px-4 py-4 md:grid-cols-2">
+                        <div className="mt-3 rounded-[16px] border border-apple-mist bg-[rgb(var(--apple-snow))] px-4 py-4">
                           <div>
                             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-apple-steel">
                               Description
                             </p>
-                            <p className="mt-2 text-base font-semibold text-apple-charcoal">
+                            <p className="mt-2 whitespace-pre-wrap text-base font-semibold leading-7 text-apple-charcoal">
                               {form.displayName || "Item description"}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-apple-steel">
-                              Notes
-                            </p>
-                            <p className="mt-2 text-sm leading-6 text-apple-steel">
-                              {form.notes || "No notes added for this item."}
                             </p>
                           </div>
                         </div>
@@ -426,7 +401,7 @@ export default function CostEstimatorItemModal({
                 const rowErrors = errors.materialRows[materialRow.id] ?? {};
 
                 return (
-                  <div className="flex w-full flex-col bg-white p-4 xl:h-full xl:min-h-0">
+                  <div className="flex w-full flex-col bg-white  xl:h-full xl:min-h-0">
                     <div>
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-apple-steel">
                         Material {materialNumber}
@@ -810,7 +785,7 @@ export default function CostEstimatorItemModal({
                         return (
                           <div
                             key={material.id}
-                            className={`w-full rounded-[12px] border-b border-emerald-200/70 bg-white/60 px-2 py-2 pb-4 text-left transition-[transform,opacity] duration-200 last:border-b-0 last:pb-2 ${
+                            className={`w-full rounded-[12px] border-b border-emerald-200/70 bg-white px-2 py-2 pb-4 text-left transition-[transform,opacity] duration-200 last:border-b-0 last:pb-2 ${
                               isAnimatingIn
                                 ? "animate-[materialRowIn_220ms_ease-out]"
                                 : ""
