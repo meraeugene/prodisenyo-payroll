@@ -540,9 +540,42 @@ export interface Database {
           updated_at?: string;
         };
       };
+      projects: {
+        Row: {
+          id: string; name: string; location: string; client_name: string | null;
+          subject: string | null; lead: string | null; assigned_engineer_id: string | null;
+          status: "planning" | "active" | "on_hold" | "completed" | "archived";
+          budget_ceiling: number; currency_code: string; start_date: string; end_date: string;
+          description: string | null; image_url: string | null; created_by: string;
+          updated_by: string | null; created_at: string; updated_at: string;
+        };
+        Insert: {
+          id?: string; name: string; location: string; client_name?: string | null;
+          subject?: string | null; lead?: string | null; assigned_engineer_id?: string | null;
+          status?: "planning" | "active" | "on_hold" | "completed" | "archived";
+          budget_ceiling: number; currency_code?: string; start_date: string; end_date: string;
+          description?: string | null; image_url?: string | null; created_by: string;
+          updated_by?: string | null; created_at?: string; updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["projects"]["Insert"]>;
+      };
+      project_progress_activities: {
+        Row: {
+          id: string; project_id: string; activity: string; weight_percent: number;
+          progress_percent: number; sort_order: number; created_by: string;
+          updated_by: string | null; created_at: string; updated_at: string;
+        };
+        Insert: {
+          id?: string; project_id: string; activity: string; weight_percent: number;
+          progress_percent?: number; sort_order?: number; created_by: string;
+          updated_by?: string | null; created_at?: string; updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["project_progress_activities"]["Insert"]>;
+      };
       budget_projects: {
         Row: {
           id: string;
+          project_id: string | null;
           name: string;
           project_type: BudgetProjectType | null;
           currency_code: string;
@@ -556,6 +589,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          project_id?: string | null;
           name: string;
           project_type?: BudgetProjectType | null;
           currency_code?: string;
@@ -568,6 +602,7 @@ export interface Database {
           updated_at?: string;
         };
         Update: {
+          project_id?: string | null;
           name?: string;
           project_type?: BudgetProjectType | null;
           currency_code?: string;
@@ -663,6 +698,7 @@ export interface Database {
       project_estimates: {
         Row: {
           id: string;
+          project_id: string | null;
           project_name: string;
           project_type: BudgetProjectType | null;
           client_name: string | null;
@@ -684,6 +720,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          project_id?: string | null;
           project_name: string;
           project_type?: BudgetProjectType | null;
           client_name?: string | null;
@@ -704,6 +741,7 @@ export interface Database {
           updated_at?: string;
         };
         Update: {
+          project_id?: string | null;
           project_name?: string;
           project_type?: BudgetProjectType | null;
           client_name?: string | null;

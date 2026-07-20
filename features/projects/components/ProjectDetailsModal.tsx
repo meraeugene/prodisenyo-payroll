@@ -3,32 +3,20 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ProjectRecord } from "../types";
-import { X, Calendar, DollarSign, User, MapPin, ClipboardList, Activity, Building2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { X, Calendar, DollarSign, User, MapPin, ClipboardList, Activity, Building2, Pencil, Trash2 } from "lucide-react";
 
 interface ProjectDetailsModalProps {
   project: ProjectRecord;
   onClose: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }
 
-export default function ProjectDetailsModal({ project, onClose }: ProjectDetailsModalProps) {
+export default function ProjectDetailsModal({ project, onClose, onEdit, onDelete }: ProjectDetailsModalProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    const previousBodyOverflow = document.body.style.overflow;
-    const previousHtmlOverflow = document.documentElement.style.overflow;
-
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
-
-    return () => {
-      document.body.style.overflow = previousBodyOverflow;
-      document.documentElement.style.overflow = previousHtmlOverflow;
-    };
   }, []);
 
   const formatCurrency = (value: number) => {
@@ -39,20 +27,6 @@ export default function ProjectDetailsModal({ project, onClose }: ProjectDetails
     }).format(value);
   };
 
-  const getStatusLabel = (status: ProjectRecord["status"]) => {
-    if (status === "active") return "Active / Building";
-    if (status === "planning") return "Under Planning";
-    if (status === "on_hold") return "On Hold";
-    return "Completed";
-  };
-
-  const getStatusColor = (status: ProjectRecord["status"]) => {
-    if (status === "active") return "bg-emerald-50 text-emerald-700 border-emerald-100";
-    if (status === "planning") return "bg-sky-50 text-sky-700 border-sky-100";
-    if (status === "on_hold") return "bg-rose-50 text-rose-700 border-rose-100";
-    return "bg-slate-50 text-slate-700 border-slate-100";
-  };
-
   if (!mounted) return null;
 
   return createPortal(
@@ -60,10 +34,7 @@ export default function ProjectDetailsModal({ project, onClose }: ProjectDetails
       <div className="w-full max-w-2xl bg-white border border-apple-mist rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
           <div>
-            <span className={cn("border px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider", getStatusColor(project.status))}>
-              {getStatusLabel(project.status)}
-            </span>
-            <h3 className="text-xl font-bold text-apple-charcoal mt-2">{project.name}</h3>
+            <h3 className="text-xl font-bold text-apple-charcoal">{project.name}</h3>
             <div className="flex items-center gap-1 text-slate-400 text-xs mt-1">
               <MapPin size={13} />
               <span>{project.location}</span>
@@ -81,10 +52,17 @@ export default function ProjectDetailsModal({ project, onClose }: ProjectDetails
           {/* Project Details Grid */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Client</span>
+              <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Subject</span>
               <div className="flex items-center gap-1.5 text-sm text-apple-charcoal font-semibold">
                 <Building2 size={13} className="text-slate-400" />
-                <span>{project.client}</span>
+                <span>{project.subject || project.client || "—"}</span>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Lead</span>
+              <div className="flex items-center gap-1.5 text-sm text-apple-charcoal font-semibold">
+                <User size={13} className="text-slate-400" />
+                <span>{project.lead || project.manager || "—"}</span>
               </div>
             </div>
             <div className="space-y-1">
@@ -95,14 +73,7 @@ export default function ProjectDetailsModal({ project, onClose }: ProjectDetails
               </div>
             </div>
             <div className="space-y-1">
-              <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Project Manager</span>
-              <div className="flex items-center gap-1.5 text-sm text-apple-charcoal font-semibold">
-                <User size={13} className="text-slate-400" />
-                <span>{project.manager}</span>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Site Engineer</span>
+              <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Assigned Site Engineer or Project Manager</span>
               <div className="flex items-center gap-1.5 text-sm text-apple-charcoal font-semibold">
                 <User size={13} className="text-slate-400" />
                 <span>{project.engineer}</span>
@@ -162,6 +133,15 @@ export default function ProjectDetailsModal({ project, onClose }: ProjectDetails
                 </p>
               </div>
             </div>
+          </div>
+
+          <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
+            <button type="button" onClick={onDelete} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-red-200 px-4 text-sm font-semibold text-red-700 transition hover:bg-red-50">
+              <Trash2 size={15} /> Delete Project
+            </button>
+            <button type="button" onClick={onEdit} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#1f6a37] px-4 text-sm font-semibold text-white transition hover:bg-emerald-800">
+              <Pencil size={15} /> Edit Project
+            </button>
           </div>
         </div>
       </div>

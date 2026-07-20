@@ -28,6 +28,7 @@ export function parseMaterialRequestPayload(params: {
   const raw = payload as Record<string, unknown>;
   const projectName =
     typeof raw.projectName === "string" ? raw.projectName.trim() : "";
+  const projectId = typeof raw.projectId === "string" ? raw.projectId.trim() : "";
   const materialName =
     typeof raw.materialName === "string" ? raw.materialName.trim() : "";
   const unit = typeof raw.unit === "string" ? raw.unit.trim() : "";
@@ -37,7 +38,7 @@ export function parseMaterialRequestPayload(params: {
   const quantity = raw.quantity;
   const priority = raw.priority;
 
-  if (!projectName || !materialName || !unit || !neededBy) return null;
+  if (!projectId || !projectName || !materialName || !unit || !neededBy) return null;
   if (!isFinitePositiveNumber(quantity)) return null;
   if (!isPriority(priority)) return null;
 
@@ -45,6 +46,7 @@ export function parseMaterialRequestPayload(params: {
     id: params.id,
     requestId: params.requestId,
     projectName,
+    projectId,
     materialName,
     quantity,
     unit,

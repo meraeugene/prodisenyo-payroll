@@ -34,6 +34,8 @@ const FEATURE_ICONS: Record<string, LucideIcon> = {
   "/review-attendance": UserRoundSearch,
   "/generate-payroll": FolderKanban,
   "/budget-tracker": Receipt,
+  "/payroll-analytics": LayoutDashboard,
+  "/payroll-change": LineChart,
   "/payroll-approvals": LineChart,
   "/payroll-reports": LineChart,
   "/overtime-approvals": Clock3,
@@ -75,9 +77,9 @@ const ROLE_FEATURES: Record<AppRole, FeatureCard[]> = {
   ],
   ceo: [
     {
-      href: "/dashboard",
-      title: "Dashboard",
-      description: "Monitor company-wide payroll and review queues.",
+      href: "/payroll-analytics",
+      title: "Payroll Analytics",
+      description: "View payroll analytics, trends, and workforce totals.",
     },
     {
       href: "/projects",
@@ -102,7 +104,7 @@ const ROLE_FEATURES: Record<AppRole, FeatureCard[]> = {
     {
       href: "/payroll-approvals",
       title: "Payroll Approvals",
-      description: "Review submitted payroll runs and approvals.",
+      description: "Review submitted payroll runs and approval updates.",
     },
     {
       href: "/overtime-approvals",
@@ -112,7 +114,7 @@ const ROLE_FEATURES: Record<AppRole, FeatureCard[]> = {
     {
       href: "/estimate-approvals",
       title: "Estimate Approvals",
-      description: "Check project estimate submissions for approval.",
+      description: "Review project estimate submissions from the Projects workflow.",
     },
   ],
   payroll_manager: [
@@ -165,8 +167,8 @@ const ROLE_FEATURES: Record<AppRole, FeatureCard[]> = {
 
 function getGreetingMessage(hour: number) {
   if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afty";
-  return "Good evee";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
 }
 
 function getPhilippineHour() {

@@ -4,6 +4,7 @@ export interface MaterialRequestRecord {
   id: string;
   requestId: string;
   projectName: string;
+  projectId: string;
   materialName: string;
   quantity: number;
   unit: string;
@@ -16,6 +17,7 @@ export interface MaterialRequestRecord {
 }
 
 export interface CreateMaterialRequestInput {
+  projectId: string;
   projectName: string;
   materialName: string;
   quantity: number;

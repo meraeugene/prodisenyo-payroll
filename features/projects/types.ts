@@ -5,6 +5,8 @@ export interface ProjectRecord {
   name: string;
   location: string;
   client: string;
+  subject?: string;
+  lead?: string;
   status: ProjectStatus;
   budget: number;
   spent: number;
@@ -13,8 +15,15 @@ export interface ProjectRecord {
   endDate: string;
   manager: string;
   engineer: string;
+  assignedEngineerId?: string | null;
+  imageUrl?: string | null;
   tasksCount: number;
   completedTasksCount: number;
   materialsCount: number;
   description: string;
+}
+
+export interface EngineerOption {
+  id: string;
+  name: string;
 }

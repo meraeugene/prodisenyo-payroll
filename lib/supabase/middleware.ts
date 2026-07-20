@@ -29,9 +29,11 @@ const PROTECTED_PREFIXES = [
   "/generate-payroll",
   "/attendance-analytics",
   "/payroll-analytics",
+  "/payroll-change",
   "/payroll-approvals",
   "/payroll-reports",
   "/add-user",
+  "/request-material",
   "/request-overtime",
   "/reset-data",
   "/settings",
@@ -48,7 +50,6 @@ const HR_SUBMISSION_REQUIRED_PREFIXES = [
 ] as const;
 
 const CEO_ALLOWED_PREFIXES = [
-  "/home",
   "/dashboard",
   "/budget-tracker",
   "/estimate-approvals",
@@ -56,6 +57,7 @@ const CEO_ALLOWED_PREFIXES = [
   "/overtime-approvals",
   "/attendance-analytics",
   "/payroll-analytics",
+  "/payroll-change",
   "/payroll-approvals",
   "/payroll-reports",
   "/settings",
@@ -74,6 +76,7 @@ const CEO_ONLY_PREFIXES = [
   "/estimate-approvals",
   "/estimate-reviews",
   "/overtime-approvals",
+  "/payroll-change",
   "/payroll-approvals",
   "/payroll-reports",
   "/material-approvals",
@@ -88,6 +91,7 @@ const EMPLOYEE_REDIRECT_PATH = "/home";
 const ENGINEER_ALLOWED_PREFIXES = [
   "/projects",
   "/cost-estimator",
+  "/request-material",
   "/request-overtime",
   "/settings",
 ] as const;

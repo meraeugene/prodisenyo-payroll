@@ -33,6 +33,7 @@ interface SaveCostCatalogItemInput {
 
 interface SaveProjectEstimateDraftInput {
   id?: string;
+  projectId?: string;
   projectName?: string;
   projectType?: BudgetProjectType | "";
   location?: string;
@@ -164,7 +165,7 @@ function isMissingProjectEstimateColumnError(
 function buildEstimateHeaderPayload(
   input: Pick<
     SaveProjectEstimateDraftInput,
-    "projectName" | "projectType" | "location" | "ownerName" | "notes"
+    "projectId" | "projectName" | "projectType" | "location" | "ownerName" | "notes"
   >,
   options?: {
     includeLocation?: boolean;
@@ -175,6 +176,7 @@ function buildEstimateHeaderPayload(
   const includeOwnerName = options?.includeOwnerName ?? true;
 
   return {
+    project_id: input.projectId || null,
     project_name: normalizeText(input.projectName),
     project_type: input.projectType || null,
     ...(includeLocation ? { location: normalizeLocation(input.location) } : {}),
@@ -277,6 +279,7 @@ function revalidateEstimatorPages() {
   revalidatePath("/cost-estimator");
   revalidatePath("/estimate-approvals");
   revalidatePath("/estimate-reviews");
+  revalidatePath("/projects");
   revalidatePath("/budget-tracker");
 }
 
@@ -548,6 +551,9 @@ export async function saveProjectEstimateDraftAction(
   const database = createSupabaseAdminClient() as any;
   const estimateId = normalizeText(input.id);
   const requestedTotal = normalizeMoney(input.costEstimate);
+  const { data: linkedProject } = await database.from("projects").select("id,name,location").eq("assigned_engineer_id", user.id).eq(input.projectId ? "id" : "name", input.projectId || normalizeText(input.projectName)).neq("status", "archived").limit(1).maybeSingle();
+  if (!linkedProject) throw new Error("Select a project assigned to you before saving an estimate.");
+  input = { ...input, projectId: linkedProject.id, projectName: linkedProject.name, location: linkedProject.location };
 
   let estimate: Database["public"]["Tables"]["project_estimates"]["Row"];
 
@@ -823,6 +829,7 @@ export async function approveProjectEstimateAction(estimateId: string) {
   const items = await loadEstimateItems(database, estimate.id);
   const estimateTotal = normalizeMoney(estimate.estimate_total);
 
+  if (!estimate.project_id) throw new Error("This estimate is not linked to a canonical project.");
   let budgetProjectId = estimate.budget_project_id;
   if (!budgetProjectId) {
     const existingBudgetProject = await loadApprovedBudgetProject(database, estimate.id);
@@ -830,28 +837,8 @@ export async function approveProjectEstimateAction(estimateId: string) {
   }
 
   if (!budgetProjectId) {
-    const payload: BudgetProjectInsert = {
-      name: estimate.project_name,
-      project_type: estimate.project_type,
-      currency_code: "PHP",
-      starting_budget: estimateTotal,
-      source_estimate_id: estimate.id,
-      created_by: user.id,
-      updated_by: user.id,
-    };
-
-    const { data: budgetProject, error: budgetProjectError } = await database
-      .from("budget_projects")
-      .insert(payload)
-      .select("id")
-      .single();
-
-    if (budgetProjectError) {
-      throw new Error(
-        `Failed to create budget project from estimate. ${budgetProjectError.message}`,
-      );
-    }
-
+    const { data: budgetProject, error: budgetProjectError } = await database.from("budget_projects").select("id").eq("project_id", estimate.project_id).single();
+    if (budgetProjectError || !budgetProject) throw new Error("The project's budget workspace was not found.");
     budgetProjectId = budgetProject.id;
   }
 

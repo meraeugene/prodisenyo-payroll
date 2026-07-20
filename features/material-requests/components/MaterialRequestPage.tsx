@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import MaterialRequestPageClient from "@/features/material-requests/components/MaterialRequestPageClient";
 import { parseMaterialRequestPayload } from "@/features/material-requests/utils/materialRequestMappers";
 import type { MaterialRequestRecord } from "@/features/material-requests/types";
+import { createSupabaseAdminClient } from "@/lib/supabase/server";
 
 interface MaterialRequestAuditRow {
   id: string;
@@ -14,6 +15,7 @@ interface MaterialRequestAuditRow {
 export default async function MaterialRequestPage() {
   const { user } = await requireRole(APP_ROLES.ENGINEER);
   const supabase = await createSupabaseServerClient();
+  const database = createSupabaseAdminClient() as any;
 
   const { data } = await supabase
     .from("audit_logs")
@@ -37,5 +39,6 @@ export default async function MaterialRequestPage() {
     )
     .filter((row): row is MaterialRequestRecord => row !== null);
 
-  return <MaterialRequestPageClient initialRequests={initialRequests} />;
+  const { data: projects } = await database.from("projects").select("id,name").eq("assigned_engineer_id", user.id).neq("status", "archived").order("name");
+  return <MaterialRequestPageClient initialRequests={initialRequests} projects={projects ?? []} />;
 }

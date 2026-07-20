@@ -17,7 +17,6 @@ import {
   LineChart,
   Menu,
   Users,
-  Receipt,
   Settings,
   Trash2,
   Upload,
@@ -54,30 +53,26 @@ const PAYROLL_MANAGER_REQUEST_ITEMS = [
 ] as const;
 
 const CEO_GENERAL_ITEMS = [
-  { href: "/home", label: "Home", icon: House },
-  { href: "/projects", label: "Projects", icon: FolderKanban },
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
 ] as const;
 
-const CEO_MANAGEMENT_ITEMS = [
-  { href: "/budget-tracker", label: "Budget Tracker", icon: Receipt },
+const CEO_PAYROLL_ITEMS = [
+  {
+    href: "/payroll-analytics",
+    label: "Payroll Analytics",
+    icon: LayoutDashboard,
+  },
+  { href: "/payroll-approvals", label: "Payroll Approvals", icon: LineChart },
+] as const;
+
+const CEO_PROJECT_ITEMS = [
+  { href: "/projects", label: "Projects", icon: FolderKanban },
 ] as const;
 
 const CEO_REVIEW_ITEMS = [
   {
-    href: "/payroll-approvals",
-    label: "Payroll Approvals",
-    icon: LineChart,
-  },
-  {
     href: "/overtime-approvals",
     label: "Overtime Approvals",
     icon: Clock3,
-  },
-  {
-    href: "/estimate-approvals",
-    label: "Estimate Approvals",
-    icon: Calculator,
   },
 ] as const;
 
@@ -88,10 +83,6 @@ const GENERAL_WORKFLOW_ITEMS = [
     icon: UserRoundSearch,
   },
   { href: "/generate-payroll", label: "Generate Payroll", icon: Wallet },
-] as const;
-
-const BUDGET_NAV_ITEMS = [
-  { href: "/budget-tracker", label: "Budget Tracker", icon: Receipt },
 ] as const;
 
 const CEO_ADMIN_ITEMS = [
@@ -371,15 +362,32 @@ export default function DashboardShell({
               {isCeo ? (
                 <>
                   {renderSidebarSectionLabel({
-                    label: "Management",
+                    label: "Projects",
                     collapsed,
                   })}
-                  {CEO_MANAGEMENT_ITEMS.map((item) =>
+                  {CEO_PROJECT_ITEMS.map((item) =>
                     renderSidebarLink({
                       item,
                       pathname,
                       collapsed,
                       onNavigate: () => setOpen(false),
+                    }),
+                  )}
+
+                  {renderSidebarSectionLabel({
+                    label: "Payroll",
+                    collapsed,
+                  })}
+                  {CEO_PAYROLL_ITEMS.map((item) =>
+                    renderSidebarLink({
+                      item,
+                      pathname,
+                      collapsed,
+                      onNavigate: () => setOpen(false),
+                      badgeCount:
+                        item.href === "/payroll-approvals"
+                          ? notificationCounts.payrollReports
+                          : 0,
                     }),
                   )}
 
@@ -396,11 +404,7 @@ export default function DashboardShell({
                       badgeCount:
                         item.href === "/overtime-approvals"
                           ? notificationCounts.overtime
-                          : item.href === "/payroll-approvals"
-                            ? notificationCounts.payrollReports
-                            : item.href === "/estimate-approvals"
-                              ? notificationCounts.estimateReviews
-                              : 0,
+                          : 0,
                     }),
                   )}
                 </>

@@ -30,7 +30,7 @@ export default function PayrollAnalyticsPageClient() {
   }, [runIdFromQuery, selectedPeriodKey, setSelectedPeriodKey]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 p-0 sm:p-6">
       <DashboardPageHero
         eyebrow="Data Analytics"
         title="Payroll Analytics"

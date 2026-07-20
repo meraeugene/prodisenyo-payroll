@@ -1,5 +1,5 @@
-const STATIC_CACHE = "prodisenyo-static-v1";
-const DYNAMIC_CACHE = "prodisenyo-dynamic-v1";
+const STATIC_CACHE = "prodisenyo-static-v2";
+const DYNAMIC_CACHE = "prodisenyo-dynamic-v2";
 const PRECACHE_URLS = ["/", "/manifest.webmanifest", "/icon.ico"];
 
 self.addEventListener("install", (event) => {
@@ -30,6 +30,14 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+
+  // Next.js build and development chunks are content-addressed and must never
+  // be served cache-first. An old chunk can reference modules that no longer
+  // exist after a deployment or Turbopack rebuild.
+  if (url.pathname.startsWith("/_next/") || url.pathname === "/sw.js") {
+    event.respondWith(fetch(request));
+    return;
+  }
 
   if (request.mode === "navigate") {
     event.respondWith(

@@ -103,7 +103,7 @@ const INITIAL_POS: PurchaseOrder[] = [
   },
 ];
 
-export default function PurchasingApprovalsPageClient() {
+export default function PurchasingApprovalsPageClient({ projectName }: { projectName?: string }) {
   const [purchaseOrders, setPurchaseOrders] =
     useState<PurchaseOrder[]>(INITIAL_POS);
   const [activeTab, setActiveTab] = useState<
@@ -118,6 +118,7 @@ export default function PurchasingApprovalsPageClient() {
 
   const filteredPOs = React.useMemo(() => {
     return purchaseOrders.filter((po) => {
+      if (projectName && po.projectName !== projectName) return false;
       const matchesTab = activeTab === "all" ? true : po.status === activeTab;
       const matchesSearch =
         po.projectName.toLowerCase().includes(searchTerm.toLowerCase()) ||

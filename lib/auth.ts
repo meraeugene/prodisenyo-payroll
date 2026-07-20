@@ -22,7 +22,7 @@ export const DEFAULT_AUTH_REDIRECT = "/dashboard";
 
 export function getRoleHomePath(role: AppRole | null | undefined) {
   if (role === APP_ROLES.ADMIN) return "/add-user";
-  if (role === APP_ROLES.CEO) return "/home";
+  if (role === APP_ROLES.CEO) return "/projects";
   if (role === APP_ROLES.PAYROLL_MANAGER) return "/home";
   if (role === APP_ROLES.ENGINEER) return "/projects";
   if (role === APP_ROLES.EMPLOYEE) return "/home";

@@ -22,6 +22,7 @@ const PRIORITY_OPTIONS: Array<{
 ];
 
 const EMPTY_FORM: CreateMaterialRequestInput = {
+  projectId: "",
   projectName: "",
   materialName: "",
   quantity: 1,
@@ -63,8 +64,10 @@ function formatDate(value: string) {
 
 export default function MaterialRequestPageClient({
   initialRequests,
+  projects,
 }: {
   initialRequests: MaterialRequestRecord[];
+  projects: Array<{ id: string; name: string }>;
 }) {
   const [form, setForm] = useState<CreateMaterialRequestInput>(EMPTY_FORM);
   const [requests, setRequests] =
@@ -108,9 +111,7 @@ export default function MaterialRequestPageClient({
     const quantity = Number(form.quantity ?? 0);
     const notes = (form.notes ?? "").trim();
 
-    if (!projectName) {
-      errors.projectName = "Project name is required.";
-    }
+    if (!form.projectId || !projectName) errors.projectId = "Project is required.";
 
     if (!materialName) {
       errors.materialName = "Material name is required.";
@@ -199,17 +200,12 @@ export default function MaterialRequestPageClient({
               <span className="text-sm font-semibold text-apple-charcoal">
                 Project Name <span className="text-rose-500">*</span>
               </span>
-              <input
-                value={form.projectName}
-                onChange={(event) =>
-                  updateField("projectName", event.target.value)
-                }
-                placeholder="Dream Home Renovation"
-                className={inputClass(Boolean(formErrors.projectName))}
-              />
-              {formErrors.projectName ? (
+              <select value={form.projectId} onChange={(event) => { const selected = projects.find((project) => project.id === event.target.value); updateField("projectId", event.target.value); updateField("projectName", selected?.name ?? ""); }} className={inputClass(Boolean(formErrors.projectId))}>
+                <option value="">Select an assigned project</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+              </select>
+              {formErrors.projectId ? (
                 <p className="text-xs font-medium text-rose-600">
-                  {formErrors.projectName}
+                  {formErrors.projectId}
                 </p>
               ) : null}
             </label>

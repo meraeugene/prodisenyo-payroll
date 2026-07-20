@@ -98,7 +98,7 @@ const INITIAL_REQUESTS: MaterialRequest[] = [
   },
 ];
 
-export default function MaterialApprovalsPageClient() {
+export default function MaterialApprovalsPageClient({ projectName }: { projectName?: string }) {
   const [requests, setRequests] = useState<MaterialRequest[]>([]);
   const [activeTab, setActiveTab] = useState<
     "pending" | "approved" | "rejected" | "all"
@@ -132,6 +132,7 @@ export default function MaterialApprovalsPageClient() {
 
   const filteredRequests = React.useMemo(() => {
     return requests.filter((r) => {
+      if (projectName && r.projectName !== projectName) return false;
       const matchesTab = activeTab === "all" ? true : r.status === activeTab;
       const matchesSearch =
         r.projectName.toLowerCase().includes(searchTerm.toLowerCase()) ||

@@ -32,7 +32,16 @@ export async function createSupabaseServerClient() {
       },
       setAll(cookiesToSet: CookieMutation[]) {
         cookiesToSet.forEach(({ name, value, options }) => {
-          cookieStore.set(name, value, options);
+          try {
+            cookieStore.set(name, value, options);
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : String(error);
+
+            if (!message.includes("Cookies can only be modified")) {
+              throw error;
+            }
+          }
         });
       },
     },

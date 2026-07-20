@@ -74,7 +74,11 @@ async function assertBudgetProjectExists(projectId: string) {
 
 export async function createBudgetProjectAction(
   input: CreateBudgetProjectInput,
-) {
+): Promise<{ project: Database["public"]["Tables"]["budget_projects"]["Row"] }> {
+  void input;
+  await requireRole(APP_ROLES.CEO);
+  throw new Error("Create projects from Project Portfolio. Their budget workspace is created automatically.");
+  /* Legacy implementation retained below temporarily for type compatibility.
   const { user } = await requireRole([
     APP_ROLES.CEO,
     APP_ROLES.ENGINEER,
@@ -110,6 +114,7 @@ export async function createBudgetProjectAction(
   return {
     project: data,
   };
+  */
 }
 
 export async function saveBudgetItemAction(input: SaveBudgetItemInput) {

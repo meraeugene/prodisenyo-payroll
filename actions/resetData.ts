@@ -5,11 +5,13 @@ import { APP_ROLES, requireRole } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 
 const TABLES_TO_CLEAR = [
+  "project_progress_activities",
   "project_estimate_items",
   "project_estimates",
   "cost_catalog_items",
   "budget_items",
   "budget_projects",
+  "projects",
   "payroll_run_items",
   "payroll_run_daily_totals",
   "payroll_runs",
@@ -48,6 +50,7 @@ export async function resetWorkspaceDataAction() {
   revalidatePath("/payroll-approvals");
   revalidatePath("/overtime-approvals");
   revalidatePath("/budget-tracker");
+  revalidatePath("/projects");
   revalidatePath("/cost-estimator");
   revalidatePath("/request-overtime");
   revalidatePath("/request-material");

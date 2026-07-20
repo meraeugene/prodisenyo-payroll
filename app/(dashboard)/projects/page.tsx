@@ -1,28 +1,15 @@
 import { APP_ROLES, requireRole } from "@/lib/auth";
+import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import ProjectsPageClient from "@/features/projects/components/ProjectsPageClient";
+import { mapProjectRow } from "@/features/projects/utils/projectMappers";
 
-type ProjectsSearchParams = {
-  section?: string;
-};
-
-export default async function Page({
-  searchParams,
-}: {
-  searchParams?: Promise<ProjectsSearchParams>;
-}) {
-  const { profile } = await requireRole([APP_ROLES.CEO, APP_ROLES.ENGINEER]);
-  const params = searchParams ? await searchParams : undefined;
-  const initialSection =
-    params?.section === "material-approvals" ||
-    params?.section === "purchasing-approvals"
-      ? params.section
-      : "portfolio";
-
-  return (
-    <ProjectsPageClient
-      role={profile.role as "ceo" | "engineer"}
-      fullName={profile.full_name}
-      initialSection={initialSection}
-    />
-  );
+export default async function Page() {
+  const { user, profile } = await requireRole([APP_ROLES.CEO, APP_ROLES.ENGINEER]);
+  const database = createSupabaseAdminClient() as any;
+  let query = database.from("projects").select("*, engineer:profiles!projects_assigned_engineer_id_fkey(full_name,username), progress:project_progress_activities(weight_percent,progress_percent), budget:budget_projects(budget_items(actual_spent))").neq("status", "archived").order("created_at", { ascending: false });
+  if (profile.role === APP_ROLES.ENGINEER) query = query.eq("assigned_engineer_id", user.id);
+  const [{ data, error }, { data: engineerRows }] = await Promise.all([query, database.from("profiles").select("id,full_name,username").eq("role", "engineer").eq("is_active", true).order("full_name")]);
+  if (error) throw new Error(`Failed to load projects. ${error.message}`);
+  const engineers = (engineerRows ?? []).map((row: any) => ({ id: row.id, name: row.full_name || row.username }));
+  return <ProjectsPageClient role={profile.role as "ceo" | "engineer"} fullName={profile.full_name} projects={(data ?? []).map(mapProjectRow)} engineers={engineers}/>;
 }

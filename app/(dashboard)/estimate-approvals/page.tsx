@@ -1,5 +1,5 @@
-import EstimateReviewsPage from "@/features/cost-estimator/components/EstimateReviewsPage";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <EstimateReviewsPage />;
+  redirect("/projects?section=estimate-approvals");
 }

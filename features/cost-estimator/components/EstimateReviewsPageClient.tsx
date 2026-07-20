@@ -15,19 +15,24 @@ import type {
   ProjectEstimateItemRow,
   ReviewProjectEstimateRow,
 } from "@/features/cost-estimator/types";
+import { cn } from "@/lib/utils";
 
 export default function EstimateReviewsPageClient({
   estimates,
   items,
+  embedded = false,
 }: {
   estimates: ReviewProjectEstimateRow[];
   items: ProjectEstimateItemRow[];
+  embedded?: boolean;
 }) {
   const state = useEstimateReviewsPage({ estimates, items });
 
   return (
-    <div className="p-0 sm:p-6">
-      <DashboardPageHero eyebrow="CEO Review" title="Estimate Approvals" />
+    <div className={cn("p-0", !embedded && "sm:p-6")}>
+      {!embedded ? (
+        <DashboardPageHero eyebrow="CEO Review" title="Estimate Approvals" />
+      ) : null}
 
       <EstimateReviewsTable
         estimates={state.sortedEstimates}

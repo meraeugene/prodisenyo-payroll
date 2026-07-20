@@ -42,15 +42,17 @@ export async function createMaterialRequestAction(
   const { user } = await requireRole(APP_ROLES.ENGINEER);
 
   const projectName = normalizeText(input.projectName);
+  const projectId = normalizeText(input.projectId);
   const materialName = normalizeText(input.materialName);
   const unit = normalizeText(input.unit);
   const neededBy = normalizeText(input.neededBy);
   const quantity = normalizeQuantity(input.quantity);
   const priority = normalizeText(input.priority).toLowerCase();
 
-  if (!projectName) {
-    throw new Error("Project name is required.");
-  }
+  if (!projectId) throw new Error("Project is required.");
+  const database = createSupabaseAdminClient() as any;
+  const { data: project } = await database.from("projects").select("id,name").eq("id", projectId).eq("assigned_engineer_id", user.id).neq("status", "archived").maybeSingle();
+  if (!project) throw new Error("Project is not assigned to you.");
 
   if (!materialName) {
     throw new Error("Material name is required.");
@@ -73,7 +75,8 @@ export async function createMaterialRequestAction(
   }
 
   const payload: Json = {
-    projectName,
+    projectId,
+    projectName: project.name,
     materialName,
     quantity,
     unit,
@@ -83,7 +86,6 @@ export async function createMaterialRequestAction(
     notes: normalizeOptionalText(input.notes),
   };
 
-  const database = createSupabaseAdminClient() as any;
   const requestId = randomUUID();
 
   const { data, error } = await database

@@ -37,7 +37,7 @@ export default function RoleGreetingHero({
           {title}
         </h1>
 
-        <div className="relative mt-2 max-w-lg rounded-[18px] bg-white px-3 py-2 text-apple-charcoal shadow-[0_10px_22px_rgba(15,23,42,0.15)] sm:px-4 sm:py-3">
+        <div className="relative mt-2 h-[78px] max-w-lg overflow-hidden rounded-[18px] bg-white px-3 py-2 text-apple-charcoal shadow-[0_10px_22px_rgba(15,23,42,0.15)] sm:h-[82px] sm:px-4 sm:py-3">
           <span
             aria-hidden="true"
             className="absolute -left-1 top-1/2 h-3 w-3 -translate-y-1/2 rotate-45 bg-white"
@@ -45,7 +45,7 @@ export default function RoleGreetingHero({
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-700/80">
             Prody
           </p>
-          <p className="mt-1 min-h-[2.5rem] text-xs leading-5 text-apple-steel sm:min-h-full sm:text-sm">
+          <p className="mt-1 line-clamp-2 text-xs leading-5 text-apple-steel sm:text-sm">
             <RoleHintTypewriter messages={messages} />
           </p>
         </div>

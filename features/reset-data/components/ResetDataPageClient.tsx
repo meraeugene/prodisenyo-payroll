@@ -52,8 +52,9 @@ export default function ResetDataPageClient() {
               Danger Zone
             </h2>
             <p className="text-sm text-red-700">
-              This removes attendance, payroll, overtime, estimates, budgets,
-              and request logs from the database.
+              This removes projects, progress, attendance, payroll, overtime,
+              estimates, budgets, employees, sites, catalogs, and request logs
+              from the database. Back up the database before continuing.
             </p>
             <p className="text-sm font-semibold text-red-800">
               Preserved tables: auth users and profile accounts.

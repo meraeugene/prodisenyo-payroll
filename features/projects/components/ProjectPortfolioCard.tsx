@@ -18,23 +18,6 @@ type ProjectPortfolioCardProps = {
   onOpen: () => void;
 };
 
-function getStatusTone(status: ProjectRecord["status"]) {
-  if (status === "active") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-800";
-  }
-  if (status === "planning") {
-    return "border-amber-200 bg-amber-50 text-amber-800";
-  }
-  if (status === "on_hold") {
-    return "border-slate-300 bg-slate-100 text-slate-700";
-  }
-  return "border-slate-200 bg-slate-50 text-slate-700";
-}
-
-function formatStatus(status: ProjectRecord["status"]) {
-  return status.replace(/_/g, " ");
-}
-
 export default function ProjectPortfolioCard({
   project,
   role,
@@ -55,22 +38,14 @@ export default function ProjectPortfolioCard({
           className="h-full w-full object-cover"
         />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.12)_0%,rgba(15,23,42,0.28)_42%,rgba(15,23,42,0.78)_100%)]" />
-        <div className="absolute left-4 top-4 flex items-center gap-2">
-          <span
-            className={cn(
-              "rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] shadow-sm",
-              getStatusTone(project.status),
-            )}
-          >
-            {formatStatus(project.status)}
-          </span>
-          {budgetWarning ? (
+        {budgetWarning ? (
+          <div className="absolute left-4 top-4 flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.1em] text-rose-700 shadow-sm">
               <AlertTriangle size={11} />
               Budget
             </span>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
         <div className="absolute inset-x-0 bottom-0 p-4 text-white">
           <h3 className="text-lg font-semibold leading-tight tracking-[-0.01em] [text-shadow:0_1px_3px_rgba(0,0,0,0.8)]">
             {project.name}

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function Page() {
-  redirect("/estimate-approvals");
+  redirect("/projects?section=estimate-approvals");
 }

@@ -1,5 +1,5 @@
-import BudgetTrackerPage from "@/features/budget-tracker/components/BudgetTrackerPage";
+import { redirect } from "next/navigation";
 
 export default function BudgetTrackerRoutePage() {
-  return <BudgetTrackerPage />;
+  redirect("/projects?section=budget-tracker");
 }

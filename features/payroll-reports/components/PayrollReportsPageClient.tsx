@@ -15,7 +15,7 @@ export default function PayrollReportsPageClient({
 
   return (
     <div className="p-0 sm:p-6">
-      <DashboardPageHero eyebrow="CEO Review" title="Payroll Approval Review" />
+      <DashboardPageHero eyebrow="CEO Review" title="Payroll Approvals" />
 
       <PayrollReportsArchiveSection
         reports={state.sortedReports}
