@@ -544,6 +544,7 @@ export interface Database {
         Row: {
           id: string; name: string; location: string; client_name: string | null;
           subject: string | null; lead: string | null; assigned_engineer_id: string | null;
+          assigned_estimate_engineer_id: string | null;
           status: "planning" | "active" | "on_hold" | "completed" | "archived";
           budget_ceiling: number; currency_code: string; start_date: string; end_date: string;
           description: string | null; image_url: string | null; created_by: string;
@@ -552,6 +553,7 @@ export interface Database {
         Insert: {
           id?: string; name: string; location: string; client_name?: string | null;
           subject?: string | null; lead?: string | null; assigned_engineer_id?: string | null;
+          assigned_estimate_engineer_id?: string | null;
           status?: "planning" | "active" | "on_hold" | "completed" | "archived";
           budget_ceiling: number; currency_code?: string; start_date: string; end_date: string;
           description?: string | null; image_url?: string | null; created_by: string;

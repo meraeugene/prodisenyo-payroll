@@ -26,7 +26,7 @@ function fieldClass(hasError: boolean, withPrefix = false) {
     : "mt-2 w-full rounded-[10px] px-4 py-3 text-sm outline-none";
   return `${base} transition focus:border-[#1f6a37] ${
     hasError
-      ? "border border-rose-300 "
+      ? "border border-red-500 bg-white"
       : "border border-apple-mist bg-[rgb(var(--apple-snow))]"
   }`;
 }
@@ -64,14 +64,8 @@ export default function BudgetTrackerSetupForm({
     const projectType = projectForm.projectType;
     const startingBudget = parseBudgetValue(projectBudgetInput);
 
-    if (!projectName) {
-      errors.name = "Project name is required.";
-    }
-
-    if (!projectType) {
-      errors.projectType = "Project type is required.";
-    }
-
+    if (!projectName) errors.name = "Project name is required.";
+    if (!projectType) errors.projectType = "Project type is required.";
     if (!Number.isFinite(startingBudget) || startingBudget <= 0) {
       errors.startingBudget = "Starting budget must be greater than zero.";
     }
@@ -95,8 +89,8 @@ export default function BudgetTrackerSetupForm({
   }
 
   return (
-    <section className="flex min-h-[calc(100vh-3rem)] w-full items-start justify-center pt-6 sm:items-center sm:pt-0">
-      <div className="w-full max-w-lg px-4 sm:px-0">
+    <section className="flex min-h-[calc(100vh-3rem)] w-full items-start justify-center px-4 pt-6 sm:items-center sm:pt-0">
+      <div className="w-full max-w-lg rounded-2xl border border-apple-mist bg-white p-6 shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
         {projects.length > 0 ? (
           <button
             type="button"
@@ -109,12 +103,19 @@ export default function BudgetTrackerSetupForm({
         ) : null}
 
         <div className="mt-5 sm:mt-6">
-          <h2 className="text-3xl font-semibold tracking-[-0.03em] text-apple-charcoal">
-            Set up your project
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-apple-steel">
+            Budget tracker
+          </p>
+          <h2 className="mt-1 text-2xl font-semibold text-apple-charcoal">
+            Set up your project budget
           </h2>
+          <p className="mt-2 text-sm leading-6 text-apple-steel">
+            Track estimated and actual costs for a project workspace.
+          </p>
         </div>
 
         <form
+          noValidate
           onSubmit={handleValidatedSubmit}
           className="mt-6 space-y-5 sm:mt-8 sm:space-y-6"
         >
@@ -124,15 +125,13 @@ export default function BudgetTrackerSetupForm({
             </label>
             <input
               value={projectForm.name}
+              aria-invalid={Boolean(fieldErrors.name)}
               onChange={(event) => {
                 onProjectFormChange((current) => ({
                   ...current,
                   name: event.target.value,
                 }));
-                setFieldErrors((current) => ({
-                  ...current,
-                  name: undefined,
-                }));
+                setFieldErrors((current) => ({ ...current, name: undefined }));
               }}
               placeholder="e.g. Dream Home, Kitchen Renovation"
               className={fieldClass(Boolean(fieldErrors.name))}
@@ -148,6 +147,7 @@ export default function BudgetTrackerSetupForm({
             </label>
             <select
               value={projectForm.projectType}
+              aria-invalid={Boolean(fieldErrors.projectType)}
               onChange={(event) => {
                 onProjectFormChange((current) => ({
                   ...current,
@@ -160,7 +160,7 @@ export default function BudgetTrackerSetupForm({
               }}
               className={`mt-2 w-full rounded-[10px] px-4 py-3 text-sm outline-none transition focus:border-[#1f6a37] ${
                 fieldErrors.projectType
-                  ? "border border-rose-300 "
+                  ? "border border-red-500 bg-white"
                   : "border border-apple-mist bg-white"
               }`}
             >
@@ -195,10 +195,11 @@ export default function BudgetTrackerSetupForm({
             </label>
             <div className="relative mt-2">
               <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-apple-steel">
-                ₱
+                PHP
               </span>
               <input
                 value={projectBudgetInput}
+                aria-invalid={Boolean(fieldErrors.startingBudget)}
                 onChange={(event) => {
                   onProjectBudgetChange(event.target.value);
                   setFieldErrors((current) => ({
@@ -208,10 +209,7 @@ export default function BudgetTrackerSetupForm({
                 }}
                 placeholder="2,500,000"
                 inputMode="decimal"
-                className={fieldClass(
-                  Boolean(fieldErrors.startingBudget),
-                  true,
-                )}
+                className={fieldClass(Boolean(fieldErrors.startingBudget), true)}
               />
             </div>
             {fieldErrors.startingBudget ? (
@@ -230,7 +228,7 @@ export default function BudgetTrackerSetupForm({
           <button
             type="submit"
             disabled={isPending}
-            className="inline-flex w-full items-center justify-center rounded-[10px] bg-[#1f6a37] px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center rounded-[10px] bg-[#1f6a37] px-5 py-3 text-sm font-semibold text-white shadow-[0_12px_26px_rgba(6,95,70,0.18)] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {pendingAction === "project" ? (
               <ButtonLoader label="Starting tracking costs" />

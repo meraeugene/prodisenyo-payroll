@@ -54,7 +54,38 @@ export function parseMaterialRequestPayload(params: {
     site: site || null,
     priority,
     notes: notes || null,
-    status: "pending",
+    status: "submitted",
     createdAt: params.createdAt,
+  };
+}
+
+export function mapMaterialRequestRow(row: {
+  id: string;
+  project_id: string;
+  project?: { name: string | null } | null;
+  material_name: string;
+  quantity: number;
+  unit: string;
+  needed_by: string;
+  site: string | null;
+  priority: MaterialRequestPriority;
+  notes: string | null;
+  status: MaterialRequestRecord["status"];
+  created_at: string;
+}): MaterialRequestRecord {
+  return {
+    id: row.id,
+    requestId: row.id,
+    projectId: row.project_id,
+    projectName: row.project?.name || "",
+    materialName: row.material_name,
+    quantity: Number(row.quantity),
+    unit: row.unit,
+    neededBy: row.needed_by,
+    site: row.site,
+    priority: row.priority,
+    notes: row.notes,
+    status: row.status,
+    createdAt: row.created_at,
   };
 }

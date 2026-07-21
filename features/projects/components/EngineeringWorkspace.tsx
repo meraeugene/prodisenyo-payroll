@@ -27,24 +27,11 @@ interface EngineeringWorkspaceProps {
   activities: EngineeringProgressActivityRecord[];
   materialsCount: number;
   materialContent: ReactNode;
+  readOnly?: boolean;
+  isSubmitting?: boolean;
   onBack: () => void;
   onTabChange: (tab: EngineeringWorkspaceTab) => void;
-  onAddActivity: (input: {
-    activity: string;
-    weightPercent: number;
-    progressPercent: number;
-  }) => void;
-  onUpdateActivity: (
-    id: string,
-    input: {
-      activity: string;
-      weightPercent: number;
-      progressPercent: number;
-    },
-  ) => void;
-  onImportActivities: (activities: ImportedProgressActivity[]) => void;
-  onDeleteActivity: (id: string) => void;
-  onDeleteAllActivities: () => void;
+  onSubmitProgress: (activities: ImportedProgressActivity[]) => void;
 }
 
 export default function EngineeringWorkspace({
@@ -53,13 +40,11 @@ export default function EngineeringWorkspace({
   activities,
   materialsCount,
   materialContent,
+  readOnly = false,
+  isSubmitting = false,
   onBack,
   onTabChange,
-  onAddActivity,
-  onUpdateActivity,
-  onImportActivities,
-  onDeleteActivity,
-  onDeleteAllActivities,
+  onSubmitProgress,
 }: EngineeringWorkspaceProps) {
   const activityRows = Array.isArray(activities) ? activities : [];
   const progressSummary = buildProgressSummary(activityRows);
@@ -141,11 +126,9 @@ export default function EngineeringWorkspace({
       {tab === "progress" ? (
         <EngineeringProgressWorksheet
           activities={activityRows}
-          onAddActivity={onAddActivity}
-          onUpdateActivity={onUpdateActivity}
-          onImportActivities={onImportActivities}
-          onDeleteActivity={onDeleteActivity}
-          onDeleteAllActivities={onDeleteAllActivities}
+          readOnly={readOnly}
+          isSubmitting={isSubmitting}
+          onSubmitProgress={onSubmitProgress}
         />
       ) : null}
 

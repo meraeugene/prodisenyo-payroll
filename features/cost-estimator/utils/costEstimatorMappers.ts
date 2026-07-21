@@ -42,6 +42,7 @@ export function buildEstimateDraftForm(
 
   return {
     id: estimate.id,
+    projectId: estimate.project_id ?? "",
     projectName: estimate.project_name,
     projectType: estimate.project_type ?? "",
     location:

@@ -551,7 +551,14 @@ export async function saveProjectEstimateDraftAction(
   const database = createSupabaseAdminClient() as any;
   const estimateId = normalizeText(input.id);
   const requestedTotal = normalizeMoney(input.costEstimate);
-  const { data: linkedProject } = await database.from("projects").select("id,name,location").eq("assigned_engineer_id", user.id).eq(input.projectId ? "id" : "name", input.projectId || normalizeText(input.projectName)).neq("status", "archived").limit(1).maybeSingle();
+  const { data: linkedProject } = await database
+    .from("projects")
+    .select("id,name,location")
+    .or(`assigned_engineer_id.eq.${user.id},assigned_estimate_engineer_id.eq.${user.id}`)
+    .eq(input.projectId ? "id" : "name", input.projectId || normalizeText(input.projectName))
+    .neq("status", "archived")
+    .limit(1)
+    .maybeSingle();
   if (!linkedProject) throw new Error("Select a project assigned to you before saving an estimate.");
   input = { ...input, projectId: linkedProject.id, projectName: linkedProject.name, location: linkedProject.location };
 

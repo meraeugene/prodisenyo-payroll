@@ -12,7 +12,7 @@ export interface MaterialRequestRecord {
   site: string | null;
   priority: MaterialRequestPriority;
   notes: string | null;
-  status: "pending";
+  status: "submitted" | "approved" | "rejected" | "purchasing" | "ordered" | "received" | "cancelled";
   createdAt: string;
 }
 

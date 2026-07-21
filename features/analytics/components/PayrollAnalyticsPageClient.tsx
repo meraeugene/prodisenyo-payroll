@@ -34,7 +34,6 @@ export default function PayrollAnalyticsPageClient() {
       <DashboardPageHero
         eyebrow="Data Analytics"
         title="Payroll Analytics"
-        description="Track payroll distribution, employee compensation, project costs, and payroll insights for the selected pay period."
       />
       {periodOptions.length > 0 ? (
         <section className="rounded-[14px] border border-apple-mist bg-white p-4 shadow-[0_10px_30px_rgba(24,83,43,0.07)]">

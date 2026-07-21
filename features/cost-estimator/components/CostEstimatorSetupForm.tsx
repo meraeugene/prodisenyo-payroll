@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Calculator } from "lucide-react";
 import ButtonLoader from "@/features/budget-tracker/components/ButtonLoader";
 import { BUDGET_PROJECT_TYPE_OPTIONS } from "@/features/budget-tracker/types";
 import {
@@ -8,12 +8,16 @@ import {
   sanitizeBudgetNumericInput,
 } from "@/features/budget-tracker/utils/budgetTrackerFormatters";
 import { cn } from "@/lib/utils";
-import type { ProjectEstimateDraftForm } from "@/features/cost-estimator/types";
+import type {
+  AssignedEstimateProject,
+  ProjectEstimateDraftForm,
+} from "@/features/cost-estimator/types";
 import type { BudgetProjectType } from "@/types/database";
 
 export default function CostEstimatorSetupForm({
   hasExistingProjects,
   form,
+  assignedProjects,
   errors,
   pending,
   onBack,
@@ -22,9 +26,10 @@ export default function CostEstimatorSetupForm({
 }: {
   hasExistingProjects: boolean;
   form: ProjectEstimateDraftForm;
+  assignedProjects: AssignedEstimateProject[];
   errors: Partial<
     Record<
-      "projectName" | "projectType" | "location" | "ownerName" | "costEstimate",
+      "projectId" | "projectName" | "projectType" | "location" | "ownerName" | "costEstimate",
       string
     >
   >;
@@ -50,7 +55,7 @@ export default function CostEstimatorSetupForm({
 
   return (
     <section className="flex min-h-[calc(100vh-69px)] w-full justify-center px-6 py-10 xl:py-12">
-      <div className="w-full max-w-lg min-h-[720px]">
+      <div className="min-h-[720px] w-full max-w-2xl rounded-2xl border border-apple-mist bg-white p-6 shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
         {hasExistingProjects ? (
           <button
             type="button"
@@ -63,23 +68,56 @@ export default function CostEstimatorSetupForm({
         ) : null}
 
         <div className="mt-6">
-          <h2 className="text-3xl font-semibold tracking-[-0.03em] text-apple-charcoal">
-            Set up your project
+          <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-800">
+            <Calculator size={18} />
+          </div>
+          <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-apple-steel">
+            Cost estimate
+          </p>
+          <h2 className="mt-1 text-2xl font-semibold text-apple-charcoal">
+            Set up the project estimate
           </h2>
+          <p className="mt-2 text-sm text-apple-steel">
+            Choose one of the projects assigned to you for estimating, then build the estimate for CEO review.
+          </p>
         </div>
 
         <div className="mt-8 space-y-6">
           <div>
             <label className="text-sm font-semibold text-apple-charcoal">
-              Project name <span className="text-rose-500">*</span>
+              Assigned project <span className="text-rose-500">*</span>
+            </label>
+            <select
+              value={form.projectId}
+              onChange={(event) => onFieldChange("projectId", event.target.value)}
+              className={cn(
+                "mt-2 w-full rounded-[10px] border bg-white px-4 py-3 text-sm outline-none transition focus:border-[#1f6a37]",
+                errors.projectId ? "border-red-500" : "border-apple-mist",
+              )}
+            >
+              <option value="">Select assigned project</option>
+              {assignedProjects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+            {errors.projectId ? (
+              <p className="mt-2 text-sm text-rose-600">{errors.projectId}</p>
+            ) : null}
+          </div>
+
+          <div>
+            <label className="text-sm font-semibold text-apple-charcoal">
+              Project name
             </label>
             <input
               value={form.projectName}
-              onChange={(event) => onFieldChange("projectName", event.target.value)}
-              placeholder="e.g. Dream Home, Kitchen Renovation"
+              readOnly
+              placeholder="Selected project name"
               className={cn(
-                "mt-2 w-full rounded-[10px] border bg-[rgb(var(--apple-snow))] px-4 py-3 text-sm outline-none focus:border-[#1f6a37]",
-                errors.projectName ? "border-rose-300" : "border-apple-mist",
+                "mt-2 w-full rounded-[10px] border bg-[rgb(var(--apple-snow))] px-4 py-3 text-sm outline-none",
+                errors.projectName ? "border-red-500" : "border-apple-mist",
               )}
             />
             {errors.projectName ? (
@@ -101,7 +139,7 @@ export default function CostEstimatorSetupForm({
               }
               className={cn(
                 "mt-2 w-full rounded-[10px] border bg-white px-4 py-3 text-sm outline-none focus:border-[#1f6a37]",
-                errors.projectType ? "border-rose-300" : "border-apple-mist",
+                errors.projectType ? "border-red-500" : "border-apple-mist",
               )}
             >
               <option value="">Select a type</option>
@@ -132,7 +170,7 @@ export default function CostEstimatorSetupForm({
                 placeholder="e.g. Quezon City, Metro Manila"
                 className={cn(
                   "mt-2 w-full rounded-[10px] border bg-[rgb(var(--apple-snow))] px-4 py-3 text-sm outline-none focus:border-[#1f6a37]",
-                  errors.location ? "border-rose-300" : "border-apple-mist",
+                  errors.location ? "border-red-500" : "border-apple-mist",
                 )}
               />
               {errors.location ? (
@@ -150,7 +188,7 @@ export default function CostEstimatorSetupForm({
                 placeholder="e.g. Maria Santos"
                 className={cn(
                   "mt-2 w-full rounded-[10px] border bg-[rgb(var(--apple-snow))] px-4 py-3 text-sm outline-none focus:border-[#1f6a37]",
-                  errors.ownerName ? "border-rose-300" : "border-apple-mist",
+                  errors.ownerName ? "border-red-500" : "border-apple-mist",
                 )}
               />
               {errors.ownerName ? (
@@ -179,7 +217,7 @@ export default function CostEstimatorSetupForm({
                 inputMode="decimal"
                 className={cn(
                   "w-full rounded-[10px] border bg-[rgb(var(--apple-snow))] px-9 py-3 text-sm outline-none focus:border-[#1f6a37]",
-                  errors.costEstimate ? "border-rose-300" : "border-apple-mist",
+                  errors.costEstimate ? "border-red-500" : "border-apple-mist",
                 )}
               />
             </div>
@@ -216,7 +254,7 @@ export default function CostEstimatorSetupForm({
             disabled={pending}
             className="inline-flex w-full items-center justify-center rounded-[10px] bg-[#1f6a37] px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {pending ? <ButtonLoader label="Creating project" /> : "Start tracking costs"}
+            {pending ? <ButtonLoader label="Creating estimate" /> : "Start cost estimate"}
           </button>
         </div>
       </div>

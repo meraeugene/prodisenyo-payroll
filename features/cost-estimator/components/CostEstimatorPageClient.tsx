@@ -15,6 +15,7 @@ import EstimateRejectedAlertModal from "@/features/cost-estimator/components/Est
 import { useCostEstimatorPage } from "@/features/cost-estimator/hooks/useCostEstimatorPage";
 import type {
   CostCatalogItemRow,
+  AssignedEstimateProject,
   ProjectEstimateItemRow,
   ProjectEstimateRow,
 } from "@/features/cost-estimator/types";
@@ -23,10 +24,14 @@ export default function CostEstimatorPageClient({
   estimates,
   items,
   catalogItems,
+  initialProjectId,
+  assignedProjects,
 }: {
   estimates: ProjectEstimateRow[];
   items: ProjectEstimateItemRow[];
   catalogItems: CostCatalogItemRow[];
+  initialProjectId: string;
+  assignedProjects: AssignedEstimateProject[];
 }) {
   const [pendingDeleteItemIndices, setPendingDeleteItemIndices] = useState<
     number[] | null
@@ -46,6 +51,8 @@ export default function CostEstimatorPageClient({
     estimates,
     items,
     catalogItems,
+    initialProjectId,
+    assignedProjects,
   });
   const isSavingChanges = state.saveState === "saving";
   const isUiLocked = state.pendingEstimateAction || isSavingChanges;
@@ -95,6 +102,7 @@ export default function CostEstimatorPageClient({
         <CostEstimatorSetupForm
           hasExistingProjects={state.sortedEstimates.length > 0}
           form={state.estimateForm}
+          assignedProjects={assignedProjects}
           errors={state.setupFormErrors}
           pending={state.pendingEstimateAction}
           onBack={state.handleCloseProjectSetup}

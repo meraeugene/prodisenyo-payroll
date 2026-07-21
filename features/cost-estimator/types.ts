@@ -51,6 +51,7 @@ export interface ProjectEstimateDraftLine {
 
 export interface ProjectEstimateDraftForm {
   id?: string;
+  projectId: string;
   projectName: string;
   projectType: BudgetProjectType | "";
   location: string;
@@ -82,6 +83,7 @@ export interface EstimateItemModalMaterialForm {
 }
 
 export const EMPTY_ESTIMATE_FORM: ProjectEstimateDraftForm = {
+  projectId: "",
   projectName: "",
   projectType: "",
   location: "",
@@ -91,6 +93,16 @@ export const EMPTY_ESTIMATE_FORM: ProjectEstimateDraftForm = {
   notes: "",
   items: [],
 };
+
+export interface AssignedEstimateProject {
+  id: string;
+  name: string;
+  location: string;
+  clientName: string | null;
+  subject: string | null;
+  lead: string | null;
+  budgetCeiling: number;
+}
 
 export const EMPTY_ESTIMATE_ITEM_MODAL_FORM: EstimateItemModalForm = {
   displayName: "",

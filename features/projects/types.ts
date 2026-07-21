@@ -16,6 +16,8 @@ export interface ProjectRecord {
   manager: string;
   engineer: string;
   assignedEngineerId?: string | null;
+  estimateEngineer?: string;
+  assignedEstimateEngineerId?: string | null;
   imageUrl?: string | null;
   tasksCount: number;
   completedTasksCount: number;

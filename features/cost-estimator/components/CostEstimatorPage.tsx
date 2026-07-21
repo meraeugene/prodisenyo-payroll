@@ -2,16 +2,22 @@ import { APP_ROLES, requireRole } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type {
   CostCatalogItemRow,
+  AssignedEstimateProject,
   ProjectEstimateItemRow,
   ProjectEstimateRow,
 } from "@/features/cost-estimator/types";
 import CostEstimatorPageClient from "@/features/cost-estimator/components/CostEstimatorPageClient";
 
-export default async function CostEstimatorPage() {
+export default async function CostEstimatorPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ projectId?: string }>;
+}) {
   const { user } = await requireRole(APP_ROLES.ENGINEER);
   const supabase = await createSupabaseServerClient();
+  const initialProjectId = (await searchParams)?.projectId ?? "";
 
-  const [{ data: estimateData }, { data: catalogData }] = await Promise.all([
+  const [{ data: estimateData }, { data: catalogData }, { data: projectData }] = await Promise.all([
     supabase
       .from("project_estimates")
       .select("*")
@@ -21,6 +27,12 @@ export default async function CostEstimatorPage() {
       .from("cost_catalog_items")
       .select("*")
       .order("name", { ascending: true }),
+    supabase
+      .from("projects")
+      .select("id,name,location,client_name,subject,lead,budget_ceiling")
+      .or(`assigned_estimate_engineer_id.eq.${user.id},assigned_engineer_id.eq.${user.id}`)
+      .neq("status", "archived")
+      .order("created_at", { ascending: false }),
   ]);
 
   const estimates = (estimateData ?? []) as ProjectEstimateRow[];
@@ -43,6 +55,16 @@ export default async function CostEstimatorPage() {
       estimates={estimates}
       items={items}
       catalogItems={(catalogData ?? []) as CostCatalogItemRow[]}
+      initialProjectId={initialProjectId}
+      assignedProjects={(projectData ?? []).map((project: any) => ({
+        id: project.id,
+        name: project.name,
+        location: project.location,
+        clientName: project.client_name,
+        subject: project.subject,
+        lead: project.lead,
+        budgetCeiling: Number(project.budget_ceiling ?? 0),
+      })) as AssignedEstimateProject[]}
     />
   );
 }

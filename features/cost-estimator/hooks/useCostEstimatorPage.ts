@@ -12,6 +12,7 @@ import {
 import {
   EMPTY_ESTIMATE_FORM,
   EMPTY_ESTIMATE_ITEM_MODAL_FORM,
+  type AssignedEstimateProject,
   type CostCatalogItemRow,
   type EstimateItemModalForm,
   type EstimateItemModalMaterialForm,
@@ -43,11 +44,13 @@ interface UseCostEstimatorPageOptions {
   estimates: ProjectEstimateRow[];
   items: ProjectEstimateItemRow[];
   catalogItems: CostCatalogItemRow[];
+  initialProjectId?: string;
+  assignedProjects: AssignedEstimateProject[];
 }
 
 type SetupFormErrors = Partial<
   Record<
-    "projectName" | "projectType" | "location" | "ownerName" | "costEstimate",
+    "projectId" | "projectName" | "projectType" | "location" | "ownerName" | "costEstimate",
     string
   >
 >;
@@ -121,25 +124,55 @@ export function useCostEstimatorPage({
   estimates: initialEstimates,
   items: initialItems,
   catalogItems,
+  initialProjectId = "",
+  assignedProjects,
 }: UseCostEstimatorPageOptions) {
   const initialItemsMap = useMemo(
     () => buildEstimateItemsMap(initialItems),
     [initialItems],
   );
+  const initialLinkedEstimate =
+    initialProjectId
+      ? initialEstimates.find((estimate) => estimate.project_id === initialProjectId) ?? null
+      : null;
+  const initialAssignedProject =
+    initialProjectId
+      ? assignedProjects.find((project) => project.id === initialProjectId) ?? null
+      : null;
   const [estimates, setEstimates] = useState(initialEstimates);
   const [itemsByEstimateId, setItemsByEstimateId] = useState(initialItemsMap);
   const [selectedEstimateId, setSelectedEstimateId] = useState<string | null>(
-    initialEstimates[0]?.id ?? null,
+    initialLinkedEstimate?.id ?? initialEstimates[0]?.id ?? null,
   );
   const [estimateForm, setEstimateForm] = useState<ProjectEstimateDraftForm>(
-    () =>
-      buildEstimateDraftForm(
+    () => {
+      if (initialLinkedEstimate) {
+        return buildEstimateDraftForm(
+          initialLinkedEstimate,
+          initialItemsMap[initialLinkedEstimate.id] ?? [],
+        );
+      }
+
+      if (initialAssignedProject) {
+        return {
+          ...EMPTY_ESTIMATE_FORM,
+          projectId: initialAssignedProject.id,
+          projectName: initialAssignedProject.name,
+          location: initialAssignedProject.location,
+          ownerName: initialAssignedProject.clientName || initialAssignedProject.lead || "",
+          costEstimate: initialAssignedProject.budgetCeiling,
+          draftedDate: new Date().toISOString(),
+        };
+      }
+
+      return buildEstimateDraftForm(
         initialEstimates[0] ?? null,
         initialItemsMap[initialEstimates[0]?.id ?? ""] ?? [],
-      ),
+      );
+    },
   );
   const [projectSetupOpen, setProjectSetupOpen] = useState(
-    initialEstimates.length === 0,
+    Boolean(initialAssignedProject && !initialLinkedEstimate) || initialEstimates.length === 0,
   );
   const [itemModalOpen, setItemModalOpen] = useState(false);
   const [itemModalForm, setItemModalForm] = useState<EstimateItemModalForm>(
@@ -325,6 +358,7 @@ export function useCostEstimatorPage({
 
     const normalizeForm = (form: ProjectEstimateDraftForm) => ({
       projectName: form.projectName.trim(),
+      projectId: form.projectId,
       projectType: form.projectType || "",
       location: form.location.trim(),
       ownerName: form.ownerName.trim(),
@@ -565,6 +599,7 @@ export function useCostEstimatorPage({
   ) {
     if (
       field === "projectName" ||
+      field === "projectId" ||
       field === "projectType" ||
       field === "location" ||
       field === "ownerName" ||
@@ -577,6 +612,18 @@ export function useCostEstimatorPage({
     }
 
     setEstimateForm((current) => {
+      if (field === "projectId") {
+        const selectedProject = assignedProjects.find((project) => project.id === value);
+        return {
+          ...current,
+          projectId: value,
+          projectName: selectedProject?.name ?? "",
+          location: selectedProject?.location ?? "",
+          ownerName: selectedProject?.clientName || selectedProject?.lead || current.ownerName,
+          costEstimate: selectedProject?.budgetCeiling || current.costEstimate,
+        };
+      }
+
       if (field === "costEstimate") {
         return {
           ...current,
@@ -595,6 +642,7 @@ export function useCostEstimatorPage({
     const nextForm = ensureEstimateLineTotals(estimateForm);
     const saved = await saveProjectEstimateDraftAction({
       id: nextForm.id,
+      projectId: nextForm.projectId,
       projectName: nextForm.projectName,
       projectType: nextForm.projectType,
       location: nextForm.location,
@@ -1179,6 +1227,10 @@ export function useCostEstimatorPage({
 
   function validateSetupForm(form: ProjectEstimateDraftForm) {
     const errors: SetupFormErrors = {};
+
+    if (!form.projectId) {
+      errors.projectId = "Select an assigned project.";
+    }
 
     if (!form.projectName.trim()) {
       errors.projectName = "Project name is required.";

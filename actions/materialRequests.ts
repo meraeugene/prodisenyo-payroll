@@ -4,7 +4,10 @@ import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { APP_ROLES, requireRole } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
-import { parseMaterialRequestPayload } from "@/features/material-requests/utils/materialRequestMappers";
+import {
+  mapMaterialRequestRow,
+  parseMaterialRequestPayload,
+} from "@/features/material-requests/utils/materialRequestMappers";
 import type {
   CreateMaterialRequestInput,
   MaterialRequestPriority,
@@ -86,7 +89,28 @@ export async function createMaterialRequestAction(
     notes: normalizeOptionalText(input.notes),
   };
 
-  const requestId = randomUUID();
+  const { data: requestRow, error: requestError } = await database
+    .from("material_requests")
+    .insert({
+      project_id: projectId,
+      requested_by: user.id,
+      material_name: materialName,
+      quantity,
+      unit,
+      needed_by: neededBy,
+      site: normalizeOptionalText(input.site),
+      priority,
+      notes: normalizeOptionalText(input.notes),
+      status: "submitted",
+    })
+    .select("id, project_id, project:projects(name), material_name, quantity, unit, needed_by, site, priority, notes, status, created_at")
+    .single();
+
+  if (!requestError && requestRow) {
+    revalidatePath("/request-material");
+    revalidatePath(`/projects/${projectId}`);
+    return mapMaterialRequestRow(requestRow);
+  }
 
   const { data, error } = await database
     .from("audit_logs")
@@ -94,7 +118,7 @@ export async function createMaterialRequestAction(
       actor_id: user.id,
       action: "material_request_created",
       entity_type: "material_request",
-      entity_id: requestId,
+      entity_id: randomUUID(),
       payload,
     })
     .select("id, entity_id, payload, created_at")
