@@ -7,6 +7,7 @@ import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   Building2,
+  BadgeDollarSign,
   Calculator,
   ChevronsLeft,
   ChevronsRight,
@@ -106,6 +107,10 @@ const EMPLOYEE_NAV_ITEMS = [
   { href: "/home", label: "Home", icon: House },
   { href: "/request-overtime", label: "Request Overtime", icon: Clock3 },
 ] as const;
+const PURCHASER_NAV_ITEMS = [
+  { href: "/purchasing-approvals", label: "Purchasing", icon: BadgeDollarSign },
+] as const;
+
 
 type ProfileCardData = Pick<
   Database["public"]["Tables"]["profiles"]["Row"],
@@ -116,6 +121,7 @@ function formatRoleLabel(role: ProfileCardData["role"] | null): string {
   if (role === "admin") return "Administrator";
   if (role === "ceo") return "Chief Executive Officer";
   if (role === "payroll_manager") return "Payroll Manager";
+  if (role === "purchaser") return "Purchaser";
   if (role === "engineer") return "Engineer";
   if (role === "employee") return "Employee";
   return "Signed-in user";
@@ -218,6 +224,7 @@ export default function DashboardShell({
   const isAdmin = profile?.role === "admin";
   const isPayrollManager = profile?.role === "payroll_manager";
   const isEngineer = profile?.role === "engineer";
+  const isPurchaser = profile?.role === "purchaser";
   const isEmployee = profile?.role === "employee";
   const navState = useDashboardNavState(profile?.id ?? null, profile?.role ?? null);
   const canSeeWorkflowNav =
@@ -347,7 +354,9 @@ export default function DashboardShell({
                   ? PAYROLL_MANAGER_GENERAL_ITEMS
                   : isEngineer
                     ? ENGINEER_GENERAL_ITEMS
-                    : isEmployee
+                    : isPurchaser
+                      ? PURCHASER_NAV_ITEMS
+                      : isEmployee
                       ? EMPLOYEE_NAV_ITEMS
                       : PRIMARY_NAV_ITEMS
               ).map((item) =>

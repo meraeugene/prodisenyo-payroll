@@ -36,6 +36,12 @@
     "role": "engineer"
   },
   {
+    "username": "purchaser",
+    "password": "ChangeMe123!",
+    "full_name": "Purchasing Officer",
+    "role": "purchaser"
+  },
+  {
     "username": "employee",
     "password": "ChangeMe123!",
     "full_name": "Site Employee",

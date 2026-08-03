@@ -8,6 +8,7 @@ export function roleLabel(role: ProfileRow["role"] | null) {
   if (role === "admin") return "Administrator";
   if (role === "ceo") return "Chief Executive Officer";
   if (role === "payroll_manager") return "Payroll Manager";
+  if (role === "purchaser") return "Purchaser";
   if (role === "engineer") return "Engineer";
   return "Signed-in user";
 }

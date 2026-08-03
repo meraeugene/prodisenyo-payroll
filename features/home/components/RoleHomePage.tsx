@@ -134,6 +134,19 @@ const ROLE_FEATURES: Record<AppRole, FeatureCard[]> = {
       description: "Manage account settings and preferences.",
     },
   ],
+  purchaser: [
+    {
+      href: "/purchasing-approvals",
+      title: "Purchasing",
+      description:
+        "Track approved material purchases, suppliers, costs, invoices, and deliveries.",
+    },
+    {
+      href: "/settings",
+      title: "Settings",
+      description: "Manage account settings and preferences.",
+    },
+  ],
   engineer: [
     {
       href: "/overview",

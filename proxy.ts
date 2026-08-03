@@ -28,6 +28,7 @@ export const config = {
     "/payroll-change/:path*",
     "/payroll-approvals/:path*",
     "/payroll-reports/:path*",
+    "/purchasing-approvals/:path*",
     "/settings/:path*",
   ],
 };

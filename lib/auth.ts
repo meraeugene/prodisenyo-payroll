@@ -14,6 +14,7 @@ export const APP_ROLES = {
   ADMIN: "admin",
   CEO: "ceo",
   PAYROLL_MANAGER: "payroll_manager",
+  PURCHASER: "purchaser",
   ENGINEER: "engineer",
   EMPLOYEE: "employee",
 } as const satisfies Record<string, AppRole>;
@@ -24,6 +25,7 @@ export function getRoleHomePath(role: AppRole | null | undefined) {
   if (role === APP_ROLES.ADMIN) return "/add-user";
   if (role === APP_ROLES.CEO) return "/projects";
   if (role === APP_ROLES.PAYROLL_MANAGER) return "/home";
+  if (role === APP_ROLES.PURCHASER) return "/purchasing-approvals";
   if (role === APP_ROLES.ENGINEER) return "/projects";
   if (role === APP_ROLES.EMPLOYEE) return "/home";
   return "/dashboard";

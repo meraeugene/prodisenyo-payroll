@@ -42,6 +42,7 @@ function validateRole(role: AppRole) {
       APP_ROLES.PAYROLL_MANAGER,
       APP_ROLES.ENGINEER,
       APP_ROLES.EMPLOYEE,
+      APP_ROLES.PURCHASER,
     ].includes(role)
   ) {
     throw new Error("Role is required.");

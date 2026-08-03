@@ -88,6 +88,11 @@ const ADMIN_REDIRECT_PATH = "/add-user";
 const PAYROLL_MANAGER_REDIRECT_PATH = "/home";
 const ENGINEER_REDIRECT_PATH = "/projects";
 const EMPLOYEE_REDIRECT_PATH = "/home";
+const PURCHASER_REDIRECT_PATH = "/purchasing-approvals";
+const PURCHASER_ALLOWED_PREFIXES = [
+  "/purchasing-approvals",
+  "/settings",
+] as const;
 const ENGINEER_ALLOWED_PREFIXES = [
   "/projects",
   "/cost-estimator",
@@ -133,6 +138,12 @@ function isCeoOnlyPath(pathname: string) {
 
 function isAllowedEngineerPath(pathname: string) {
   return ENGINEER_ALLOWED_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+}
+
+function isAllowedPurchaserPath(pathname: string) {
+  return PURCHASER_ALLOWED_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
 }
@@ -221,6 +232,8 @@ export async function updateSession(request: NextRequest) {
             ? PAYROLL_MANAGER_REDIRECT_PATH
             : currentRole === "engineer"
               ? ENGINEER_REDIRECT_PATH
+            : currentRole === "purchaser"
+              ? PURCHASER_REDIRECT_PATH
               : currentRole === "employee"
                 ? EMPLOYEE_REDIRECT_PATH
                 : "/dashboard";
@@ -318,6 +331,17 @@ export async function updateSession(request: NextRequest) {
     ) {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = EMPLOYEE_REDIRECT_PATH;
+      redirectUrl.searchParams.delete("required");
+      return redirect(redirectUrl);
+    }
+
+    if (
+      !profileError &&
+      currentRole === "purchaser" &&
+      !isAllowedPurchaserPath(pathname)
+    ) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = PURCHASER_REDIRECT_PATH;
       redirectUrl.searchParams.delete("required");
       return redirect(redirectUrl);
     }

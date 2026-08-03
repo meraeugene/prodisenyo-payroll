@@ -10,6 +10,7 @@ export type AppRole =
   | "admin"
   | "ceo"
   | "payroll_manager"
+  | "purchaser"
   | "engineer"
   | "employee";
 export type PayrollRunStatus = "draft" | "submitted" | "approved" | "rejected";
