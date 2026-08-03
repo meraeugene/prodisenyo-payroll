@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import useSWR from "swr";
 import {
   ArrowLeft,
   CheckCircle2,
-  Eye,
   LoaderCircle,
   XCircle,
 } from "lucide-react";
@@ -23,12 +22,9 @@ import {
 import MaterialApprovalsPageClient from "@/features/material-approvals/components/MaterialApprovalsPageClient";
 import PurchasingApprovalsPageClient from "@/features/purchasing-approvals/components/PurchasingApprovalsPageClient";
 import EstimateReportModal from "@/features/cost-estimator/components/EstimateReportModal";
-import {
-  formatBudgetMoney,
-  formatEstimateDateTime,
-  formatProjectTypeLabel,
-} from "@/features/cost-estimator/utils/costEstimatorFormatters";
 import EngineeringProgressWorksheet from "./EngineeringProgressWorksheet";
+import ProjectEstimateReviewSection from "./ProjectEstimateReviewSection";
+import ProjectWorkspaceTabSkeleton from "./ProjectWorkspaceTabSkeleton";
 import type { ImportedProgressActivity } from "../utils/engineeringProgressImport";
 import type { EngineeringProgressActivityRecord } from "../utils/engineeringWorkspace";
 import type {
@@ -62,6 +58,7 @@ type WorkspaceData = {
 };
 
 const TABS = ["overview", "estimates", "materials", "purchasing", "budget"] as const;
+type WorkspaceTab = (typeof TABS)[number];
 
 function mapActivity(projectName: string, activity: Activity): EngineeringProgressActivityRecord {
   return {
@@ -97,7 +94,11 @@ export default function ProjectWorkspaceClient({
   const router = useRouter();
   const params = useSearchParams();
   const selected = params.get("tab");
-  const tab = TABS.includes(selected as any) ? selected! : "overview";
+  const tab = TABS.includes(selected as WorkspaceTab)
+    ? (selected as WorkspaceTab)
+    : "overview";
+  const [pendingTab, setPendingTab] = useState<WorkspaceTab | null>(null);
+  const [isTabPending, startTabTransition] = useTransition();
   const [isSubmittingProgress, setIsSubmittingProgress] = useState(false);
   const [pendingEstimateAction, setPendingEstimateAction] = useState<{
     id: string;
@@ -139,6 +140,24 @@ export default function ProjectWorkspaceClient({
       router.replace(`/cost-estimator?projectId=${project.id}`);
     }
   }, [canCreateEstimate, canReviewEstimates, project.id, router, tab]);
+
+  useEffect(() => {
+    if (!isTabPending) setPendingTab(null);
+  }, [isTabPending]);
+
+  function switchTab(nextTab: WorkspaceTab) {
+    if (nextTab === tab || isTabPending) return;
+
+    const href =
+      nextTab === "estimates" && canCreateEstimate && !canReviewEstimates
+        ? `/cost-estimator?projectId=${project.id}`
+        : `/projects/${project.id}?tab=${nextTab}`;
+
+    setPendingTab(nextTab);
+    startTabTransition(() => {
+      router.push(href);
+    });
+  }
 
   function submitProgress(nextActivities: ImportedProgressActivity[]) {
     if (!canUpdateProgress) return;
@@ -249,28 +268,32 @@ export default function ProjectWorkspaceClient({
 
       <nav className="flex gap-2 overflow-x-auto border-b border-slate-200 pb-3">
         {TABS.map((item) => {
-          const href =
-            item === "estimates" && canCreateEstimate && !canReviewEstimates
-              ? `/cost-estimator?projectId=${project.id}`
-              : `/projects/${project.id}?tab=${item}`;
+          const isActive = (pendingTab ?? tab) === item;
 
           return (
-            <Link
+            <button
+              type="button"
               key={item}
-              href={href}
+              onClick={() => switchTab(item)}
+              aria-current={isActive ? "page" : undefined}
+              disabled={isTabPending}
               className={`rounded-lg px-4 py-2 text-sm font-semibold capitalize transition ${
-                tab === item
+                isActive
                   ? "bg-emerald-800 text-white shadow-sm"
                   : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-              }`}
+              } disabled:cursor-wait`}
             >
               {item === "overview" ? "Progress" : item}
-            </Link>
+            </button>
           );
         })}
       </nav>
 
-      {tab === "overview" ? (
+      {isTabPending ? (
+        <ProjectWorkspaceTabSkeleton tab={pendingTab ?? tab} />
+      ) : null}
+
+      {!isTabPending && tab === "overview" ? (
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-3">
             <Card label="Completion" value={`${project.progress}%`} />
@@ -286,109 +309,30 @@ export default function ProjectWorkspaceClient({
         </div>
       ) : null}
 
-      {tab === "estimates" && canReviewEstimates ? (
-        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="divide-y divide-slate-100">
-            {liveEstimates.map((item) => (
-              <div key={item.id} className="grid gap-4 py-4 text-sm lg:grid-cols-[1.4fr_0.75fr_auto] lg:items-center">
-                <div
-                  className={
-                    item.status === "draft"
-                      ? "w-full rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center font-semibold text-slate-500"
-                      : "space-y-2"
-                  }
-                >
-                  <p className="font-semibold capitalize text-slate-950">
-                    {item.status === "draft"
-                      ? "Waiting for engineer submission"
-                      : item.status === "submitted"
-                        ? "Needs CEO approval"
-                        : item.status}
-                  </p>
-                  {item.status !== "draft" ? (
-                    <div className="grid gap-2 text-xs text-slate-500 sm:grid-cols-2 xl:grid-cols-4">
-                      <span>Project: {item.project_name}</span>
-                      <span>Type: {formatProjectTypeLabel(item.project_type)}</span>
-                      <span>
-                        Submitted: {formatEstimateDateTime(item.submitted_at ?? item.created_at)}
-                      </span>
-                      <span>
-                        Engineer:{" "}
-                        {item.requester_profile?.full_name?.trim() ||
-                          item.requester_profile?.username ||
-                          "Unknown engineer"}
-                      </span>
-                    </div>
-                  ) : null}
-                </div>
-                <span className={item.status === "draft" ? "hidden" : Number(item.estimate_total) > project.budget ? "font-bold text-rose-600" : "font-semibold text-emerald-700"}>
-                  {formatBudgetMoney(item.estimate_total)}
-                  {Number(item.estimate_total) > project.budget ? " · Over ceiling" : ""}
-                </span>
-                {item.status === "submitted" ? (
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <button
-                      type="button"
-                      onClick={() => setActiveEstimateId(item.id)}
-                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                    >
-                      <Eye size={16} />
-                      View details
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setReturnEstimateId(item.id)}
-                      disabled={pendingEstimateAction !== null}
-                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-emerald-50 px-4 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {pendingEstimateAction?.id === item.id &&
-                      pendingEstimateAction.type === "return" ? (
-                        <LoaderCircle size={15} className="animate-spin" />
-                      ) : (
-                        <XCircle size={16} />
-                      )}
-                      Return
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => approveEstimate(item.id)}
-                      disabled={pendingEstimateAction !== null}
-                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-emerald-800 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {pendingEstimateAction?.id === item.id &&
-                      pendingEstimateAction.type === "approve" ? (
-                        <LoaderCircle size={15} className="animate-spin" />
-                      ) : (
-                        <CheckCircle2 size={16} />
-                      )}
-                      Approve
-                    </button>
-                  </div>
-                ) : item.status !== "draft" ? (
-                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">
-                    No action needed
-                  </span>
-                ) : null}
-              </div>
-            ))}
-            {!liveEstimates.length ? <p className="py-4 text-sm text-slate-500">No estimates submitted for CEO approval yet.</p> : null}
-          </div>
-        </section>
+      {!isTabPending && tab === "estimates" && canReviewEstimates ? (
+        <ProjectEstimateReviewSection
+          estimates={liveEstimates}
+          projectBudget={project.budget}
+          pendingAction={pendingEstimateAction}
+          onViewDetails={setActiveEstimateId}
+          onReturn={setReturnEstimateId}
+          onApprove={approveEstimate}
+        />
       ) : null}
 
-      {tab === "materials" ? (
+      {!isTabPending && tab === "materials" ? (
         <>
           <PreviewNotice label="Material approvals are preview data in this phase." />
           <MaterialApprovalsPageClient projectName={project.name} />
         </>
       ) : null}
-      {tab === "purchasing" ? (
+      {!isTabPending && tab === "purchasing" ? (
         <>
           <PreviewNotice label="Purchasing approvals are preview data in this phase." />
           <PurchasingApprovalsPageClient projectName={project.name} />
         </>
       ) : null}
-      {tab === "budget" ? (
+      {!isTabPending && tab === "budget" ? (
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-3">
             <Card label="Budget ceiling" value={money(project.budget)} />

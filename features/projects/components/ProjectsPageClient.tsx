@@ -3,10 +3,10 @@
 import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { Calculator, ClipboardCheck, HardHat, LoaderCircle, PackageCheck, Plus, WalletCards, X, type LucideIcon } from "lucide-react";
+import { LoaderCircle, Plus, X } from "lucide-react";
 import { toast } from "sonner";
-import RoleGreetingHero from "@/features/home/components/RoleGreetingHero";
 import ProjectPortfolioCard from "./ProjectPortfolioCard";
+import ProjectPortfolioOverview from "./ProjectPortfolioOverview";
 import { createProjectAction } from "@/actions/projects";
 import type { EngineerOption, ProjectRecord } from "../types";
 
@@ -26,7 +26,6 @@ type FormErrors = Partial<Record<ProjectField, string>>;
 
 export default function ProjectsPageClient({
   role,
-  fullName,
   projects,
   engineers,
 }: {
@@ -135,56 +134,16 @@ export default function ProjectsPageClient({
 
   return (
     <div className="space-y-4 p-0 sm:p-6">
-      <RoleGreetingHero
-        dateLabel={new Intl.DateTimeFormat("en-US", {
-          weekday: "long",
-          month: "long",
-          day: "numeric",
-          timeZone: "Asia/Manila",
-        })
-          .format(new Date())
-          .toUpperCase()}
-        title={`Welcome, ${fullName?.split(" ")[0] || (role === "ceo" ? "CEO" : "Engineer")}!`}
-        messages={[
-          role === "ceo"
-            ? "Create projects, assign engineers, approve estimates, and watch budgets move from plan to actuals."
-            : "Open an assigned project to update engineering progress and requests.",
-        ]}
+      <ProjectPortfolioOverview
+        role={role}
+        totalBudget={money(totalBudget)}
+        totalSpent={money(totalSpent)}
+        onCreateProject={() => {
+          setFormErrors({});
+          setBudgetValue("");
+          setShowCreate(true);
+        }}
       />
-      {role === "ceo" ? (
-        <section className="grid gap-3 rounded-2xl border border-emerald-100 bg-white p-4 shadow-[0_14px_38px_rgba(15,23,42,0.06)] md:grid-cols-5">
-          <WorkflowStep icon={ClipboardCheck} label="Create project" detail="CEO sets scope" />
-          <WorkflowStep icon={HardHat} label="Assign engineers" detail="Site and estimate" />
-          <WorkflowStep icon={Calculator} label="Cost estimate" detail="Engineer drafts" />
-          <WorkflowStep icon={PackageCheck} label="Materials" detail="Request and approve" />
-          <WorkflowStep icon={WalletCards} label="Budget tracker" detail="Track actual spend" />
-        </section>
-      ) : null}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-100 pb-4">
-        <div>
-          <h1 className="text-xl font-bold text-slate-950">
-            Project Portfolio
-          </h1>
-         
-        </div>
-        {role === "ceo" ? (
-          <button
-            onClick={() => {
-              setFormErrors({});
-              setBudgetValue("");
-              setShowCreate(true);
-            }}
-            className="inline-flex h-11 items-center gap-2 rounded-xl bg-emerald-800 px-5 text-sm font-semibold text-white shadow-[0_12px_26px_rgba(6,95,70,0.18)] hover:bg-emerald-900"
-          >
-            <Plus size={17} />
-            Create New Project
-          </button>
-        ) : null}
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Summary label="Total portfolio budget" value={money(totalBudget)} />
-        <Summary label="Actual spent to date" value={money(totalSpent)} />
-      </div>
       {projects.length ? (
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {projects.map((project) => (
@@ -360,38 +319,6 @@ export default function ProjectsPageClient({
   );
 }
 
-function Summary({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-        {label}
-      </p>
-      <p className="mt-2 text-2xl font-bold text-slate-950">{value}</p>
-    </div>
-  );
-}
-
-function WorkflowStep({
-  icon: Icon,
-  label,
-  detail,
-}: {
-  icon: LucideIcon;
-  label: string;
-  detail: string;
-}) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-3">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-800">
-        <Icon size={17} />
-      </span>
-      <span>
-        <span className="block text-sm font-semibold text-slate-900">{label}</span>
-        <span className="block text-xs text-slate-500">{detail}</span>
-      </span>
-    </div>
-  );
-}
 function Field({
   name,
   label,

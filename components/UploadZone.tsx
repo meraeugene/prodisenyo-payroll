@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, DragEvent, ChangeEvent } from "react";
 import { Upload, FileSpreadsheet, X, AlertCircle, Loader2 } from "lucide-react";
 import { parseAttendanceFiles, type ParseResult } from "@/lib/parser";
+import AttendanceUploadProgress from "@/features/attendance/components/AttendanceUploadProgress";
 import type { UploadedFileItem } from "@/types";
 
 interface UploadZoneProps {
@@ -55,14 +56,35 @@ export default function UploadZone({
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [progressPhase, setProgressPhase] = useState<
+    "processing" | "saving" | "complete"
+  >("processing");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setDragging(false);
     setLoading(false);
+    setProgress(0);
+    setProgressPhase("processing");
     setError(null);
     if (inputRef.current) inputRef.current.value = "";
   }, [resetSignal]);
+
+  useEffect(() => {
+    if (!loading) return;
+
+    const interval = window.setInterval(() => {
+      setProgress((current) => {
+        if (current >= 90) return current;
+        if (current < 40) return Math.min(current + 3, 90);
+        if (current < 70) return Math.min(current + 2, 90);
+        return Math.min(current + 1, 90);
+      });
+    }, 250);
+
+    return () => window.clearInterval(interval);
+  }, [loading]);
 
   function handleDrop(e: DragEvent<HTMLDivElement>) {
     e.preventDefault();
@@ -103,6 +125,8 @@ export default function UploadZone({
       return;
     }
     setLoading(true);
+    setProgress(5);
+    setProgressPhase("processing");
     setError(null);
     try {
       const result = await parseAttendanceFiles(sourceFiles);
@@ -111,9 +135,15 @@ export default function UploadZone({
           "No employee records found. Check export format and try again.",
         );
       }
+      setProgress((current) => Math.max(current, 72));
+      setProgressPhase("saving");
       await onParsed(result);
+      setProgress(100);
+      setProgressPhase("complete");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to parse file.");
+      setProgress(0);
+      setProgressPhase("processing");
     } finally {
       setLoading(false);
     }
@@ -266,6 +296,13 @@ export default function UploadZone({
         </div>
       )}
 
+      {loading && (
+        <AttendanceUploadProgress
+          progress={progress}
+          phase={progressPhase}
+        />
+      )}
+
       <div className="flex gap-3">
         <button
           onClick={handleProcess}
@@ -282,7 +319,8 @@ export default function UploadZone({
         >
           {loading ? (
             <>
-              <Loader2 size={15} className="animate-spin" /> Processing...
+              <Loader2 size={15} className="animate-spin" />
+              Processing... {Math.round(progress)}%
             </>
           ) : (
             <>
