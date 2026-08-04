@@ -54,6 +54,7 @@ const PAYROLL_MANAGER_REQUEST_ITEMS = [
 ] as const;
 
 const CEO_GENERAL_ITEMS = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
 ] as const;
 
 const CEO_PAYROLL_ITEMS = [

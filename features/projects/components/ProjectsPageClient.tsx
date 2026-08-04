@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { LoaderCircle, Plus, X } from "lucide-react";
 import { toast } from "sonner";
+import CeoProjectsOverview from "./CeoProjectsOverview";
 import ProjectPortfolioCard from "./ProjectPortfolioCard";
 import ProjectPortfolioOverview from "./ProjectPortfolioOverview";
 import { createProjectAction } from "@/actions/projects";
@@ -134,39 +135,47 @@ export default function ProjectsPageClient({
 
   return (
     <div className="space-y-4 p-0 sm:p-6">
-      <ProjectPortfolioOverview
-        role={role}
-        totalBudget={money(totalBudget)}
-        totalSpent={money(totalSpent)}
-        onCreateProject={() => {
-          setFormErrors({});
-          setBudgetValue("");
-          setShowCreate(true);
-        }}
-      />
-      {projects.length ? (
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {projects.map((project) => (
-            <ProjectPortfolioCard
-              key={project.id}
-              project={project}
-              role={role}
-              imageSrc={project.imageUrl}
-              formatCurrency={money}
-              isOverBudget={(item) => item.spent > item.budget}
-              onOpen={() => router.push(`/projects/${project.id}`)}
-            />
-          ))}
-        </div>
+      {role === "ceo" ? (
+        <CeoProjectsOverview
+          projects={projects}
+          onCreateProject={() => {
+            setFormErrors({});
+            setBudgetValue("");
+            setShowCreate(true);
+          }}
+          onOpenProject={(projectId) => router.push("/projects/" + projectId)}
+        />
       ) : (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-          <p className="font-semibold text-slate-800">No projects yet</p>
-          <p className="mt-1 text-sm text-slate-500">
-            {role === "ceo"
-              ? "Create the first project to initialize its budget workspace."
-              : "Projects assigned to you will appear here."}
-          </p>
-        </div>
+        <>
+          <ProjectPortfolioOverview
+            role={role}
+            totalBudget={money(totalBudget)}
+            totalSpent={money(totalSpent)}
+            onCreateProject={() => undefined}
+          />
+          {projects.length ? (
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {projects.map((project) => (
+                <ProjectPortfolioCard
+                  key={project.id}
+                  project={project}
+                  role={role}
+                  imageSrc={project.imageUrl}
+                  formatCurrency={money}
+                  isOverBudget={(item) => item.spent > item.budget}
+                  onOpen={() => router.push("/projects/" + project.id)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
+              <p className="font-semibold text-slate-800">No projects yet</p>
+              <p className="mt-1 text-sm text-slate-500">
+                Projects assigned to you will appear here.
+              </p>
+            </div>
+          )}
+        </>
       )}
       {showCreate && typeof document !== "undefined"
         ? createPortal(

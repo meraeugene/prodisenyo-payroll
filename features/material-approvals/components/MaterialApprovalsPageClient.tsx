@@ -98,6 +98,22 @@ const INITIAL_REQUESTS: MaterialRequest[] = [
   },
 ];
 
+function getMockStorageKey(projectName?: string) {
+  return projectName
+    ? "prodisenyo-material-requests-v2-" + projectName
+    : "prodisenyo-material-requests-v2";
+}
+
+function buildMockRequests(projectName?: string) {
+  if (!projectName) return INITIAL_REQUESTS;
+
+  return INITIAL_REQUESTS.map((request) => ({
+    ...request,
+    id: request.id + "-" + projectName,
+    projectName,
+  }));
+}
+
 export default function MaterialApprovalsPageClient({ projectName }: { projectName?: string }) {
   const [requests, setRequests] = useState<MaterialRequest[]>([]);
   const [activeTab, setActiveTab] = useState<
@@ -106,23 +122,23 @@ export default function MaterialApprovalsPageClient({ projectName }: { projectNa
   const [searchTerm, setSearchTerm] = useState("");
   const [isPendingTransition, startTransition] = useTransition();
 
-  // Load from local storage
+  // Load project-scoped mock data from local storage.
   useEffect(() => {
-    const saved = localStorage.getItem("prodisenyo-material-requests-v2");
+    const storageKey = getMockStorageKey(projectName);
+    const initialRequests = buildMockRequests(projectName);
+    const saved = localStorage.getItem(storageKey);
+
     if (saved) {
       try {
         setRequests(JSON.parse(saved));
-      } catch (e) {
-        setRequests(INITIAL_REQUESTS);
+      } catch {
+        setRequests(initialRequests);
       }
     } else {
-      setRequests(INITIAL_REQUESTS);
-      localStorage.setItem(
-        "prodisenyo-material-requests-v2",
-        JSON.stringify(INITIAL_REQUESTS),
-      );
+      setRequests(initialRequests);
+      localStorage.setItem(storageKey, JSON.stringify(initialRequests));
     }
-  }, []);
+  }, [projectName]);
 
   // Action states for comments popup
   const [reviewingRequest, setReviewingRequest] =
@@ -181,7 +197,7 @@ export default function MaterialApprovalsPageClient({ projectName }: { projectNa
 
       setRequests(updated);
       localStorage.setItem(
-        "prodisenyo-material-requests-v2",
+        getMockStorageKey(projectName),
         JSON.stringify(updated),
       );
 

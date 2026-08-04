@@ -13,7 +13,7 @@ alter table public.purchase_orders
 create unique index if not exists purchase_orders_material_request_unique
   on public.purchase_orders(material_request_id) where material_request_id is not null;
 
-create table if not exists public.workflow_evid ence (
+create table if not exists public.workflow_evidence (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references public.projects(id) on delete cascade,
   entity_type text not null,

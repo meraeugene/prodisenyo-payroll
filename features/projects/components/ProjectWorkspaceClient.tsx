@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import useSWR from "swr";
 import {
-  ArrowLeft,
   CheckCircle2,
   LoaderCircle,
   XCircle,
@@ -23,7 +22,9 @@ import MaterialApprovalsPageClient from "@/features/material-approvals/component
 import PurchasingApprovalsPageClient from "@/features/purchasing-approvals/components/PurchasingApprovalsPageClient";
 import EstimateReportModal from "@/features/cost-estimator/components/EstimateReportModal";
 import EngineeringProgressWorksheet from "./EngineeringProgressWorksheet";
+import CeoProjectOverview from "./CeoProjectOverview";
 import ProjectEstimateReviewSection from "./ProjectEstimateReviewSection";
+import ProjectWorkspaceHeader from "./ProjectWorkspaceHeader";
 import ProjectWorkspaceTabSkeleton from "./ProjectWorkspaceTabSkeleton";
 import type { ImportedProgressActivity } from "../utils/engineeringProgressImport";
 import type { EngineeringProgressActivityRecord } from "../utils/engineeringWorkspace";
@@ -238,35 +239,10 @@ export default function ProjectWorkspaceClient({
   }
 
   return (
-    <div className="space-y-5 px-4 py-4 sm:px-6">
-      <header >
-        <Link href="/projects" className="inline-flex bg-white shadow-sm items-center gap-2 text-sm font-semibold rounded-lg px-3 py-2 hover:bg-slate-100 text-slate-700 border border-slate-200">
-          <ArrowLeft size={15} />
-        </Link>
-        <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
-          <div>
-         
-            <h1 className="text-2xl font-bold text-slate-950">{project.name}</h1>
-            <p className="mt-1 text-sm text-slate-500">{project.location}</p>
-            <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
-                Site engineer: {project.engineer}
-              </span>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
-                Estimate engineer: {project.estimateEngineer || project.engineer}
-              </span>
-            </div>
-          </div>
-          <div className="text-left sm:text-right">
-            <p className="text-xs uppercase text-slate-500">Budget ceiling</p>
-            <p className="text-xl font-bold">{money(project.budget)}</p>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-full space-y-5 bg-slate-50/40 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+      <ProjectWorkspaceHeader project={project} />
 
-
-
-      <nav className="flex gap-2 overflow-x-auto border-b border-slate-200 pb-3">
+      <nav className="flex gap-1 overflow-x-auto border-b border-slate-200">
         {TABS.map((item) => {
           const isActive = (pendingTab ?? tab) === item;
 
@@ -277,13 +253,13 @@ export default function ProjectWorkspaceClient({
               onClick={() => switchTab(item)}
               aria-current={isActive ? "page" : undefined}
               disabled={isTabPending}
-              className={`rounded-lg px-4 py-2 text-sm font-semibold capitalize transition ${
+              className={`border-b-2 px-4 py-3 text-sm font-semibold capitalize transition ${
                 isActive
-                  ? "bg-emerald-800 text-white shadow-sm"
-                  : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  ? "border-emerald-700 text-emerald-800"
+                  : "border-transparent text-slate-600 hover:border-slate-300 hover:text-slate-950"
               } disabled:cursor-wait`}
             >
-              {item === "overview" ? "Progress" : item}
+              {item === "overview" ? (canReviewEstimates ? "Overview" : "Progress") : item}
             </button>
           );
         })}
@@ -294,19 +270,27 @@ export default function ProjectWorkspaceClient({
       ) : null}
 
       {!isTabPending && tab === "overview" ? (
-        <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Card label="Completion" value={`${project.progress}%`} />
-            <Card label="Activities" value={String(liveActivities.length)} />
-            <Card label="Remaining budget" value={money(project.budget - spent)} />
-          </div>
-          <EngineeringProgressWorksheet
-            activities={activityRows}
-            readOnly={!canUpdateProgress}
-            isSubmitting={isSubmittingProgress}
-            onSubmitProgress={submitProgress}
+        canReviewEstimates ? (
+          <CeoProjectOverview
+            project={project}
+            activities={liveActivities}
+            budgetItems={liveBudgetItems}
           />
-        </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Card label="Completion" value={String(project.progress) + "%"} />
+              <Card label="Activities" value={String(liveActivities.length)} />
+              <Card label="Remaining budget" value={money(project.budget - spent)} />
+            </div>
+            <EngineeringProgressWorksheet
+              activities={activityRows}
+              readOnly={!canUpdateProgress}
+              isSubmitting={isSubmittingProgress}
+              onSubmitProgress={submitProgress}
+            />
+          </div>
+        )
       ) : null}
 
       {!isTabPending && tab === "estimates" && canReviewEstimates ? (
