@@ -306,8 +306,8 @@ export default function ProjectWorkspaceClient({
         canReviewEstimates ? (
           <CeoProjectOverview
             project={project}
-            activities={liveActivities}
             budgetItems={liveBudgetItems}
+            progressUpdates={liveProgressUpdates}
           />
         ) : (
           <EngineerProjectOverview

@@ -447,3 +447,113 @@ final result: blocked
 - No visual-fix iteration was possible without rendered evidence.
 
 final result: blocked
+---
+
+# CEO Dashboard Live-Data Redesign QA
+
+- Source visual truth: C:\Users\User\Downloads\CEO DASHBOARD.png
+- Implementation screenshot: unavailable
+- Intended viewport: 1680 x 945 CSS px, device scale factor 1
+- Source pixels: 1680 x 945
+- Implementation pixels: unavailable
+- Density normalization: not performed because no browser-rendered implementation capture is available
+- State: authenticated CEO on /dashboard with all live projects
+
+## Full-view comparison evidence
+
+The supplied reference established the page hierarchy: five executive summary cards, a dense project overview, approval queue, recent progress, cost summary, materials workflow, attention items, and recent activity. The implementation could not be captured in an authenticated browser because this environment has no browser or screenshot-capable browser tool. A valid combined source-and-implementation comparison could not be produced.
+
+## Focused region comparison evidence
+
+Blocked for the same reason. Typography, five-column card density, large-screen grid tracks, table wrapping, stored project image crops, responsive stacking, focus states, and empty states require a browser-rendered capture before final visual certification.
+
+## Findings
+
+- [P1] Browser-rendered visual verification is unavailable
+  - Location: /dashboard
+  - Evidence: the source reference exists and the production build passes, but no implementation screenshot or browser console output can be captured.
+  - Impact: final visual fidelity, responsive behavior, and interactive navigation cannot be certified against the reference.
+  - Fix: open /dashboard as CEO at 1680 x 945 and mobile width, exercise all project and approval links, inspect the console, and compare the implementation and source in one combined view.
+
+## Required fidelity surfaces
+
+- Fonts and typography: existing application typography and compact executive hierarchy are implemented; rendered weights, wrapping, and truncation are unverified.
+- Spacing and layout rhythm: responsive five-card summaries and three-panel dashboard grids are implemented; exact browser measurements are unverified.
+- Colors and visual tokens: existing white, slate, emerald, amber, sky, violet, and rose semantic tokens are used; browser contrast remains unverified.
+- Image quality and asset fidelity: stored project images use the existing ProjectThumbnail component and fallback. Standard UI icons use the installed Lucide library. Final crop and sharpness are unverified.
+- Copy and content: all visible metrics and activity copy map to persisted project, progress-update, material-request, estimate, budget, document, payroll, or overtime data. Unsupported critical-issue and notification feeds are omitted.
+
+## Primary interactions tested
+
+- Static routes and links compile for project details, material approvals, estimate approvals, payroll approvals, overtime approvals, project portfolio, and budget tracker.
+- Automated tests cover totals, approval queue counts, attention conditions, and recent-activity ordering.
+- Browser interactions and console errors: blocked because no browser tool is available.
+
+## Comparison history
+
+- Initial implementation: replaced the prior sparse dashboard and removed its hard-coded material approval count.
+- Visual fixes made: none from a rendered comparison because browser evidence is unavailable.
+- Post-fix evidence: unavailable.
+
+## Implementation checklist
+
+- Capture authenticated desktop and mobile dashboard states.
+- Test approval and project navigation with keyboard focus.
+- Compare the source and implementation together, then correct any P0/P1/P2 drift.
+
+final result: blocked
+---
+
+# Purchaser Dashboard Live-Data UI QA
+
+- Source visual truth: C:\Users\User\Downloads\purchaser dashboard.png
+- Implementation screenshot: unavailable
+- Intended viewport: 1680 x 945 CSS px, device scale factor 1
+- Source pixels: 1680 x 945
+- Implementation pixels: unavailable
+- Density normalization: not performed because no browser-rendered implementation capture is available
+- State: authenticated purchaser on /purchaser-dashboard with all assigned or unassigned purchases
+
+## Full-view comparison evidence
+
+The supplied reference established the hierarchy: four workflow summary cards, approved-request and recorded-pricing panels, then purchase orders, recent procurement activity, and receipt references. This environment has no in-app or screenshot-capable browser tool, so the authenticated implementation could not be captured and placed beside the source for a valid combined comparison.
+
+## Focused region comparison evidence
+
+Blocked for the same reason. The project selector, responsive table rows, status pills, stored project-image crops, empty states, keyboard focus, and mobile stacking require browser-rendered evidence before visual certification.
+
+## Findings
+
+- [P1] Browser-rendered visual verification is unavailable
+  - Location: /purchaser-dashboard
+  - Evidence: the source reference exists and automated verification passes, but there is no implementation screenshot or browser console capture.
+  - Impact: final typography, spacing, responsive behavior, and interactive fidelity cannot be certified against the reference.
+  - Fix: open /purchaser-dashboard as a purchaser at 1680 x 945 and mobile width, test the project selector and purchasing links, inspect console errors, and compare the implementation and source in one combined view.
+
+## Required fidelity surfaces
+
+- Fonts and typography: the existing application font stack and compact dashboard hierarchy are used; rendered weight, truncation, and wrapping remain unverified.
+- Spacing and layout rhythm: the source-inspired four-card summary, two-panel primary grid, and three-panel secondary grid are implemented; exact browser measurements remain unverified.
+- Colors and visual tokens: the existing white, slate, emerald, sky, amber, violet, and rose tokens are used; browser contrast remains unverified.
+- Image quality and asset fidelity: existing stored project images and ProjectThumbnail fallback are used; no supplier or file imagery is fabricated. Standard UI icons use the installed Lucide system.
+- Copy and content: every visible value comes from purchase orders, linked projects, linked material-request dates, delivery status, supplier pricing, or receipt/invoice references. Unsupported supplier management, file upload, partial deliveries, and standalone quotation records are omitted.
+
+## Primary interactions tested
+
+- Automated tests cover summary counts, project filtering, procurement-state activity, and stable display codes.
+- Route protection, purchaser post-login redirect, loading state, project selector state, and purchasing links compile successfully.
+- Browser interactions and console errors: blocked because no browser tool is available.
+
+## Comparison history
+
+- Initial implementation: new purchaser landing dashboard added while preserving the detailed /purchasing-approvals workspace.
+- Visual fixes made: none from a rendered comparison because browser evidence is unavailable.
+- Post-fix evidence: unavailable.
+
+## Implementation checklist
+
+- Capture authenticated desktop and mobile dashboard states.
+- Test project filtering and all purchasing navigation using keyboard and pointer.
+- Compare source and implementation together and correct any P0/P1/P2 drift.
+
+final result: blocked

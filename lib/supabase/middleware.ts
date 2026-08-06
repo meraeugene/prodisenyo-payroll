@@ -41,6 +41,7 @@ const PROTECTED_PREFIXES = [
   "/overview",
   "/material-approvals",
   "/purchasing-approvals",
+  "/purchaser-dashboard",
 ] as const;
 
 const HR_SUBMISSION_REQUIRED_PREFIXES = [
@@ -83,13 +84,14 @@ const CEO_ONLY_PREFIXES = [
   "/purchasing-approvals",
   "/budget-tracker",
 ] as const;
-const CEO_REDIRECT_PATH = "/projects";
+const CEO_REDIRECT_PATH = "/dashboard";
 const ADMIN_REDIRECT_PATH = "/add-user";
 const PAYROLL_MANAGER_REDIRECT_PATH = "/home";
 const ENGINEER_REDIRECT_PATH = "/overview";
 const EMPLOYEE_REDIRECT_PATH = "/home";
-const PURCHASER_REDIRECT_PATH = "/purchasing-approvals";
+const PURCHASER_REDIRECT_PATH = "/purchaser-dashboard";
 const PURCHASER_ALLOWED_PREFIXES = [
+  "/purchaser-dashboard",
   "/purchasing-approvals",
   "/settings",
 ] as const;

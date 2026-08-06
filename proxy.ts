@@ -30,6 +30,7 @@ export const config = {
     "/payroll-approvals/:path*",
     "/payroll-reports/:path*",
     "/purchasing-approvals/:path*",
+    "/purchaser-dashboard/:path*",
     "/settings/:path*",
   ],
 };

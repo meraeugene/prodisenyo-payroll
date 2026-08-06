@@ -23,12 +23,14 @@ export default function ProjectProgressUpdatesPanel({
   canSubmit,
   onCreated,
   displayMode = "full",
+  historyClassName,
 }: {
   projectId: string;
   updates: ProjectProgressUpdateRecord[];
   canSubmit: boolean;
   onCreated: (update: ProjectProgressUpdateRecord) => void;
   displayMode?: "full" | "form" | "history";
+  historyClassName?: string;
 }) {
   const [overallPercent, setOverallPercent] = useState(0);
   const [completedWorkSummary, setCompletedWorkSummary] = useState("");
@@ -87,7 +89,7 @@ export default function ProjectProgressUpdatesPanel({
         </form>
       ) : null}
 
-      {displayMode !== "form" ? <section className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_22px_rgba(15,23,42,.04)] ${canSubmit ? "" : "xl:col-span-2"}`}>
+      {displayMode !== "form" ? <section className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_22px_rgba(15,23,42,.04)] ${historyClassName ?? (canSubmit ? "" : "xl:col-span-2")}`}>
         <h2 className="text-lg font-semibold text-slate-950">Progress Update History</h2>
         <p className="mt-1 text-xs text-slate-500">Overall site updates do not change weighted activity progress.</p>
         <div className="mt-4 space-y-3">

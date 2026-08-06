@@ -110,6 +110,7 @@ const EMPLOYEE_NAV_ITEMS = [
   { href: "/request-overtime", label: "Request Overtime", icon: Clock3 },
 ] as const;
 const PURCHASER_NAV_ITEMS = [
+  { href: "/purchaser-dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/purchasing-approvals", label: "Purchasing", icon: BadgeDollarSign },
 ] as const;
 

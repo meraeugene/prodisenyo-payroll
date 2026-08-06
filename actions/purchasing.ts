@@ -139,5 +139,6 @@ export async function updatePurchaseOrderAction(
   }
 
   revalidatePath("/purchasing-approvals");
+  revalidatePath("/purchaser-dashboard");
   return mapRow(data);
 }

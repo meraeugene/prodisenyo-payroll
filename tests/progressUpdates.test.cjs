@@ -17,7 +17,11 @@ function loadTypeScriptModule(relativePath) {
   return compiledModule.exports;
 }
 
-const { normalizeProgressUpdateInput } = loadTypeScriptModule("../features/projects/utils/progressUpdates.ts");
+const {
+  getLatestProgressUpdatePercentage,
+  normalizeProgressUpdateInput,
+  selectLatestProgressUpdate,
+} = loadTypeScriptModule("../features/projects/utils/progressUpdates.ts");
 
 test("normalizes a separate overall progress update", () => {
   assert.deepEqual(normalizeProgressUpdateInput({
@@ -40,4 +44,17 @@ test("rejects invalid percentage and missing completed-work summary", () => {
 
 test("stores blank remarks as null", () => {
   assert.equal(normalizeProgressUpdateInput({ projectId: "p1", overallPercent: 0, completedWorkSummary: "Mobilization", remarks: " " }).remarks, null);
+});
+test("uses the newest persisted progress update for the CEO overview", () => {
+  const updates = [
+    { id: "older", overall_percent: 88, created_at: "2026-08-04T00:00:00Z" },
+    { id: "newer", overall_percent: 42.4, created_at: "2026-08-06T00:00:00Z" },
+  ];
+  assert.equal(selectLatestProgressUpdate(updates).id, "newer");
+  assert.equal(getLatestProgressUpdatePercentage(updates), 42);
+});
+
+test("shows no overall percentage when a project has no progress update", () => {
+  assert.equal(selectLatestProgressUpdate([]), null);
+  assert.equal(getLatestProgressUpdatePercentage([]), null);
 });
