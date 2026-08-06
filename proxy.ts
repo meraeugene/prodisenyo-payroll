@@ -10,6 +10,7 @@ export const config = {
     "/auth/login",
     "/home/:path*",
     "/dashboard/:path*",
+    "/overview/:path*",
     "/upload-attendance/:path*",
     "/budget-tracker/:path*",
     "/projects/:path*",

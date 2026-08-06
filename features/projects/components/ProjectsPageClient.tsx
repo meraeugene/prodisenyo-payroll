@@ -6,8 +6,7 @@ import { useRouter } from "next/navigation";
 import { LoaderCircle, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import CeoProjectsOverview from "./CeoProjectsOverview";
-import ProjectPortfolioCard from "./ProjectPortfolioCard";
-import ProjectPortfolioOverview from "./ProjectPortfolioOverview";
+import EngineerProjectPortfolio from "./EngineerProjectPortfolio";
 import { createProjectAction } from "@/actions/projects";
 import type { EngineerOption, ProjectRecord } from "../types";
 
@@ -40,17 +39,6 @@ export default function ProjectsPageClient({
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [budgetValue, setBudgetValue] = useState("");
   const [pending, startTransition] = useTransition();
-  const totalBudget = projects.reduce(
-    (sum, project) => sum + project.budget,
-    0,
-  );
-  const totalSpent = projects.reduce((sum, project) => sum + project.spent, 0);
-  const money = (value: number) =>
-    new Intl.NumberFormat("en-PH", {
-      style: "currency",
-      currency: "PHP",
-      maximumFractionDigits: 0,
-    }).format(value);
   const clearFieldError = (field: ProjectField) =>
     setFormErrors((current) => ({ ...current, [field]: undefined }));
 
@@ -146,36 +134,10 @@ export default function ProjectsPageClient({
           onOpenProject={(projectId) => router.push("/projects/" + projectId)}
         />
       ) : (
-        <>
-          <ProjectPortfolioOverview
-            role={role}
-            totalBudget={money(totalBudget)}
-            totalSpent={money(totalSpent)}
-            onCreateProject={() => undefined}
-          />
-          {projects.length ? (
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {projects.map((project) => (
-                <ProjectPortfolioCard
-                  key={project.id}
-                  project={project}
-                  role={role}
-                  imageSrc={project.imageUrl}
-                  formatCurrency={money}
-                  isOverBudget={(item) => item.spent > item.budget}
-                  onOpen={() => router.push("/projects/" + project.id)}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
-              <p className="font-semibold text-slate-800">No projects yet</p>
-              <p className="mt-1 text-sm text-slate-500">
-                Projects assigned to you will appear here.
-              </p>
-            </div>
-          )}
-        </>
+        <EngineerProjectPortfolio
+          projects={projects}
+          onOpenProject={(projectId) => router.push("/projects/" + projectId)}
+        />
       )}
       {showCreate && typeof document !== "undefined"
         ? createPortal(

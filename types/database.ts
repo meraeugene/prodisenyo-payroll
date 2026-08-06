@@ -562,6 +562,56 @@ export interface Database {
         };
         Update: Partial<Database["public"]["Tables"]["projects"]["Insert"]>;
       };
+      project_documents: {
+        Row: {
+          id: string;
+          project_id: string;
+          uploaded_by: string;
+          file_name: string;
+          storage_path: string;
+          mime_type: string;
+          file_size: number;
+          category: "plans" | "reports" | "permits" | "contracts" | "photos" | "forms" | "other";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          uploaded_by: string;
+          file_name: string;
+          storage_path: string;
+          mime_type: string;
+          file_size: number;
+          category?: "plans" | "reports" | "permits" | "contracts" | "photos" | "forms" | "other";
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["project_documents"]["Insert"]>;
+      };
+      project_progress_updates: {
+        Row: {
+          id: string;
+          project_id: string;
+          submitted_by: string;
+          overall_percent: number;
+          completed_work_summary: string;
+          remarks: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          submitted_by: string;
+          overall_percent: number;
+          completed_work_summary: string;
+          remarks?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          overall_percent?: number;
+          completed_work_summary?: string;
+          remarks?: string | null;
+        };
+      };
       project_progress_activities: {
         Row: {
           id: string; project_id: string; activity: string; weight_percent: number;

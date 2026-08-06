@@ -86,7 +86,7 @@ const CEO_ONLY_PREFIXES = [
 const CEO_REDIRECT_PATH = "/projects";
 const ADMIN_REDIRECT_PATH = "/add-user";
 const PAYROLL_MANAGER_REDIRECT_PATH = "/home";
-const ENGINEER_REDIRECT_PATH = "/projects";
+const ENGINEER_REDIRECT_PATH = "/overview";
 const EMPLOYEE_REDIRECT_PATH = "/home";
 const PURCHASER_REDIRECT_PATH = "/purchasing-approvals";
 const PURCHASER_ALLOWED_PREFIXES = [
@@ -94,6 +94,7 @@ const PURCHASER_ALLOWED_PREFIXES = [
   "/settings",
 ] as const;
 const ENGINEER_ALLOWED_PREFIXES = [
+  "/overview",
   "/projects",
   "/cost-estimator",
   "/request-material",

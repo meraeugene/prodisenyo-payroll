@@ -5,6 +5,8 @@ import { APP_ROLES, requireRole } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 
 const TABLES_TO_CLEAR = [
+  "project_documents",
+  "project_progress_updates",
   "project_progress_activities",
   "project_estimate_items",
   "project_estimates",

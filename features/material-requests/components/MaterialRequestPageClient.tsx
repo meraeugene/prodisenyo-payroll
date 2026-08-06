@@ -65,11 +65,14 @@ function formatDate(value: string) {
 export default function MaterialRequestPageClient({
   initialRequests,
   projects,
+  defaultProjectId,
 }: {
   initialRequests: MaterialRequestRecord[];
   projects: Array<{ id: string; name: string }>;
+  defaultProjectId?: string;
 }) {
-  const [form, setForm] = useState<CreateMaterialRequestInput>(EMPTY_FORM);
+  const defaultProject = projects.find((project) => project.id === defaultProjectId);
+  const [form, setForm] = useState<CreateMaterialRequestInput>({ ...EMPTY_FORM, projectId: defaultProject?.id ?? "", projectName: defaultProject?.name ?? "" });
   const [requests, setRequests] =
     useState<MaterialRequestRecord[]>(initialRequests);
   const [formErrors, setFormErrors] = useState<MaterialFormErrors>({});
@@ -161,6 +164,7 @@ export default function MaterialRequestPageClient({
         setForm({
           ...EMPTY_FORM,
           neededBy: form.neededBy,
+          projectId: form.projectId,
           projectName: form.projectName,
         });
         toast.success("Material request submitted.");

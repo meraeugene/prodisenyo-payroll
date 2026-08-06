@@ -15,7 +15,7 @@ interface MaterialRequestAuditRow {
   created_at: string;
 }
 
-export default async function MaterialRequestPage() {
+export default async function MaterialRequestPage({ defaultProjectId }: { defaultProjectId?: string }) {
   const { user } = await requireRole(APP_ROLES.ENGINEER);
   const supabase = await createSupabaseServerClient();
   const database = createSupabaseAdminClient() as any;
@@ -54,5 +54,5 @@ export default async function MaterialRequestPage() {
   }
 
   const { data: projects } = await database.from("projects").select("id,name").eq("assigned_engineer_id", user.id).neq("status", "archived").order("name");
-  return <MaterialRequestPageClient initialRequests={initialRequests} projects={projects ?? []} />;
+  return <MaterialRequestPageClient initialRequests={initialRequests} projects={projects ?? []} defaultProjectId={defaultProjectId} />;
 }

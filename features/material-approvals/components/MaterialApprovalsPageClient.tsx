@@ -1,36 +1,27 @@
 "use client";
 
 import React, { useState, useTransition, useEffect } from "react";
-import DashboardPageHero from "@/components/DashboardPageHero";
 import {
   ClipboardList,
   CheckCircle,
   XCircle,
-  AlertCircle,
   Search,
   MessageSquare,
-  LoaderCircle,
   ThumbsUp,
   ThumbsDown,
   Building,
+  Pencil,
   User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-interface MaterialRequest {
-  id: string;
-  projectName: string;
-  materialName: string;
-  quantity: number;
-  unit: string;
-  neededBy: string;
-  priority: "low" | "medium" | "high" | "urgent";
-  requestedBy: string;
-  status: "pending" | "approved" | "rejected";
-  notes?: string;
-  approvalNotes?: string;
-}
+import MaterialRequestEditDialog from "@/features/material-approvals/components/MaterialRequestEditDialog";
+import MaterialRequestReviewDialog from "@/features/material-approvals/components/MaterialRequestReviewDialog";
+import type {
+  EditableMaterialRequest,
+  MaterialRequest,
+} from "@/features/material-approvals/types";
 
 const INITIAL_REQUESTS: MaterialRequest[] = [
   {
@@ -114,7 +105,13 @@ function buildMockRequests(projectName?: string) {
   }));
 }
 
-export default function MaterialApprovalsPageClient({ projectName }: { projectName?: string }) {
+export default function MaterialApprovalsPageClient({
+  projectName,
+  canManage = false,
+}: {
+  projectName?: string;
+  canManage?: boolean;
+}) {
   const [requests, setRequests] = useState<MaterialRequest[]>([]);
   const [activeTab, setActiveTab] = useState<
     "pending" | "approved" | "rejected" | "all"
@@ -145,6 +142,8 @@ export default function MaterialApprovalsPageClient({ projectName }: { projectNa
     useState<MaterialRequest | null>(null);
   const [actionType, setActionType] = useState<"approve" | "reject">("approve");
   const [commentText, setCommentText] = useState("");
+  const [editingRequest, setEditingRequest] =
+    useState<MaterialRequest | null>(null);
 
   const filteredRequests = React.useMemo(() => {
     return requests.filter((r) => {
@@ -169,13 +168,14 @@ export default function MaterialApprovalsPageClient({ projectName }: { projectNa
     request: MaterialRequest,
     action: "approve" | "reject",
   ) => {
+    if (!canManage) return;
     setReviewingRequest(request);
     setActionType(action);
     setCommentText("");
   };
 
   const handleConfirmAction = () => {
-    if (!reviewingRequest) return;
+    if (!reviewingRequest || !canManage) return;
 
     const targetStatus = (
       actionType === "approve" ? "approved" : "rejected"
@@ -208,6 +208,27 @@ export default function MaterialApprovalsPageClient({ projectName }: { projectNa
     });
   };
 
+  const handleSaveEdit = (changes: EditableMaterialRequest) => {
+    if (!editingRequest || !canManage) return;
+
+    const updated = requests.map((request) =>
+      request.id === editingRequest.id
+        ? {
+            ...request,
+            ...changes,
+            lastEditedBy: "Company CEO",
+            lastEditedAt: new Date().toISOString(),
+          }
+        : request,
+    );
+    setRequests(updated);
+    localStorage.setItem(
+      getMockStorageKey(projectName),
+      JSON.stringify(updated),
+    );
+    setEditingRequest(null);
+    toast.success("Material request updated by CEO.");
+  };
   const getPriorityBadgeClass = (priority: MaterialRequest["priority"]) => {
     if (priority === "urgent")
       return "bg-rose-50 text-rose-700 border-rose-100";
@@ -321,9 +342,19 @@ export default function MaterialApprovalsPageClient({ projectName }: { projectNa
                       <User size={12} />
                       <span>Requested by {req.requestedBy}</span>
                     </div>
-                    <span>•</span>
+                    <span aria-hidden="true">&bull;</span>
                     <span>Needed by: {req.neededBy}</span>
                   </div>
+
+                  {req.lastEditedBy ? (
+                    <p className="text-[11px] font-medium text-amber-700">
+                      Edited by {req.lastEditedBy}
+                      {req.lastEditedAt
+                        ? " on " +
+                          new Date(req.lastEditedAt).toLocaleString("en-PH")
+                        : ""}
+                    </p>
+                  ) : null}
 
                   {req.notes && (
                     <p className="text-xs text-slate-500 bg-slate-50 p-2.5 rounded-xl italic border border-slate-100">
@@ -352,8 +383,14 @@ export default function MaterialApprovalsPageClient({ projectName }: { projectNa
 
               {/* Status details & actions */}
               <div className="flex items-center gap-2 self-end md:self-center">
-                {req.status === "pending" ? (
+                {req.status === "pending" && canManage ? (
                   <>
+                    <button
+                      onClick={() => setEditingRequest(req)}
+                      className="h-10 px-4 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 transition flex items-center gap-1.5"
+                    >
+                      <Pencil size={14} /> Edit
+                    </button>
                     <button
                       onClick={() => handleActionClick(req, "reject")}
                       className="h-10 px-4 rounded-xl border border-rose-200 text-xs font-semibold text-rose-700 bg-rose-50/30 hover:bg-rose-50 hover:border-rose-300 transition flex items-center gap-1.5"
@@ -367,6 +404,10 @@ export default function MaterialApprovalsPageClient({ projectName }: { projectNa
                       <ThumbsUp size={14} /> Approve
                     </button>
                   </>
+                ) : req.status === "pending" ? (
+                  <span className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-amber-700">
+                    Pending CEO review
+                  </span>
                 ) : (
                   <span
                     className={cn(
@@ -400,63 +441,24 @@ export default function MaterialApprovalsPageClient({ projectName }: { projectNa
         )}
       </div>
 
-      {/* Review Dialog / Modal */}
-      {reviewingRequest && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-white border border-apple-mist rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-200">
-            <h3 className="text-lg font-bold text-apple-charcoal">
-              {actionType === "approve" ? "Approve" : "Reject"} Material Request
-            </h3>
-            <p className="text-xs text-slate-500 mt-1">
-              {reviewingRequest.materialName} ({reviewingRequest.quantity}{" "}
-              {reviewingRequest.unit}) for {reviewingRequest.projectName}
-            </p>
-
-            <div className="mt-4 space-y-3">
-              <label className="text-xs font-semibold text-slate-700">
-                Review Comments / Notes
-              </label>
-              <textarea
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                placeholder={
-                  actionType === "approve"
-                    ? "Provide approval notes, specifications, or vendor hints..."
-                    : "Explain reason for rejecting the request..."
-                }
-                rows={3}
-                className="w-full rounded-xl border border-apple-mist p-3 text-xs text-apple-charcoal outline-none placeholder:text-apple-silver transition focus:border-[#1f6a37]"
-              />
-            </div>
-
-            <div className="mt-6 flex justify-end gap-3 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setReviewingRequest(null)}
-                className="h-10 px-4 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmAction}
-                disabled={isPendingTransition}
-                className={cn(
-                  "h-10 px-5 rounded-xl text-xs font-semibold text-white shadow-sm flex items-center gap-1.5",
-                  actionType === "approve"
-                    ? "bg-[#1f6a37] hover:bg-emerald-800"
-                    : "bg-rose-600 hover:bg-rose-700",
-                )}
-              >
-                {isPendingTransition && (
-                  <LoaderCircle size={14} className="animate-spin" />
-                )}
-                Confirm {actionType === "approve" ? "Approval" : "Rejection"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {reviewingRequest ? (
+        <MaterialRequestReviewDialog
+          request={reviewingRequest}
+          action={actionType}
+          comment={commentText}
+          isPending={isPendingTransition}
+          onCommentChange={setCommentText}
+          onClose={() => setReviewingRequest(null)}
+          onConfirm={handleConfirmAction}
+        />
+      ) : null}
+      {editingRequest ? (
+        <MaterialRequestEditDialog
+          request={editingRequest}
+          onClose={() => setEditingRequest(null)}
+          onSave={handleSaveEdit}
+        />
+      ) : null}
     </div>
   );
 }

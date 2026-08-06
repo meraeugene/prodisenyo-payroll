@@ -1,9 +1,13 @@
 type WorkspaceTab =
   | "overview"
+  | "activities"
+  | "progress-updates"
   | "estimates"
   | "materials"
   | "purchasing"
-  | "budget";
+  | "documents"
+  | "activity-log"
+  | "cost-tracking";
 
 export default function ProjectWorkspaceTabSkeleton({
   tab,
@@ -49,7 +53,7 @@ export default function ProjectWorkspaceTabSkeleton({
     );
   }
 
-  if (tab === "overview" || tab === "budget") {
+  if (tab === "overview" || tab === "cost-tracking") {
     return (
       <div aria-label={`Loading ${tab}`} aria-live="polite" className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-3">
@@ -63,7 +67,7 @@ export default function ProjectWorkspaceTabSkeleton({
             </div>
           ))}
         </div>
-        <ListSkeleton rows={tab === "overview" ? 5 : 4} />
+        <ListSkeleton rows={tab === "overview" ? 5 : 6} />
       </div>
     );
   }

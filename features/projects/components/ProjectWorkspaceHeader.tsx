@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { ArrowLeft, CalendarDays, MapPin, UserRound } from "lucide-react";
+import { CalendarDays, MapPin, UserRound } from "lucide-react";
 import type { ProjectRecord } from "@/features/projects/types";
 import {
   formatProjectCurrency,
@@ -22,13 +21,7 @@ export default function ProjectWorkspaceHeader({
 
   return (
     <header className="border-b border-slate-200 pb-5">
-      <Link
-        href="/projects"
-        className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 transition hover:text-emerald-800"
-      >
-        <ArrowLeft size={15} /> Back to Projects
-      </Link>
-      <div className="mt-5 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-3xl font-bold tracking-[-0.035em] text-slate-950">

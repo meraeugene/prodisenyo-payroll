@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { APP_ROLES, requireRole } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import type { ProjectStatus } from "@/features/projects/types";
+import { normalizeProgressUpdateInput } from "@/features/projects/utils/progressUpdates";
+import { mapProjectDocumentRow } from "@/features/project-documents/utils/documentMappers";
 
 export interface ProjectInput {
   name: string; location: string; subject?: string; lead?: string; client?: string;
@@ -93,7 +95,7 @@ export async function getProjectWorkspaceDataAction(projectId: string) {
   const { data: project, error: projectError } = await projectQuery.maybeSingle();
   if (projectError || !project) throw new Error("Project workspace not found.");
 
-  const [{ data: activities }, { data: estimates }, { data: budgets }] =
+  const [{ data: activities }, { data: estimates }, { data: budgets }, { data: progressSubmissions }, { data: materialRequests }, { data: progressUpdates }, { data: documents }, { data: projectExpenses }, { data: purchaseOrders }, { data: materialReceipts }] =
     await Promise.all([
       database
         .from("project_progress_activities")
@@ -110,6 +112,45 @@ export async function getProjectWorkspaceDataAction(projectId: string) {
         .from("budget_projects")
         .select("id,budget_items(id,name,category,estimated_cost,actual_spent,status)")
         .eq("project_id", normalizedProjectId),
+      database
+        .from("project_progress_submissions")
+        .select("id,activity_count,submitted_at")
+        .eq("project_id", normalizedProjectId)
+        .order("submitted_at", { ascending: false })
+        .limit(8),
+      database
+        .from("material_requests")
+        .select("id,material_name,quantity,unit,needed_by,priority,notes,status,created_at,updated_at")
+        .eq("project_id", normalizedProjectId)
+        .order("created_at", { ascending: false })
+        .limit(100),
+      database
+        .from("project_progress_updates")
+        .select("id,project_id,submitted_by,overall_percent,completed_work_summary,remarks,created_at")
+        .eq("project_id", normalizedProjectId)
+        .order("created_at", { ascending: false })
+        .limit(20),
+      database
+        .from("project_documents")
+        .select("*, uploader:profiles!project_documents_uploaded_by_fkey(full_name,username)")
+        .eq("project_id", normalizedProjectId)
+        .order("created_at", { ascending: false })
+        .limit(100),
+      database
+        .from("project_expenses")
+        .select("id,category,description,amount,expense_date,status")
+        .eq("project_id", normalizedProjectId)
+        .order("expense_date", { ascending: false }),
+      database
+        .from("purchase_orders")
+        .select("id,material_request_id,item_name,quantity,unit,estimated_unit_cost,actual_unit_cost,status,delivery_status,ordered_at,received_at,notes,created_at,updated_at")
+        .eq("project_id", normalizedProjectId)
+        .order("updated_at", { ascending: false }),
+      database
+        .from("project_material_receipts")
+        .select("id,purchase_order_id,item_name,quantity,unit,total_cost,accepted_at")
+        .eq("project_id", normalizedProjectId)
+        .order("accepted_at", { ascending: false }),
     ]);
   const estimateIds = (estimates ?? []).map((estimate: any) => estimate.id);
   const { data: estimateItems } = estimateIds.length
@@ -125,6 +166,13 @@ export async function getProjectWorkspaceDataAction(projectId: string) {
     estimates: estimates ?? [],
     estimateItems: estimateItems ?? [],
     budgetItems: (budgets ?? []).flatMap((budget: any) => budget.budget_items ?? []),
+    progressSubmissions: progressSubmissions ?? [],
+    materialRequests: materialRequests ?? [],
+    progressUpdates: progressUpdates ?? [],
+    documents: (documents ?? []).map(mapProjectDocumentRow),
+    projectExpenses: projectExpenses ?? [],
+    purchaseOrders: purchaseOrders ?? [],
+    materialReceipts: materialReceipts ?? [],
   };
 }
 
@@ -200,4 +248,39 @@ export async function submitProjectProgressAction(input: {
 
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/projects");
+}
+export async function createProjectProgressUpdateAction(input: {
+  projectId: string;
+  overallPercent: number;
+  completedWorkSummary: string;
+  remarks?: string;
+}) {
+  const { user } = await requireRole(APP_ROLES.ENGINEER);
+  const database = createSupabaseAdminClient() as any;
+  const { projectId, overallPercent, completedWorkSummary, remarks } =
+    normalizeProgressUpdateInput(input);
+
+  const { data: project } = await database
+    .from("projects")
+    .select("id")
+    .eq("id", projectId)
+    .eq("assigned_engineer_id", user.id)
+    .neq("status", "archived")
+    .maybeSingle();
+  if (!project) throw new Error("Only the assigned site engineer can submit a progress update.");
+
+  const { data, error } = await database
+    .from("project_progress_updates")
+    .insert({
+      project_id: projectId,
+      submitted_by: user.id,
+      overall_percent: overallPercent,
+      completed_work_summary: completedWorkSummary,
+      remarks,
+    })
+    .select("id,project_id,submitted_by,overall_percent,completed_work_summary,remarks,created_at")
+    .single();
+  if (error) throw new Error(`Failed to submit progress update. ${error.message}`);
+  revalidatePath(`/projects/${projectId}`);
+  return data;
 }

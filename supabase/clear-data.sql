@@ -2,6 +2,8 @@ begin;
 
 -- Full operational data reset. Authentication users and profiles are retained.
 -- Back up the database first: this operation is irreversible.
+truncate table public.project_documents restart identity cascade;
+truncate table public.project_progress_updates restart identity cascade;
 truncate table public.project_progress_activities restart identity cascade;
 truncate table public.project_estimate_items restart identity cascade;
 truncate table public.project_estimates restart identity cascade;

@@ -93,6 +93,7 @@ const CEO_ADMIN_ITEMS = [
 ] as const;
 
 const ENGINEER_GENERAL_ITEMS = [
+  { href: "/overview", label: "Dashboard", icon: LayoutDashboard },
   { href: "/projects", label: "Projects", icon: FolderKanban },
 ] as const;
 

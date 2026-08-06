@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import useSWR from "swr";
 import {
+  ArrowLeft,
   CheckCircle2,
   LoaderCircle,
   XCircle,
@@ -22,9 +23,25 @@ import MaterialApprovalsPageClient from "@/features/material-approvals/component
 import PurchasingApprovalsPageClient from "@/features/purchasing-approvals/components/PurchasingApprovalsPageClient";
 import EstimateReportModal from "@/features/cost-estimator/components/EstimateReportModal";
 import EngineeringProgressWorksheet from "./EngineeringProgressWorksheet";
+import EngineerProjectOverview from "./EngineerProjectOverview";
+import ProjectProgressUpdatesPanel from "./ProjectProgressUpdatesPanel";
+import ProjectMaterialsPanel, { type ProjectMaterialRequest } from "./ProjectMaterialsPanel";
+import ProjectDocumentsPanel from "@/features/project-documents/components/ProjectDocumentsPanel";
+import type { ProjectDocumentRecord } from "@/features/project-documents/types";
+import ProjectActivityLogPanel from "@/features/project-activity-log/components/ProjectActivityLogPanel";
+import ProjectCostTrackingPanel from "@/features/project-cost-tracking/components/ProjectCostTrackingPanel";
+import type {
+  ProjectExpenseRecord,
+  ProjectMaterialReceipt,
+  ProjectPurchaseOrder,
+} from "@/features/project-cost-tracking/types";
+import type { ProjectProgressUpdateRecord } from "../progressUpdateTypes";
 import CeoProjectOverview from "./CeoProjectOverview";
 import ProjectEstimateReviewSection from "./ProjectEstimateReviewSection";
 import ProjectWorkspaceHeader from "./ProjectWorkspaceHeader";
+import ProjectWorkspaceTabs from "./ProjectWorkspaceTabs";
+import ProjectPreviewNotice from "./ProjectPreviewNotice";
+import ProjectReturnEstimateDialog from "./ProjectReturnEstimateDialog";
 import ProjectWorkspaceTabSkeleton from "./ProjectWorkspaceTabSkeleton";
 import type { ImportedProgressActivity } from "../utils/engineeringProgressImport";
 import type { EngineeringProgressActivityRecord } from "../utils/engineeringWorkspace";
@@ -43,6 +60,8 @@ type Activity = {
   updated_at?: string;
 };
 type Estimate = ReviewProjectEstimateRow;
+type ProgressSubmission = { id: string; activity_count: number; submitted_at: string };
+type MaterialRequestActivity = ProjectMaterialRequest;
 type BudgetItem = {
   id: string;
   name: string;
@@ -56,10 +75,18 @@ type WorkspaceData = {
   estimates: Estimate[];
   estimateItems: ProjectEstimateItemRow[];
   budgetItems: BudgetItem[];
+  progressSubmissions: ProgressSubmission[];
+  materialRequests: MaterialRequestActivity[];
+  progressUpdates: ProjectProgressUpdateRecord[];
+  documents?: ProjectDocumentRecord[];
+  projectExpenses?: ProjectExpenseRecord[];
+  purchaseOrders?: ProjectPurchaseOrder[];
+  materialReceipts?: ProjectMaterialReceipt[];
 };
 
-const TABS = ["overview", "estimates", "materials", "purchasing", "budget"] as const;
-type WorkspaceTab = (typeof TABS)[number];
+const CEO_TABS = ["overview", "estimates", "materials", "purchasing", "documents", "activity-log", "cost-tracking"] as const;
+const ENGINEER_TABS = ["overview", "activities", "progress-updates", "materials", "documents", "activity-log", "cost-tracking"] as const;
+type WorkspaceTab = (typeof CEO_TABS)[number] | (typeof ENGINEER_TABS)[number];
 
 function mapActivity(projectName: string, activity: Activity): EngineeringProgressActivityRecord {
   return {
@@ -75,6 +102,7 @@ function mapActivity(projectName: string, activity: Activity): EngineeringProgre
 
 export default function ProjectWorkspaceClient({
   project,
+  currentUserId,
   canUpdateProgress,
   canCreateEstimate,
   canReviewEstimates,
@@ -82,8 +110,16 @@ export default function ProjectWorkspaceClient({
   estimates,
   estimateItems,
   budgetItems,
+  progressSubmissions,
+  materialRequests,
+  progressUpdates,
+  documents,
+  projectExpenses,
+  purchaseOrders,
+  materialReceipts,
 }: {
   project: ProjectRecord;
+  currentUserId: string;
   canUpdateProgress: boolean;
   canCreateEstimate: boolean;
   canReviewEstimates: boolean;
@@ -91,13 +127,19 @@ export default function ProjectWorkspaceClient({
   estimates: Estimate[];
   estimateItems: ProjectEstimateItemRow[];
   budgetItems: BudgetItem[];
+  progressSubmissions: ProgressSubmission[];
+  materialRequests: MaterialRequestActivity[];
+  progressUpdates: ProjectProgressUpdateRecord[];
+  documents: ProjectDocumentRecord[];
+  projectExpenses: ProjectExpenseRecord[];
+  purchaseOrders: ProjectPurchaseOrder[];
+  materialReceipts: ProjectMaterialReceipt[];
 }) {
   const router = useRouter();
   const params = useSearchParams();
+  const tabs: readonly WorkspaceTab[] = canReviewEstimates ? CEO_TABS : ENGINEER_TABS;
   const selected = params.get("tab");
-  const tab = TABS.includes(selected as WorkspaceTab)
-    ? (selected as WorkspaceTab)
-    : "overview";
+  const tab = tabs.includes(selected as WorkspaceTab) ? (selected as WorkspaceTab) : "overview";
   const [pendingTab, setPendingTab] = useState<WorkspaceTab | null>(null);
   const [isTabPending, startTabTransition] = useTransition();
   const [isSubmittingProgress, setIsSubmittingProgress] = useState(false);
@@ -112,7 +154,7 @@ export default function ProjectWorkspaceClient({
     ["project-workspace", project.id],
     async () => getProjectWorkspaceDataAction(project.id) as Promise<WorkspaceData>,
     {
-      fallbackData: { activities, estimates, estimateItems, budgetItems },
+      fallbackData: { activities, estimates, estimateItems, budgetItems, progressSubmissions, materialRequests, progressUpdates, documents, projectExpenses, purchaseOrders, materialReceipts },
       refreshInterval: 4000,
       revalidateOnFocus: true,
     },
@@ -121,20 +163,20 @@ export default function ProjectWorkspaceClient({
   const liveEstimates = workspaceState.data?.estimates ?? estimates;
   const liveEstimateItems = workspaceState.data?.estimateItems ?? estimateItems;
   const liveBudgetItems = workspaceState.data?.budgetItems ?? budgetItems;
-  const estimated = liveBudgetItems.reduce((sum, item) => sum + Number(item.estimated_cost), 0);
-  const spent = liveBudgetItems.reduce((sum, item) => sum + Number(item.actual_spent), 0);
+  const liveProgressSubmissions = workspaceState.data?.progressSubmissions ?? progressSubmissions;
+  const liveMaterialRequests = workspaceState.data?.materialRequests ?? materialRequests;
+  const liveProgressUpdates = workspaceState.data?.progressUpdates ?? progressUpdates;
+  const liveDocuments = workspaceState.data?.documents ?? documents ?? [];
+  const liveProjectExpenses = workspaceState.data?.projectExpenses ?? projectExpenses ?? [];
+  const livePurchaseOrders = workspaceState.data?.purchaseOrders ?? purchaseOrders ?? [];
+  const liveMaterialReceipts = workspaceState.data?.materialReceipts ?? materialReceipts ?? [];
+
   const activityRows = liveActivities.map((activity) => mapActivity(project.name, activity));
   const activeEstimate =
     liveEstimates.find((estimate) => estimate.id === activeEstimateId) ?? null;
   const activeEstimateItems = activeEstimate
     ? liveEstimateItems.filter((item) => item.estimate_id === activeEstimate.id)
     : [];
-  const money = (value: number) =>
-    new Intl.NumberFormat("en-PH", {
-      style: "currency",
-      currency: "PHP",
-      maximumFractionDigits: 0,
-    }).format(value);
 
   useEffect(() => {
     if (tab === "estimates" && canCreateEstimate && !canReviewEstimates) {
@@ -184,6 +226,9 @@ export default function ProjectWorkspaceClient({
         activities: current?.activities ?? liveActivities,
         estimateItems: current?.estimateItems ?? liveEstimateItems,
         budgetItems: current?.budgetItems ?? liveBudgetItems,
+        progressSubmissions: current?.progressSubmissions ?? liveProgressSubmissions,
+        materialRequests: current?.materialRequests ?? liveMaterialRequests,
+        progressUpdates: current?.progressUpdates ?? liveProgressUpdates,
         estimates:
           current?.estimates.map((estimate) =>
             estimate.id === updatedEstimate.id ? updatedEstimate : estimate,
@@ -240,30 +285,18 @@ export default function ProjectWorkspaceClient({
 
   return (
     <div className="min-h-full space-y-5 bg-slate-50/40 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+      <div className="sticky top-0 z-40 -mx-4 -mt-5 border-b border-slate-200 bg-slate-50/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:-mt-7 lg:px-8">
+        <Link href="/projects" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 transition hover:text-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2">
+          <ArrowLeft size={15} /> Back to Projects
+        </Link>
+      </div>
       <ProjectWorkspaceHeader project={project} />
-
-      <nav className="flex gap-1 overflow-x-auto border-b border-slate-200">
-        {TABS.map((item) => {
-          const isActive = (pendingTab ?? tab) === item;
-
-          return (
-            <button
-              type="button"
-              key={item}
-              onClick={() => switchTab(item)}
-              aria-current={isActive ? "page" : undefined}
-              disabled={isTabPending}
-              className={`border-b-2 px-4 py-3 text-sm font-semibold capitalize transition ${
-                isActive
-                  ? "border-emerald-700 text-emerald-800"
-                  : "border-transparent text-slate-600 hover:border-slate-300 hover:text-slate-950"
-              } disabled:cursor-wait`}
-            >
-              {item === "overview" ? (canReviewEstimates ? "Overview" : "Progress") : item}
-            </button>
-          );
-        })}
-      </nav>
+      <ProjectWorkspaceTabs
+        tabs={tabs}
+        activeTab={pendingTab ?? tab}
+        disabled={isTabPending}
+        onSelect={switchTab}
+      />
 
       {isTabPending ? (
         <ProjectWorkspaceTabSkeleton tab={pendingTab ?? tab} />
@@ -277,22 +310,51 @@ export default function ProjectWorkspaceClient({
             budgetItems={liveBudgetItems}
           />
         ) : (
-          <div className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Card label="Completion" value={String(project.progress) + "%"} />
-              <Card label="Activities" value={String(liveActivities.length)} />
-              <Card label="Remaining budget" value={money(project.budget - spent)} />
-            </div>
-            <EngineeringProgressWorksheet
-              activities={activityRows}
-              readOnly={!canUpdateProgress}
-              isSubmitting={isSubmittingProgress}
-              onSubmitProgress={submitProgress}
-            />
-          </div>
+          <EngineerProjectOverview
+            project={project}
+            activities={activityRows}
+            budgetItems={liveBudgetItems}
+            submissions={liveProgressSubmissions}
+            materialRequests={liveMaterialRequests}
+            progressUpdates={liveProgressUpdates}
+            canUpdateProgress={canUpdateProgress}
+            onUpdateProgress={() => switchTab("progress-updates")}
+            onOpenMaterials={() => switchTab("materials")}
+          />
         )
       ) : null}
 
+
+      {!isTabPending && tab === "activities" ? (
+        <EngineeringProgressWorksheet
+          activities={activityRows}
+          readOnly={!canUpdateProgress}
+          isSubmitting={isSubmittingProgress}
+          onSubmitProgress={submitProgress}
+        />
+      ) : null}
+
+      {!isTabPending && tab === "progress-updates" ? (
+        <ProjectProgressUpdatesPanel
+          projectId={project.id}
+          updates={liveProgressUpdates}
+          canSubmit={canUpdateProgress}
+          onCreated={(update) => {
+            void workspaceState.mutate(
+              (current) => ({
+                activities: current?.activities ?? liveActivities,
+                estimates: current?.estimates ?? liveEstimates,
+                estimateItems: current?.estimateItems ?? liveEstimateItems,
+                budgetItems: current?.budgetItems ?? liveBudgetItems,
+                progressSubmissions: current?.progressSubmissions ?? liveProgressSubmissions,
+                materialRequests: current?.materialRequests ?? liveMaterialRequests,
+                progressUpdates: [update, ...(current?.progressUpdates ?? liveProgressUpdates)],
+              }),
+              false,
+            );
+          }}
+        />
+      ) : null}
       {!isTabPending && tab === "estimates" && canReviewEstimates ? (
         <ProjectEstimateReviewSection
           estimates={liveEstimates}
@@ -305,40 +367,76 @@ export default function ProjectWorkspaceClient({
       ) : null}
 
       {!isTabPending && tab === "materials" ? (
-        <>
-          <PreviewNotice label="Material approvals are preview data in this phase." />
-          <MaterialApprovalsPageClient projectName={project.name} />
-        </>
+        canReviewEstimates ? (
+          <>
+            <ProjectPreviewNotice label="Material approvals are preview data in this phase." />
+            <MaterialApprovalsPageClient projectName={project.name} canManage />
+          </>
+        ) : (
+          <ProjectMaterialsPanel projectId={project.id} requests={liveMaterialRequests} />
+        )
       ) : null}
       {!isTabPending && tab === "purchasing" ? (
         <>
-          <PreviewNotice label="Purchasing approvals are preview data in this phase." />
+          <ProjectPreviewNotice label="Purchasing approvals are preview data in this phase." />
           <PurchasingApprovalsPageClient projectName={project.name} />
         </>
       ) : null}
-      {!isTabPending && tab === "budget" ? (
-        <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Card label="Budget ceiling" value={money(project.budget)} />
-            <Card label="Estimated" value={money(estimated)} />
-            <Card label="Actual spent" value={money(spent)} />
-          </div>
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-bold text-slate-950">Budget items</h2>
-            {liveBudgetItems.map((item) => (
-              <div key={item.id} className="mt-3 flex justify-between gap-3 border-t border-slate-100 pt-3 text-sm">
-                <span>
-                  {item.name} <small className="text-slate-500">({item.category})</small>
-                </span>
-                <span>{money(item.actual_spent)} / {money(item.estimated_cost)}</span>
-              </div>
-            ))}
-            {!liveBudgetItems.length ? <p className="mt-4 text-sm text-slate-500">No budget items yet.</p> : null}
-            <Link href="/projects?section=budget-tracker" className="mt-4 inline-flex text-sm font-semibold text-emerald-800">
-              Open full Budget Tracker
-            </Link>
-          </section>
-        </div>
+      {!isTabPending && tab === "documents" ? (
+        <ProjectDocumentsPanel
+          projectId={project.id}
+          documents={liveDocuments}
+          canUpload={canUpdateProgress}
+          currentUserId={currentUserId}
+          onCreated={(document) => {
+            void workspaceState.mutate(
+              (current) => ({
+                activities: current?.activities ?? liveActivities,
+                estimates: current?.estimates ?? liveEstimates,
+                estimateItems: current?.estimateItems ?? liveEstimateItems,
+                budgetItems: current?.budgetItems ?? liveBudgetItems,
+                progressSubmissions: current?.progressSubmissions ?? liveProgressSubmissions,
+                materialRequests: current?.materialRequests ?? liveMaterialRequests,
+                progressUpdates: current?.progressUpdates ?? liveProgressUpdates,
+                documents: [document, ...(current?.documents ?? liveDocuments)],
+              }),
+              false,
+            );
+          }}
+          onDeleted={(documentId) => {
+            void workspaceState.mutate(
+              (current) => ({
+                activities: current?.activities ?? liveActivities,
+                estimates: current?.estimates ?? liveEstimates,
+                estimateItems: current?.estimateItems ?? liveEstimateItems,
+                budgetItems: current?.budgetItems ?? liveBudgetItems,
+                progressSubmissions: current?.progressSubmissions ?? liveProgressSubmissions,
+                materialRequests: current?.materialRequests ?? liveMaterialRequests,
+                progressUpdates: current?.progressUpdates ?? liveProgressUpdates,
+                documents: (current?.documents ?? liveDocuments).filter((document) => document.id !== documentId),
+              }),
+              false,
+            );
+          }}
+        />
+      ) : null}
+      {!isTabPending && tab === "activity-log" ? (
+        <ProjectActivityLogPanel
+          engineerName={project.engineer}
+          progressUpdates={liveProgressUpdates}
+          progressSubmissions={liveProgressSubmissions}
+          materialRequests={liveMaterialRequests}
+          documents={liveDocuments}
+        />
+      ) : null}
+      {!isTabPending && tab === "cost-tracking" ? (
+        <ProjectCostTrackingPanel
+          startingBudget={project.budget}
+          materialRequests={liveMaterialRequests}
+          purchaseOrders={livePurchaseOrders}
+          materialReceipts={liveMaterialReceipts}
+          expenses={liveProjectExpenses}
+        />
       ) : null}
 
       {activeEstimate ? (
@@ -379,69 +477,17 @@ export default function ProjectWorkspaceClient({
       ) : null}
 
       {returnEstimateId ? (
-        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-[0_24px_64px_rgba(15,23,42,0.24)]">
-            <div className="border-b border-slate-100 bg-emerald-900 px-5 py-4 text-white">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
-                Return estimate
-              </p>
-              <h2 className="mt-1 text-lg font-bold">
-                Send this estimate back to the engineer
-              </h2>
-            </div>
-            <div className="space-y-4 p-5">
-              <textarea
-                value={returnReason}
-                onChange={(event) => setReturnReason(event.target.value)}
-                rows={5}
-                placeholder="Add an optional return note for the engineer."
-                className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none transition focus:border-emerald-700"
-              />
-              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setReturnEstimateId(null);
-                    setReturnReason("");
-                  }}
-                  disabled={pendingEstimateAction !== null}
-                  className="h-10 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={confirmReturnEstimate}
-                  disabled={pendingEstimateAction !== null}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-emerald-800 px-4 text-sm font-semibold text-white transition hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {pendingEstimateAction?.type === "return" ? (
-                    <LoaderCircle size={15} className="animate-spin" />
-                  ) : null}
-                  Confirm return
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ProjectReturnEstimateDialog
+          reason={returnReason}
+          isPending={pendingEstimateAction !== null}
+          onReasonChange={setReturnReason}
+          onCancel={() => {
+            setReturnEstimateId(null);
+            setReturnReason("");
+          }}
+          onConfirm={confirmReturnEstimate}
+        />
       ) : null}
-    </div>
-  );
-}
-
-function Card({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <p className="text-xs uppercase text-slate-500">{label}</p>
-      <p className="mt-2 text-xl font-bold">{value}</p>
-    </div>
-  );
-}
-
-function PreviewNotice({ label }: { label: string }) {
-  return (
-    <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-      {label} Changes here are not stored in Supabase yet.
     </div>
   );
 }
