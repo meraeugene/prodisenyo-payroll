@@ -5,6 +5,7 @@ import { ClipboardPlus, LoaderCircle, Send } from "lucide-react";
 import { toast } from "sonner";
 import DashboardPageHero from "@/components/DashboardPageHero";
 import { createMaterialRequestAction } from "@/actions/materialRequests";
+import type { PlannedMaterialRow } from "@/features/material-requests/utils/plannedMaterials";
 import type {
   CreateMaterialRequestInput,
   MaterialRequestPriority,
@@ -66,13 +67,23 @@ export default function MaterialRequestPageClient({
   initialRequests,
   projects,
   defaultProjectId,
+  plannedMaterial,
 }: {
   initialRequests: MaterialRequestRecord[];
   projects: Array<{ id: string; name: string }>;
   defaultProjectId?: string;
+  plannedMaterial?: PlannedMaterialRow | null;
 }) {
   const defaultProject = projects.find((project) => project.id === defaultProjectId);
-  const [form, setForm] = useState<CreateMaterialRequestInput>({ ...EMPTY_FORM, projectId: defaultProject?.id ?? "", projectName: defaultProject?.name ?? "" });
+  const [form, setForm] = useState<CreateMaterialRequestInput>({
+    ...EMPTY_FORM,
+    projectId: defaultProject?.id ?? "",
+    projectName: defaultProject?.name ?? "",
+    estimateItemId: plannedMaterial?.estimateItemId,
+    materialName: plannedMaterial?.materialName ?? "",
+    unit: plannedMaterial?.unit ?? "pcs",
+    quantity: plannedMaterial?.remainingQuantity ?? 1,
+  });
   const [requests, setRequests] =
     useState<MaterialRequestRecord[]>(initialRequests);
   const [formErrors, setFormErrors] = useState<MaterialFormErrors>({});
@@ -166,6 +177,10 @@ export default function MaterialRequestPageClient({
           neededBy: form.neededBy,
           projectId: form.projectId,
           projectName: form.projectName,
+          estimateItemId: form.estimateItemId,
+          materialName: plannedMaterial?.materialName ?? "",
+          unit: plannedMaterial?.unit ?? "pcs",
+          quantity: plannedMaterial?.remainingQuantity ?? 1,
         });
         toast.success("Material request submitted.");
       } catch (error) {
@@ -199,12 +214,27 @@ export default function MaterialRequestPageClient({
             Material Request Form
           </h2>
 
+          {plannedMaterial ? (
+            <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">
+                Approved estimate material
+              </p>
+              <p className="mt-2 font-semibold text-emerald-950">
+                {plannedMaterial.materialName}
+              </p>
+              <p className="mt-1 text-sm text-emerald-800">
+                {plannedMaterial.remainingQuantity} {plannedMaterial.unit} remaining of{" "}
+                {plannedMaterial.plannedQuantity} planned
+              </p>
+            </div>
+          ) : null}
+
           <form className="mt-4 grid gap-4" onSubmit={handleSubmit}>
             <label className="grid gap-2">
               <span className="text-sm font-semibold text-apple-charcoal">
                 Project Name <span className="text-rose-500">*</span>
               </span>
-              <select value={form.projectId} onChange={(event) => { const selected = projects.find((project) => project.id === event.target.value); updateField("projectId", event.target.value); updateField("projectName", selected?.name ?? ""); }} className={inputClass(Boolean(formErrors.projectId))}>
+              <select disabled={Boolean(plannedMaterial)} value={form.projectId} onChange={(event) => { const selected = projects.find((project) => project.id === event.target.value); updateField("projectId", event.target.value); updateField("projectName", selected?.name ?? ""); }} className={inputClass(Boolean(formErrors.projectId))}>
                 <option value="">Select an assigned project</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
               </select>
               {formErrors.projectId ? (
@@ -224,6 +254,7 @@ export default function MaterialRequestPageClient({
                   updateField("materialName", event.target.value)
                 }
                 placeholder="2x3 steel tubing"
+                readOnly={Boolean(plannedMaterial)}
                 className={inputClass(Boolean(formErrors.materialName))}
               />
               {formErrors.materialName ? (
@@ -242,6 +273,7 @@ export default function MaterialRequestPageClient({
                   type="number"
                   min={0.01}
                   step={0.01}
+                  max={plannedMaterial?.remainingQuantity}
                   value={form.quantity}
                   onChange={(event) =>
                     updateField("quantity", Number(event.target.value || 0))
@@ -263,6 +295,7 @@ export default function MaterialRequestPageClient({
                   value={form.unit}
                   onChange={(event) => updateField("unit", event.target.value)}
                   placeholder="pcs"
+                  readOnly={Boolean(plannedMaterial)}
                   className={inputClass(Boolean(formErrors.unit))}
                 />
                 {formErrors.unit ? (

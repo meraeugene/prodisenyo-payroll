@@ -16,7 +16,7 @@ export async function getEngineerDashboardData(params: {
   const { data: projectRows, error: projectError } = await database
     .from("projects")
     .select(
-      "id,name,location,status,budget_ceiling,start_date,end_date,progress:project_progress_activities(weight_percent,progress_percent),budget:budget_projects(starting_budget,budget_items(actual_spent))",
+      "id,name,location,status,assigned_engineer_id,assigned_estimate_engineer_id,budget_ceiling,start_date,end_date,progress:project_progress_activities(weight_percent,progress_percent),budget:budget_projects(starting_budget,budget_items(actual_spent))",
     )
     .or(
       `assigned_engineer_id.eq.${params.userId},assigned_estimate_engineer_id.eq.${params.userId}`,
@@ -28,7 +28,12 @@ export async function getEngineerDashboardData(params: {
     throw new Error(`Failed to load the engineer dashboard. ${projectError.message}`);
   }
 
-  const projects = (projectRows ?? []).map((row: any) => ({
+  const assignedRows = (projectRows ?? []).filter((row: any) =>
+    row.status === "planning"
+      ? row.assigned_estimate_engineer_id === params.userId
+      : row.assigned_engineer_id === params.userId,
+  );
+  const projects = assignedRows.map((row: any) => ({
     id: row.id,
     name: row.name,
     location: row.location,

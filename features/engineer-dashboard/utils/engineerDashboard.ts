@@ -63,6 +63,7 @@ export function buildEngineerDashboardAlerts(params: {
   const scheduleAlerts = params.projects
     .filter(
       (project) =>
+        project.status !== "planning" &&
         project.status !== "completed" &&
         project.progress < 100 &&
         new Date(`${project.endDate}T23:59:59`).getTime() < now.getTime(),

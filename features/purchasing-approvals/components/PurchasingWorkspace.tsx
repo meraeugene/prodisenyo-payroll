@@ -42,7 +42,7 @@ export default function PurchasingWorkspace() {
   }, []);
 
   const filtered = records.filter((record) =>
-    [record.projectName, record.itemName, record.supplierName]
+    [record.projectName, record.itemName, record.supplierName, record.quotationReference]
       .join(" ")
       .toLowerCase()
       .includes(search.toLowerCase()),
@@ -58,6 +58,7 @@ export default function PurchasingWorkspace() {
       try {
         const updated = await updatePurchaseOrderAction({
           id: editing.id,
+          quotationReference: String(formData.get('quotationReference') ?? ''),
           supplierName: String(formData.get("supplierName") ?? ""),
           actualUnitCost: Number(formData.get("actualUnitCost") ?? 0),
           status: String(formData.get("status")) as PurchaseStatus,
@@ -107,8 +108,8 @@ export default function PurchasingWorkspace() {
                 <div>
                   <p className="text-xs font-semibold uppercase text-apple-steel">{record.projectName}</p>
                   <h2 className="mt-1 font-bold text-apple-charcoal">{record.itemName}</h2>
-                  <p className="mt-1 text-sm text-apple-smoke">{record.quantity} {record.unit} ? {record.supplierName || "Supplier pending"}</p>
-                  <p className="mt-2 text-xs text-apple-steel">Invoice/receipt: {record.receiptInvoiceReference || "Not recorded"} ? Delivery: {record.deliveryStatus.replace("_", " ")}</p>
+                  <p className="mt-1 text-sm text-apple-smoke">{record.quantity} {record.unit} · {record.supplierName || "Supplier pending"}</p>
+                  <p className="mt-2 text-xs text-apple-steel">Quotation: {record.quotationReference || "Not recorded"} · Invoice/receipt: {record.receiptInvoiceReference || "Not recorded"} · Delivery: {record.deliveryStatus.replace("_", " ")}</p>
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="text-right">
@@ -116,10 +117,16 @@ export default function PurchasingWorkspace() {
                     <p className="font-bold text-emerald-800">{money(record.quantity * record.actualUnitCost)}</p>
                     <span className="text-xs font-semibold uppercase text-apple-smoke">{record.status}</span>
                   </div>
-                  <button onClick={() => setEditing(record)} aria-label="Edit purchase details"
-                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-apple-mist text-emerald-700 hover:bg-emerald-50">
-                    <Pencil size={14} />
-                  </button>
+                  {record.status === "received" ? (
+                    <span className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+                      Final
+                    </span>
+                  ) : (
+                    <button onClick={() => setEditing(record)} aria-label="Edit purchase details"
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-apple-mist text-emerald-700 hover:bg-emerald-50">
+                      <Pencil size={14} />
+                    </button>
+                  )}
                 </div>
               </div>
             </article>
@@ -137,6 +144,7 @@ export default function PurchasingWorkspace() {
               <label className="text-xs font-semibold text-slate-700">Purchase status<select name="status" defaultValue={editing.status} className="mt-1 h-10 w-full rounded-xl border border-apple-mist px-3 text-sm">{STATUS_OPTIONS.map((value) => <option key={value}>{value}</option>)}</select></label>
               <label className="text-xs font-semibold text-slate-700">Delivery status<select name="deliveryStatus" defaultValue={editing.deliveryStatus} className="mt-1 h-10 w-full rounded-xl border border-apple-mist px-3 text-sm">{DELIVERY_OPTIONS.map((value) => <option key={value}>{value}</option>)}</select></label>
             </div>
+            <label className="block text-xs font-semibold text-slate-700">Supplier quotation reference<input name="quotationReference" defaultValue={editing.quotationReference} placeholder="Quotation number or file reference" className="mt-1 h-10 w-full rounded-xl border border-apple-mist px-3 text-sm" /></label>
             <label className="block text-xs font-semibold text-slate-700">Receipt / invoice reference<input name="receiptInvoiceReference" defaultValue={editing.receiptInvoiceReference} className="mt-1 h-10 w-full rounded-xl border border-apple-mist px-3 text-sm" /></label>
             <label className="block text-xs font-semibold text-slate-700">Notes<textarea name="notes" defaultValue={editing.notes} rows={3} className="mt-1 w-full rounded-xl border border-apple-mist p-3 text-sm" /></label>
             <div className="flex justify-end gap-2 border-t border-apple-mist pt-4">

@@ -546,6 +546,7 @@ export interface Database {
           id: string; name: string; location: string; client_name: string | null;
           subject: string | null; lead: string | null; assigned_engineer_id: string | null;
           assigned_estimate_engineer_id: string | null;
+          active_approved_estimate_id: string | null;
           status: "planning" | "active" | "on_hold" | "completed" | "archived";
           budget_ceiling: number; currency_code: string; start_date: string; end_date: string;
           description: string | null; image_url: string | null; created_by: string;
@@ -555,6 +556,7 @@ export interface Database {
           id?: string; name: string; location: string; client_name?: string | null;
           subject?: string | null; lead?: string | null; assigned_engineer_id?: string | null;
           assigned_estimate_engineer_id?: string | null;
+          active_approved_estimate_id?: string | null;
           status?: "planning" | "active" | "on_hold" | "completed" | "archived";
           budget_ceiling: number; currency_code?: string; start_date: string; end_date: string;
           description?: string | null; image_url?: string | null; created_by: string;
@@ -694,6 +696,8 @@ export interface Database {
           sort_order?: number;
           created_by: string;
           updated_by?: string | null;
+          source_estimate_item_id?: string | null;
+          source_material_request_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -707,6 +711,8 @@ export interface Database {
           notes?: string | null;
           sort_order?: number;
           updated_by?: string | null;
+          source_estimate_item_id?: string | null;
+          source_material_request_id?: string | null;
           updated_at?: string;
         };
       };
@@ -829,6 +835,9 @@ export interface Database {
           sort_order: number;
           created_at: string;
           updated_at: string;
+          pricing_basis: "catalog" | "supplier_quote";
+          reference_supplier: string | null;
+          reference_quotation: string | null;
         };
         Insert: {
           id?: string;
@@ -845,6 +854,9 @@ export interface Database {
           sort_order?: number;
           created_at?: string;
           updated_at?: string;
+          pricing_basis?: "catalog" | "supplier_quote";
+          reference_supplier?: string | null;
+          reference_quotation?: string | null;
         };
         Update: {
           estimate_id?: string;
@@ -859,6 +871,9 @@ export interface Database {
           notes?: string | null;
           sort_order?: number;
           updated_at?: string;
+          pricing_basis?: "catalog" | "supplier_quote";
+          reference_supplier?: string | null;
+          reference_quotation?: string | null;
         };
       };
       audit_logs: {

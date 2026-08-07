@@ -1,14 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import {
   LoaderCircle,
   CornerUpLeft,
   CheckCircle2,
   XCircle,
+  PencilLine,
 } from "lucide-react";
 import DashboardPageHero from "@/components/DashboardPageHero";
 import CostEstimatorConfirmModal from "@/features/cost-estimator/components/CostEstimatorConfirmModal";
 import EstimateReportModal from "@/features/cost-estimator/components/EstimateReportModal";
+import CeoEstimateEditDialog from "@/features/cost-estimator/components/CeoEstimateEditDialog";
 import EstimateReviewsTable from "@/features/cost-estimator/components/EstimateReviewsTable";
 import { useEstimateReviewsPage } from "@/features/cost-estimator/hooks/useEstimateReviewsPage";
 import type {
@@ -21,12 +24,17 @@ export default function EstimateReviewsPageClient({
   estimates,
   items,
   embedded = false,
+  onEstimateApproved,
+  projectId,
 }: {
   estimates: ReviewProjectEstimateRow[];
   items: ProjectEstimateItemRow[];
   embedded?: boolean;
+  onEstimateApproved?: (estimate: ReviewProjectEstimateRow) => void;
+  projectId?: string;
 }) {
-  const state = useEstimateReviewsPage({ estimates, items });
+  const state = useEstimateReviewsPage({ estimates, items, onEstimateApproved, projectId });
+  const [editingEstimate, setEditingEstimate] = useState(false);
 
   return (
     <div className={cn("p-0", !embedded && "sm:p-6")}>
@@ -49,6 +57,15 @@ export default function EstimateReviewsPageClient({
           footer={
             state.activeEstimate.status === "submitted" ? (
               <div className="ml-auto flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setEditingEstimate(true)}
+                  disabled={state.isPending}
+                  className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-emerald-200 bg-white px-4 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50 disabled:opacity-60 sm:w-auto"
+                >
+                  <PencilLine size={16} className="mr-2" />
+                  Edit Estimate
+                </button>
                 <button
                   type="button"
                   onClick={() =>
@@ -92,6 +109,15 @@ export default function EstimateReviewsPageClient({
               </div>
             ) : null
           }
+        />
+      ) : null}
+
+      {editingEstimate && state.activeEstimate ? (
+        <CeoEstimateEditDialog
+          estimateId={state.activeEstimate.id}
+          items={state.activeEstimateItems}
+          onClose={() => setEditingEstimate(false)}
+          onSaved={() => state.refresh()}
         />
       ) : null}
 

@@ -4,6 +4,7 @@ type ProjectRow = {
   id: string; name: string; location: string; client_name: string | null;
   subject: string | null; lead: string | null; assigned_engineer_id: string | null;
   assigned_estimate_engineer_id: string | null;
+  active_approved_estimate_id?: string | null;
   status: "planning" | "active" | "on_hold" | "completed" | "archived";
   budget_ceiling: number; start_date: string; end_date: string; description: string | null;
   image_url: string | null; engineer?: { full_name: string | null; username: string } | null;
@@ -25,7 +26,8 @@ export function mapProjectRow(row: ProjectRow): ProjectRecord {
     subject: row.subject ?? "", lead: row.lead ?? "", status: row.status === "archived" ? "on_hold" : row.status,
     budget: Number(row.budget_ceiling), spent, progress, startDate: row.start_date, endDate: row.end_date,
     manager: engineer, engineer, assignedEngineerId: row.assigned_engineer_id,
-    estimateEngineer, assignedEstimateEngineerId: row.assigned_estimate_engineer_id, imageUrl: row.image_url,
+    estimateEngineer, assignedEstimateEngineerId: row.assigned_estimate_engineer_id,
+    activeApprovedEstimateId: row.active_approved_estimate_id ?? null, imageUrl: row.image_url,
     tasksCount: activities.length, completedTasksCount: activities.filter((item) => Number(item.progress_percent) >= 100).length,
     materialsCount: 0, description: row.description ?? "",
   };

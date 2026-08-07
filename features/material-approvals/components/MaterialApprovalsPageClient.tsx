@@ -1,464 +1,308 @@
 "use client";
 
-import React, { useState, useTransition, useEffect } from "react";
+import React, { useMemo, useState, useTransition } from "react";
 import {
-  ClipboardList,
-  CheckCircle,
-  XCircle,
-  Search,
-  MessageSquare,
-  ThumbsUp,
-  ThumbsDown,
   Building,
-  Pencil,
+  CheckCircle,
+  ClipboardList,
+  Package,
+  Search,
+  ThumbsDown,
+  ThumbsUp,
   User,
+  XCircle,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-
-import MaterialRequestEditDialog from "@/features/material-approvals/components/MaterialRequestEditDialog";
+import { reviewMaterialRequestAction } from "@/actions/materialWorkflow";
 import MaterialRequestReviewDialog from "@/features/material-approvals/components/MaterialRequestReviewDialog";
-import type {
-  EditableMaterialRequest,
-  MaterialRequest,
-} from "@/features/material-approvals/types";
+import type { ProjectMaterialRequest } from "@/features/material-approvals/types";
+import type { PlannedMaterialRow } from "@/features/material-requests/utils/plannedMaterials";
+import {
+  getMaterialApprovalBucket,
+  getMaterialWorkflowLabel,
+  mapMaterialApprovalDialogRequest,
+  type MaterialApprovalBucket,
+} from "@/features/material-approvals/utils/materialApproval";
+import { cn } from "@/lib/utils";
 
-const INITIAL_REQUESTS: MaterialRequest[] = [
-  {
-    id: "mat-1",
-    projectName: "Grand Horizon Towers",
-    materialName: "Portland Cement (Type 1)",
-    quantity: 350,
-    unit: "bags",
-    neededBy: "2026-07-25",
-    priority: "high",
-    requestedBy: "Engineer User",
-    status: "pending",
-    notes: "Crucial for structural columns concrete pouring on July 26.",
-  },
-  {
-    id: "mat-2",
-    projectName: "Vista Verde Residences",
-    materialName: "Deformed Steel Bar Grade 40 (16mm x 6m)",
-    quantity: 120,
-    unit: "pcs",
-    neededBy: "2026-07-28",
-    priority: "urgent",
-    requestedBy: "Engineer User",
-    status: "pending",
-    notes: "Required for floor slab frame reinforcment.",
-  },
-  {
-    id: "mat-3",
-    projectName: "Skyline Business Park",
-    materialName: "Double-Glazed Facade Glass Panels",
-    quantity: 45,
-    unit: "sheets",
-    neededBy: "2026-08-10",
-    priority: "medium",
-    requestedBy: "Engineer User",
-    status: "pending",
-    notes: "Order needed early as lead time is 2 weeks.",
-  },
-  {
-    id: "mat-4",
-    projectName: "Grand Horizon Towers",
-    materialName: 'Electrical PVC Conduit Pipe 3/4"',
-    quantity: 500,
-    unit: "pcs",
-    neededBy: "2026-07-15",
-    priority: "low",
-    requestedBy: "Engineer User",
-    status: "approved",
-    notes: "Needed for grid conduit rough-ins.",
-    approvalNotes: "Approved for procurement. Proceed with local vendor.",
-  },
-  {
-    id: "mat-5",
-    projectName: "Novaliches Warehouse Complex",
-    materialName: "Ready-Mix Concrete (3000 PSI)",
-    quantity: 12,
-    unit: "cu.m",
-    neededBy: "2026-07-12",
-    priority: "high",
-    requestedBy: "Engineer User",
-    status: "rejected",
-    notes: "Slab pouring preparation.",
-    approvalNotes:
-      "Rejected. Project currently on hold by client decision. Wait for reactivation.",
-  },
-];
-
-function getMockStorageKey(projectName?: string) {
-  return projectName
-    ? "prodisenyo-material-requests-v2-" + projectName
-    : "prodisenyo-material-requests-v2";
+function formatDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unavailable";
+  return new Intl.DateTimeFormat("en-PH", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "Asia/Manila",
+  }).format(date);
 }
 
-function buildMockRequests(projectName?: string) {
-  if (!projectName) return INITIAL_REQUESTS;
+function priorityClass(priority: ProjectMaterialRequest["priority"]) {
+  if (priority === "urgent") return "border-rose-100 bg-rose-50 text-rose-700";
+  if (priority === "high") return "border-amber-100 bg-amber-50 text-amber-700";
+  if (priority === "medium") return "border-sky-100 bg-sky-50 text-sky-700";
+  return "border-slate-100 bg-slate-50 text-slate-700";
+}
 
-  return INITIAL_REQUESTS.map((request) => ({
-    ...request,
-    id: request.id + "-" + projectName,
-    projectName,
-  }));
+function statusClass(status: ProjectMaterialRequest["status"]) {
+  if (status === "rejected" || status === "cancelled") {
+    return "border-rose-200 bg-rose-50 text-rose-700";
+  }
+  if (status === "submitted") {
+    return "border-amber-200 bg-amber-50 text-amber-700";
+  }
+  if (status === "purchasing" || status === "ordered") {
+    return "border-sky-200 bg-sky-50 text-sky-700";
+  }
+  return "border-emerald-200 bg-emerald-50 text-emerald-700";
 }
 
 export default function MaterialApprovalsPageClient({
   projectName,
+  requestedBy,
+  requests = [],
+  plannedMaterials = [],
   canManage = false,
+  onReviewed,
 }: {
-  projectName?: string;
+  projectName: string;
+  requestedBy: string;
+  requests: ProjectMaterialRequest[];
+  plannedMaterials?: PlannedMaterialRow[];
   canManage?: boolean;
+  onReviewed?: () => Promise<unknown> | unknown;
 }) {
-  const [requests, setRequests] = useState<MaterialRequest[]>([]);
-  const [activeTab, setActiveTab] = useState<
-    "pending" | "approved" | "rejected" | "all"
-  >("pending");
+  const [activeTab, setActiveTab] = useState<MaterialApprovalBucket | "all">("pending");
   const [searchTerm, setSearchTerm] = useState("");
-  const [isPendingTransition, startTransition] = useTransition();
-
-  // Load project-scoped mock data from local storage.
-  useEffect(() => {
-    const storageKey = getMockStorageKey(projectName);
-    const initialRequests = buildMockRequests(projectName);
-    const saved = localStorage.getItem(storageKey);
-
-    if (saved) {
-      try {
-        setRequests(JSON.parse(saved));
-      } catch {
-        setRequests(initialRequests);
-      }
-    } else {
-      setRequests(initialRequests);
-      localStorage.setItem(storageKey, JSON.stringify(initialRequests));
-    }
-  }, [projectName]);
-
-  // Action states for comments popup
-  const [reviewingRequest, setReviewingRequest] =
-    useState<MaterialRequest | null>(null);
+  const [reviewingRequest, setReviewingRequest] = useState<ProjectMaterialRequest | null>(null);
   const [actionType, setActionType] = useState<"approve" | "reject">("approve");
   const [commentText, setCommentText] = useState("");
-  const [editingRequest, setEditingRequest] =
-    useState<MaterialRequest | null>(null);
+  const [isPending, startTransition] = useTransition();
 
-  const filteredRequests = React.useMemo(() => {
-    return requests.filter((r) => {
-      if (projectName && r.projectName !== projectName) return false;
-      const matchesTab = activeTab === "all" ? true : r.status === activeTab;
+  const filteredRequests = useMemo(() => {
+    const search = searchTerm.trim().toLowerCase();
+    return requests.filter((request) => {
+      const matchesTab =
+        activeTab === "all" ||
+        getMaterialApprovalBucket(request.status) === activeTab;
       const matchesSearch =
-        r.projectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.materialName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.requestedBy.toLowerCase().includes(searchTerm.toLowerCase());
+        !search ||
+        request.material_name.toLowerCase().includes(search) ||
+        request.unit.toLowerCase().includes(search) ||
+        projectName.toLowerCase().includes(search);
       return matchesTab && matchesSearch;
     });
-  }, [requests, activeTab, searchTerm]);
+  }, [activeTab, projectName, requests, searchTerm]);
 
-  const stats = React.useMemo(() => {
-    const pending = requests.filter((r) => r.status === "pending").length;
-    const approved = requests.filter((r) => r.status === "approved").length;
-    const rejected = requests.filter((r) => r.status === "rejected").length;
-    return { pending, approved, rejected };
-  }, [requests]);
+  const stats = useMemo(
+    () => ({
+      pending: requests.filter(
+        (request) => getMaterialApprovalBucket(request.status) === "pending",
+      ).length,
+      approved: requests.filter(
+        (request) => getMaterialApprovalBucket(request.status) === "approved",
+      ).length,
+      rejected: requests.filter(
+        (request) => getMaterialApprovalBucket(request.status) === "rejected",
+      ).length,
+    }),
+    [requests],
+  );
 
-  const handleActionClick = (
-    request: MaterialRequest,
+  function beginReview(
+    request: ProjectMaterialRequest,
     action: "approve" | "reject",
-  ) => {
-    if (!canManage) return;
+  ) {
+    if (!canManage || request.status !== "submitted") return;
     setReviewingRequest(request);
     setActionType(action);
     setCommentText("");
-  };
+  }
 
-  const handleConfirmAction = () => {
+  function confirmReview() {
     if (!reviewingRequest || !canManage) return;
-
-    const targetStatus = (
-      actionType === "approve" ? "approved" : "rejected"
-    ) as MaterialRequest["status"];
-    const statusWord = actionType === "approve" ? "Approved" : "Rejected";
-
     startTransition(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 600));
-
-      const updated = requests.map((r) =>
-        r.id === reviewingRequest.id
-          ? {
-              ...r,
-              status: targetStatus,
-              approvalNotes: commentText.trim() || undefined,
-            }
-          : r,
-      );
-
-      setRequests(updated);
-      localStorage.setItem(
-        getMockStorageKey(projectName),
-        JSON.stringify(updated),
-      );
-
-      toast.success(
-        `Request for ${reviewingRequest.materialName} successfully ${statusWord}!`,
-      );
-      setReviewingRequest(null);
+      try {
+        await reviewMaterialRequestAction({
+          requestId: reviewingRequest.id,
+          decision: actionType,
+          notes: commentText,
+        });
+        await onReviewed?.();
+        toast.success(
+          actionType === "approve"
+            ? "Material request approved and sent to purchasing."
+            : "Material request rejected.",
+        );
+        setReviewingRequest(null);
+        setCommentText("");
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Unable to review material request.",
+        );
+      }
     });
-  };
+  }
 
-  const handleSaveEdit = (changes: EditableMaterialRequest) => {
-    if (!editingRequest || !canManage) return;
-
-    const updated = requests.map((request) =>
-      request.id === editingRequest.id
-        ? {
-            ...request,
-            ...changes,
-            lastEditedBy: "Company CEO",
-            lastEditedAt: new Date().toISOString(),
-          }
-        : request,
-    );
-    setRequests(updated);
-    localStorage.setItem(
-      getMockStorageKey(projectName),
-      JSON.stringify(updated),
-    );
-    setEditingRequest(null);
-    toast.success("Material request updated by CEO.");
-  };
-  const getPriorityBadgeClass = (priority: MaterialRequest["priority"]) => {
-    if (priority === "urgent")
-      return "bg-rose-50 text-rose-700 border-rose-100";
-    if (priority === "high")
-      return "bg-amber-50 text-amber-700 border-amber-100";
-    if (priority === "medium") return "bg-sky-50 text-sky-700 border-sky-100";
-    return "bg-slate-50 text-slate-700 border-slate-100";
-  };
+  const tabs = [
+    { id: "pending" as const, label: "Pending (" + stats.pending + ")" },
+    { id: "approved" as const, label: "Approved (" + stats.approved + ")" },
+    { id: "rejected" as const, label: "Rejected (" + stats.rejected + ")" },
+    { id: "all" as const, label: "All Requests" },
+  ];
 
   return (
-    <div className="space-y-4 ">
-      {/* Tabs list */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-3">
+    <div className="space-y-4">
+      <div className="flex flex-col justify-between gap-4 border-b border-slate-100 pb-3 sm:flex-row sm:items-center">
         <div className="flex gap-1.5 overflow-x-auto">
-          {(
-            [
-              { id: "pending", label: `Pending (${stats.pending})` },
-              { id: "approved", label: `Approved (${stats.approved})` },
-              { id: "rejected", label: `Rejected (${stats.rejected})` },
-              { id: "all", label: "All Requests" },
-            ] as const
-          ).map((tab) => (
+          {tabs.map((tab) => (
             <button
               key={tab.id}
+              type="button"
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                "px-3.5 py-1.5 rounded-lg text-xs font-semibold tracking-tight transition-all",
+                "rounded-lg border px-3.5 py-1.5 text-xs font-semibold transition-all",
                 activeTab === tab.id
-                  ? "bg-[#1f6a37] text-white shadow-xs"
-                  : "text-apple-smoke hover:bg-apple-mist/50 hover:text-apple-charcoal border border-apple-mist bg-white",
+                  ? "border-emerald-800 bg-emerald-800 text-white"
+                  : "border-apple-mist bg-white text-apple-smoke hover:bg-apple-mist/50",
               )}
             >
               {tab.label}
             </button>
           ))}
         </div>
-
-        <div className="relative w-full sm:w-64">
-          <Search
-            size={13}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-apple-silver"
-          />
+        <label className="relative w-full sm:w-64">
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-apple-silver" />
+          <span className="sr-only">Search material requests</span>
           <input
-            type="text"
+            type="search"
             placeholder="Search material, project..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full h-9 pl-9 pr-4 rounded-xl border border-apple-mist bg-apple-mist/20 text-xs text-apple-charcoal outline-none placeholder:text-apple-silver focus:border-[#1f6a37] focus:bg-white transition"
+            onChange={(event) => setSearchTerm(event.target.value)}
+            className="h-9 w-full rounded-xl border border-apple-mist bg-white pl-9 pr-4 text-xs outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-100"
           />
-        </div>
+        </label>
       </div>
 
-      {/* Request Grid */}
       <div className="space-y-4">
-        {filteredRequests.length > 0 ? (
-          filteredRequests.map((req) => (
-            <div
-              key={req.id}
-              className="bg-white border border-apple-mist rounded-2xl p-5 shadow-[0_4px_20px_rgba(24,83,43,0.03)] hover:border-slate-300 transition flex flex-col md:flex-row md:items-center justify-between gap-6"
-            >
-              <div className="flex flex-col sm:flex-row gap-4 items-start flex-1">
-                {/* Material Thumbnail Image */}
-                <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-xl overflow-hidden bg-slate-50 border border-slate-100 shrink-0">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={
-                      req.materialName.toLowerCase().includes("cement")
-                        ? "https://images.unsplash.com/photo-1589939705384-5185137a7f0f?auto=format&fit=crop&w=150&q=80"
-                        : req.materialName.toLowerCase().includes("bar") ||
-                            req.materialName.toLowerCase().includes("steel")
-                          ? "https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?auto=format&fit=crop&w=150&q=80"
-                          : req.materialName.toLowerCase().includes("glass") ||
-                              req.materialName.toLowerCase().includes("facade")
-                            ? "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=150&q=80"
-                            : req.materialName.toLowerCase().includes("pipe") ||
-                                req.materialName.toLowerCase().includes("pvc")
-                              ? "https://images.unsplash.com/photo-1581094288338-2314dddb7ecc?auto=format&fit=crop&w=150&q=80"
-                              : "https://images.unsplash.com/photo-1535732759880-bbd5c7265e3f?auto=format&fit=crop&w=150&q=80"
-                    }
-                    alt={req.materialName}
-                    className="object-cover w-full h-full"
-                  />
-                </div>
-
-                <div className="space-y-2 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={cn(
-                        "border px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider",
-                        getPriorityBadgeClass(req.priority),
-                      )}
-                    >
-                      {req.priority} urgency
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider flex items-center gap-1">
-                      <Building size={11} /> {req.projectName}
-                    </span>
-                  </div>
-
-                  <div>
-                    <h4 className="text-base font-bold text-apple-charcoal">
-                      {req.materialName}
-                    </h4>
-                    <p className="text-sm font-semibold text-[#1f6a37] mt-0.5">
-                      Quantity: {req.quantity} {req.unit}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400 font-medium">
-                    <div className="flex items-center gap-1">
-                      <User size={12} />
-                      <span>Requested by {req.requestedBy}</span>
-                    </div>
-                    <span aria-hidden="true">&bull;</span>
-                    <span>Needed by: {req.neededBy}</span>
-                  </div>
-
-                  {req.lastEditedBy ? (
-                    <p className="text-[11px] font-medium text-amber-700">
-                      Edited by {req.lastEditedBy}
-                      {req.lastEditedAt
-                        ? " on " +
-                          new Date(req.lastEditedAt).toLocaleString("en-PH")
-                        : ""}
-                    </p>
-                  ) : null}
-
-                  {req.notes && (
-                    <p className="text-xs text-slate-500 bg-slate-50 p-2.5 rounded-xl italic border border-slate-100">
-                      &ldquo;{req.notes}&rdquo;
-                    </p>
-                  )}
-
-                  {req.approvalNotes && (
-                    <div className="bg-emerald-50/20 border border-emerald-100 text-emerald-800 rounded-xl p-2.5 flex gap-2">
-                      <MessageSquare
-                        size={14}
-                        className="text-emerald-600 mt-0.5 shrink-0"
-                      />
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700/80">
-                          CEO Review Notes
-                        </p>
-                        <p className="text-xs italic mt-0.5">
-                          {req.approvalNotes}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
+        {filteredRequests.map((request) => (
+          <article
+            key={request.id}
+            className="flex flex-col justify-between gap-6 rounded-2xl border border-apple-mist bg-white p-5 shadow-[0_4px_20px_rgba(24,83,43,.03)] md:flex-row md:items-center"
+          >
+            <div className="flex min-w-0 flex-1 items-start gap-4">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700">
+                <Package size={25} />
               </div>
-
-              {/* Status details & actions */}
-              <div className="flex items-center gap-2 self-end md:self-center">
-                {req.status === "pending" && canManage ? (
-                  <>
-                    <button
-                      onClick={() => setEditingRequest(req)}
-                      className="h-10 px-4 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 transition flex items-center gap-1.5"
-                    >
-                      <Pencil size={14} /> Edit
-                    </button>
-                    <button
-                      onClick={() => handleActionClick(req, "reject")}
-                      className="h-10 px-4 rounded-xl border border-rose-200 text-xs font-semibold text-rose-700 bg-rose-50/30 hover:bg-rose-50 hover:border-rose-300 transition flex items-center gap-1.5"
-                    >
-                      <ThumbsDown size={14} /> Reject
-                    </button>
-                    <button
-                      onClick={() => handleActionClick(req, "approve")}
-                      className="h-10 px-4 rounded-xl bg-[#1f6a37] text-xs font-semibold text-white hover:bg-emerald-800 transition shadow-sm flex items-center gap-1.5"
-                    >
-                      <ThumbsUp size={14} /> Approve
-                    </button>
-                  </>
-                ) : req.status === "pending" ? (
-                  <span className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-amber-700">
-                    Pending CEO review
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={cn("rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider", priorityClass(request.priority))}>
+                    {request.priority} urgency
                   </span>
-                ) : (
-                  <span
-                    className={cn(
-                      "border px-3 py-1 rounded-xl text-xs font-semibold flex items-center gap-1.5 uppercase tracking-wider",
-                      req.status === "approved"
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                        : "border-rose-200 bg-rose-50 text-rose-700",
-                    )}
-                  >
-                    {req.status === "approved" ? (
-                      <CheckCircle size={13} />
-                    ) : (
-                      <XCircle size={13} />
-                    )}
-                    {req.status}
+                  <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    <Building size={11} /> {projectName}
                   </span>
-                )}
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-apple-charcoal">{request.material_name}</h3>
+                  <p className="mt-0.5 text-sm font-semibold text-emerald-700">
+                    Quantity: {Number(request.quantity).toLocaleString("en-PH")} {request.unit}
+                  </p>
+                  <MaterialEstimateSource request={request} plannedMaterials={plannedMaterials} />
+                </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-medium text-slate-400">
+                  <span className="flex items-center gap-1"><User size={12} /> Requested by {requestedBy}</span>
+                  <span>Needed by: {formatDate(request.needed_by)}</span>
+                  <span>Submitted: {formatDate(request.created_at)}</span>
+                </div>
+                {request.notes ? (
+                  <p className="rounded-xl border border-slate-100 bg-slate-50 p-2.5 text-xs italic text-slate-500">
+                    &ldquo;{request.notes}&rdquo;
+                  </p>
+                ) : null}
               </div>
             </div>
-          ))
-        ) : (
-          <div className="text-center py-16 bg-white border border-dashed border-slate-200 rounded-2xl">
+
+            <div className="flex items-center gap-2 self-end md:self-center">
+              {request.status === "submitted" && canManage ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => beginReview(request, "reject")}
+                    className="flex h-10 items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50/30 px-4 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+                  >
+                    <ThumbsDown size={14} /> Reject
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => beginReview(request, "approve")}
+                    className="flex h-10 items-center gap-1.5 rounded-xl bg-emerald-800 px-4 text-xs font-semibold text-white hover:bg-emerald-900"
+                  >
+                    <ThumbsUp size={14} /> Approve
+                  </button>
+                </>
+              ) : (
+                <span className={cn("flex items-center gap-1.5 rounded-xl border px-3 py-1 text-xs font-semibold", statusClass(request.status))}>
+                  {getMaterialApprovalBucket(request.status) === "rejected" ? <XCircle size={13} /> : <CheckCircle size={13} />}
+                  {getMaterialWorkflowLabel(request.status)}
+                </span>
+              )}
+            </div>
+          </article>
+        ))}
+
+        {!filteredRequests.length ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center">
             <ClipboardList size={36} className="mx-auto text-slate-300" />
-            <p className="mt-2 text-sm font-semibold text-slate-500">
-              No requests found
-            </p>
-            <p className="text-xs text-slate-400 mt-1">
-              Excellent! All items in this category are completed.
-            </p>
+            <p className="mt-2 text-sm font-semibold text-slate-600">No requests found</p>
+            <p className="mt-1 text-xs text-slate-400">No persisted material request matches this filter.</p>
           </div>
-        )}
+        ) : null}
       </div>
 
       {reviewingRequest ? (
         <MaterialRequestReviewDialog
-          request={reviewingRequest}
+          request={mapMaterialApprovalDialogRequest({
+            request: reviewingRequest,
+            projectName,
+            requestedBy,
+          })}
           action={actionType}
           comment={commentText}
-          isPending={isPendingTransition}
+          isPending={isPending}
           onCommentChange={setCommentText}
           onClose={() => setReviewingRequest(null)}
-          onConfirm={handleConfirmAction}
+          onConfirm={confirmReview}
         />
       ) : null}
-      {editingRequest ? (
-        <MaterialRequestEditDialog
-          request={editingRequest}
-          onClose={() => setEditingRequest(null)}
-          onSave={handleSaveEdit}
-        />
-      ) : null}
+    </div>
+  );
+}
+function MaterialEstimateSource({
+  request,
+  plannedMaterials,
+}: {
+  request: ProjectMaterialRequest;
+  plannedMaterials: PlannedMaterialRow[];
+}) {
+  const planned = plannedMaterials.find(
+    (material) => material.estimateItemId === request.estimate_item_id,
+  );
+  if (!planned) {
+    return (
+      <span className="mt-2 inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-700">
+        Unplanned request
+      </span>
+    );
+  }
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 font-bold uppercase tracking-wider text-emerald-700">
+        Approved estimate
+      </span>
+      <span>Reference: {new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(planned.unitCost)} / {planned.unit}</span>
+      <span>{planned.remainingQuantity} {planned.unit} remaining after active requests</span>
     </div>
   );
 }

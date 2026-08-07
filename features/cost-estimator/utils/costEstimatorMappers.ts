@@ -66,6 +66,9 @@ export function buildEstimateDraftForm(
       lineTotal: item.line_total ?? 0,
       displayName: item.item_name_snapshot ?? "",
       notes: item.notes ?? "",
+      pricingBasis: item.pricing_basis ?? "catalog",
+      referenceSupplier: item.reference_supplier ?? "",
+      referenceQuotation: item.reference_quotation ?? "",
       sortOrder: item.sort_order ?? index,
     })),
   };
@@ -94,6 +97,9 @@ export function buildEstimateItemModalForm(
         rawCostLabel: item.unitCost ? item.unitCost.toString() : "N/A",
         unitCostInput: item.unitCost ? item.unitCost.toString() : "",
         quantityInput: item.quantity ? item.quantity.toString() : "",
+        pricingBasis: item.pricingBasis,
+        referenceSupplier: item.referenceSupplier,
+        referenceQuotation: item.referenceQuotation,
       },
     ],
   };
@@ -123,6 +129,9 @@ export function buildEstimateItemModalFormFromItems(
       rawCostLabel: item.unitCost ? item.unitCost.toString() : "N/A",
       unitCostInput: item.unitCost ? item.unitCost.toString() : "",
       quantityInput: item.quantity ? item.quantity.toString() : "",
+      pricingBasis: item.pricingBasis,
+      referenceSupplier: item.referenceSupplier,
+      referenceQuotation: item.referenceQuotation,
     })),
   };
 }
@@ -173,5 +182,8 @@ export function buildInitialModalMaterial(
     rawCostLabel: "N/A",
     unitCostInput: "",
     quantityInput: "1",
+    pricingBasis: "catalog",
+    referenceSupplier: "",
+    referenceQuotation: "",
   };
 }

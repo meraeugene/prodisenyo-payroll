@@ -20,7 +20,7 @@ export default function PurchaserPricingPanel({ records }: { records: PurchaserD
             </div>
             <div className="text-right">
               <p className="text-sm font-bold text-slate-900">{formatPurchaserCurrency(record.quantity * record.actualUnitCost)}</p>
-              <p className="mt-0.5 text-[10px] uppercase text-emerald-700">Recorded</p>
+              <p className="mt-0.5 text-[10px] uppercase text-emerald-700">{record.quotationReference || "Quotation recorded"}</p>
             </div>
           </div>
         ))}

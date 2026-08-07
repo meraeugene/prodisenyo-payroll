@@ -21,7 +21,7 @@ export function getProjectStatusPresentation(project: ProjectRecord): {
     return { label: "On Hold", tone: "rose" };
   }
   if (project.status === "planning") {
-    return { label: "Planning", tone: "amber" };
+    return { label: "Pending Cost Estimate", tone: "amber" };
   }
   if (project.spent > project.budget) {
     return { label: "Over Budget", tone: "rose" };

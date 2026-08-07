@@ -45,6 +45,10 @@ export function parseMaterialRequestPayload(params: {
   return {
     id: params.id,
     requestId: params.requestId,
+    estimateItemId:
+      typeof raw.estimateItemId === 'string' && raw.estimateItemId.trim()
+        ? raw.estimateItemId.trim()
+        : null,
     projectName,
     projectId,
     materialName,
@@ -76,6 +80,7 @@ export function mapMaterialRequestRow(row: {
   return {
     id: row.id,
     requestId: row.id,
+    estimateItemId: (row as { estimate_item_id?: string | null }).estimate_item_id ?? null,
     projectId: row.project_id,
     projectName: row.project?.name || "",
     materialName: row.material_name,

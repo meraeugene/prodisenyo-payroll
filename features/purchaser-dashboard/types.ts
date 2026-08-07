@@ -24,6 +24,7 @@ export type PurchaserDashboardRecord = {
   supplierName: string;
   estimatedUnitCost: number;
   actualUnitCost: number;
+  quotationReference: string;
   status: PurchaserPurchaseStatus;
   deliveryStatus: PurchaserDeliveryStatus;
   receiptInvoiceReference: string;

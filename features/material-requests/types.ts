@@ -3,6 +3,7 @@ export type MaterialRequestPriority = "low" | "medium" | "high" | "urgent";
 export interface MaterialRequestRecord {
   id: string;
   requestId: string;
+  estimateItemId: string | null;
   projectName: string;
   projectId: string;
   materialName: string;
@@ -19,6 +20,7 @@ export interface MaterialRequestRecord {
 export interface CreateMaterialRequestInput {
   projectId: string;
   projectName: string;
+  estimateItemId?: string;
   materialName: string;
   quantity: number;
   unit: string;

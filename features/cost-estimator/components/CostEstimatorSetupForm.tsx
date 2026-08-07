@@ -8,16 +8,12 @@ import {
   sanitizeBudgetNumericInput,
 } from "@/features/budget-tracker/utils/budgetTrackerFormatters";
 import { cn } from "@/lib/utils";
-import type {
-  AssignedEstimateProject,
-  ProjectEstimateDraftForm,
-} from "@/features/cost-estimator/types";
+import type { ProjectEstimateDraftForm } from "@/features/cost-estimator/types";
 import type { BudgetProjectType } from "@/types/database";
 
 export default function CostEstimatorSetupForm({
   hasExistingProjects,
   form,
-  assignedProjects,
   errors,
   pending,
   onBack,
@@ -26,7 +22,6 @@ export default function CostEstimatorSetupForm({
 }: {
   hasExistingProjects: boolean;
   form: ProjectEstimateDraftForm;
-  assignedProjects: AssignedEstimateProject[];
   errors: Partial<
     Record<
       "projectId" | "projectName" | "projectType" | "location" | "ownerName" | "costEstimate",
@@ -87,41 +82,16 @@ export default function CostEstimatorSetupForm({
             <label className="text-sm font-semibold text-apple-charcoal">
               Assigned project <span className="text-rose-500">*</span>
             </label>
-            <select
-              value={form.projectId}
-              onChange={(event) => onFieldChange("projectId", event.target.value)}
-              className={cn(
-                "mt-2 w-full rounded-[10px] border bg-white px-4 py-3 text-sm outline-none transition focus:border-[#1f6a37]",
-                errors.projectId ? "border-red-500" : "border-apple-mist",
-              )}
-            >
-              <option value="">Select assigned project</option>
-              {assignedProjects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-            {errors.projectId ? (
-              <p className="mt-2 text-sm text-rose-600">{errors.projectId}</p>
-            ) : null}
-          </div>
-
-          <div>
-            <label className="text-sm font-semibold text-apple-charcoal">
-              Project name
-            </label>
             <input
               value={form.projectName}
               readOnly
-              placeholder="Selected project name"
               className={cn(
-                "mt-2 w-full rounded-[10px] border bg-[rgb(var(--apple-snow))] px-4 py-3 text-sm outline-none",
-                errors.projectName ? "border-red-500" : "border-apple-mist",
+                "mt-2 w-full rounded-[10px] border bg-[rgb(var(--apple-snow))] px-4 py-3 text-sm font-medium outline-none",
+                errors.projectId ? "border-red-500" : "border-apple-mist",
               )}
             />
-            {errors.projectName ? (
-              <p className="mt-2 text-sm text-rose-600">{errors.projectName}</p>
+            {errors.projectId ? (
+              <p className="mt-2 text-sm text-rose-600">{errors.projectId}</p>
             ) : null}
           </div>
 

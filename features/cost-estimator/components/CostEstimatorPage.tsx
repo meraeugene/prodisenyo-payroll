@@ -30,8 +30,8 @@ export default async function CostEstimatorPage({
     supabase
       .from("projects")
       .select("id,name,location,client_name,subject,lead,budget_ceiling")
-      .or(`assigned_estimate_engineer_id.eq.${user.id},assigned_engineer_id.eq.${user.id}`)
-      .neq("status", "archived")
+      .eq("assigned_estimate_engineer_id", user.id)
+      .eq("status", "planning")
       .order("created_at", { ascending: false }),
   ]);
 

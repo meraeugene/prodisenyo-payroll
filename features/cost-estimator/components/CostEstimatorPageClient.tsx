@@ -42,10 +42,10 @@ export default function CostEstimatorPageClient({
   const [showSaveDraftFirstConfirm, setShowSaveDraftFirstConfirm] =
     useState(false);
   const [showProjectOverview, setShowProjectOverview] = useState(
-    estimates.length > 0,
+    estimates.length > 0 || assignedProjects.length > 0,
   );
   const [saveDraftNextAction, setSaveDraftNextAction] = useState<
-    "new-project" | "overview" | null
+    "overview" | null
   >(null);
   const state = useCostEstimatorPage({
     estimates,
@@ -56,16 +56,6 @@ export default function CostEstimatorPageClient({
   });
   const isSavingChanges = state.saveState === "saving";
   const isUiLocked = state.pendingEstimateAction || isSavingChanges;
-
-  function handleRequestNewProject() {
-    if (state.selectedEstimate && state.hasUnsavedEstimateChanges) {
-      setSaveDraftNextAction("new-project");
-      setShowSaveDraftFirstConfirm(true);
-      return;
-    }
-
-    state.handleOpenNewProjectSetup();
-  }
 
   function handleOpenProject(estimateId: string) {
     state.handleSelectEstimate(estimateId);
@@ -100,9 +90,10 @@ export default function CostEstimatorPageClient({
     return (
       <div>
         <CostEstimatorSetupForm
-          hasExistingProjects={state.sortedEstimates.length > 0}
+          hasExistingProjects={
+            state.sortedEstimates.length > 0 || assignedProjects.length > 0
+          }
           form={state.estimateForm}
-          assignedProjects={assignedProjects}
           errors={state.setupFormErrors}
           pending={state.pendingEstimateAction}
           onBack={state.handleCloseProjectSetup}
@@ -113,15 +104,16 @@ export default function CostEstimatorPageClient({
     );
   }
 
-  if (showProjectOverview && state.sortedEstimates.length > 0) {
+  if (showProjectOverview) {
     return (
       <>
         <CostEstimatorProjectsOverview
           estimates={state.sortedEstimates}
+          assignedProjects={assignedProjects}
           itemsByEstimateId={state.itemsByEstimateId}
           pending={isUiLocked}
           onOpenProject={handleOpenProject}
-          onCreateProject={handleRequestNewProject}
+          onStartEstimate={state.handleOpenAssignedProjectSetup}
         />
 
         <EstimateRejectedAlertModal
@@ -149,7 +141,6 @@ export default function CostEstimatorPageClient({
         onOpenProjects={handleRequestOpenOverview}
         onSelectEstimate={state.handleSelectEstimate}
         onSaveDraft={() => state.handleSaveEstimate()}
-        onNewProject={handleRequestNewProject}
         onDeleteProject={handleRequestDeleteProject}
       />
 
@@ -300,9 +291,7 @@ export default function CostEstimatorPageClient({
         open={showSaveDraftFirstConfirm}
         title="Save draft first?"
         description={
-          saveDraftNextAction === "overview"
-            ? "This project has unsaved changes. Save the draft first before returning to Overall Projects."
-            : "This project has unsaved changes. Save the draft first before creating a new project so nothing gets lost."
+          "This project has unsaved changes. Save the draft first before returning to Overall Projects."
         }
         confirmLabel="Save draft first"
         confirmTone="primary"
@@ -314,10 +303,7 @@ export default function CostEstimatorPageClient({
           state.handleSaveEstimate(() => {
             if (nextAction === "overview") {
               setShowProjectOverview(true);
-              return;
             }
-
-            state.handleOpenNewProjectSetup();
           });
         }}
         onCancel={() => {

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import CeoProjectsOverview from "./CeoProjectsOverview";
 import EngineerProjectPortfolio from "./EngineerProjectPortfolio";
 import { createProjectAction } from "@/actions/projects";
+import { getProjectEntryHref } from "@/features/projects/utils/projectLifecycle";
 import type { EngineerOption, ProjectRecord } from "../types";
 
 type ProjectField =
@@ -15,7 +16,6 @@ type ProjectField =
   | "location"
   | "subject"
   | "lead"
-  | "engineerId"
   | "estimateEngineerId"
   | "imageUrl"
   | "budget"
@@ -42,6 +42,12 @@ export default function ProjectsPageClient({
   const clearFieldError = (field: ProjectField) =>
     setFormErrors((current) => ({ ...current, [field]: undefined }));
 
+  function openProject(projectId: string) {
+    const project = projects.find((entry) => entry.id === projectId);
+    if (!project) return;
+    router.push(getProjectEntryHref({ role, projectId, status: project.status }));
+  }
+
   useEffect(() => {
     if (!showCreate) return;
 
@@ -65,7 +71,6 @@ export default function ProjectsPageClient({
       location: String(formData.get("location") || "").trim(),
       subject: String(formData.get("subject") || "").trim(),
       lead: String(formData.get("lead") || "").trim(),
-      engineerId: String(formData.get("engineerId") || ""),
       estimateEngineerId: String(formData.get("estimateEngineerId") || ""),
       imageUrl: String(formData.get("imageUrl") || "").trim(),
       budget: Number(budgetValue.replaceAll(",", "")),
@@ -78,7 +83,6 @@ export default function ProjectsPageClient({
     if (!values.location) errors.location = "Location is required.";
     if (!values.subject) errors.subject = "Subject is required.";
     if (!values.lead) errors.lead = "Project lead is required.";
-    if (!values.engineerId) errors.engineerId = "Select a site engineer.";
     if (!values.estimateEngineerId) {
       errors.estimateEngineerId = "Select a cost estimate engineer.";
     }
@@ -106,10 +110,10 @@ export default function ProjectsPageClient({
       try {
         await createProjectAction({
           ...values,
-          engineerId: values.engineerId || null,
-          estimateEngineerId: values.estimateEngineerId || values.engineerId || null,
+          engineerId: null,
+          estimateEngineerId: values.estimateEngineerId || null,
         });
-        toast.success("Project and budget workspace created.");
+        toast.success("Pending project created and assigned for cost estimation.");
         setShowCreate(false);
         setBudgetValue("");
         router.refresh();
@@ -131,12 +135,12 @@ export default function ProjectsPageClient({
             setBudgetValue("");
             setShowCreate(true);
           }}
-          onOpenProject={(projectId) => router.push("/projects/" + projectId)}
+          onOpenProject={openProject}
         />
       ) : (
         <EngineerProjectPortfolio
           projects={projects}
-          onOpenProject={(projectId) => router.push("/projects/" + projectId)}
+          onOpenProject={openProject}
         />
       )}
       {showCreate && typeof document !== "undefined"
@@ -183,32 +187,7 @@ export default function ProjectsPageClient({
                   <Field name="lead" label="Project lead" error={formErrors.lead} onChange={() => clearFieldError("lead")} />
                   <Field name="imageUrl" label="Project image URL" error={formErrors.imageUrl} onChange={() => clearFieldError("imageUrl")} />
                   <label className="text-sm font-semibold text-slate-700">
-                    Site engineer
-                    <select
-                      name="engineerId"
-                      aria-invalid={Boolean(formErrors.engineerId)}
-                      onChange={() => clearFieldError("engineerId")}
-                      className={`mt-1 h-11 w-full rounded-xl border bg-white px-3 outline-none ${
-                        formErrors.engineerId
-                          ? "border-red-500 focus:border-red-600"
-                          : "border-slate-200 focus:border-emerald-700"
-                      }`}
-                    >
-                      <option value="">Select site engineer</option>
-                      {engineers.map((engineer) => (
-                        <option key={engineer.id} value={engineer.id}>
-                          {engineer.name}
-                        </option>
-                      ))}
-                    </select>
-                    {formErrors.engineerId ? (
-                      <span className="mt-1 block text-xs font-medium text-red-600">
-                        {formErrors.engineerId}
-                      </span>
-                    ) : null}
-                  </label>
-                  <label className="text-sm font-semibold text-slate-700">
-                    Cost estimate engineer
+                    Cost estimate engineer / project manager
                     <select
                       name="estimateEngineerId"
                       aria-invalid={Boolean(formErrors.estimateEngineerId)}

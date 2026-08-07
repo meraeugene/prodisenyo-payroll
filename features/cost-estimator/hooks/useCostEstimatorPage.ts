@@ -135,10 +135,6 @@ export function useCostEstimatorPage({
     initialProjectId
       ? initialEstimates.find((estimate) => estimate.project_id === initialProjectId) ?? null
       : null;
-  const initialAssignedProject =
-    initialProjectId
-      ? assignedProjects.find((project) => project.id === initialProjectId) ?? null
-      : null;
   const [estimates, setEstimates] = useState(initialEstimates);
   const [itemsByEstimateId, setItemsByEstimateId] = useState(initialItemsMap);
   const [selectedEstimateId, setSelectedEstimateId] = useState<string | null>(
@@ -153,27 +149,13 @@ export function useCostEstimatorPage({
         );
       }
 
-      if (initialAssignedProject) {
-        return {
-          ...EMPTY_ESTIMATE_FORM,
-          projectId: initialAssignedProject.id,
-          projectName: initialAssignedProject.name,
-          location: initialAssignedProject.location,
-          ownerName: initialAssignedProject.clientName || initialAssignedProject.lead || "",
-          costEstimate: initialAssignedProject.budgetCeiling,
-          draftedDate: new Date().toISOString(),
-        };
-      }
-
       return buildEstimateDraftForm(
         initialEstimates[0] ?? null,
         initialItemsMap[initialEstimates[0]?.id ?? ""] ?? [],
       );
     },
   );
-  const [projectSetupOpen, setProjectSetupOpen] = useState(
-    Boolean(initialAssignedProject && !initialLinkedEstimate) || initialEstimates.length === 0,
-  );
+  const [projectSetupOpen, setProjectSetupOpen] = useState(false);
   const [itemModalOpen, setItemModalOpen] = useState(false);
   const [itemModalForm, setItemModalForm] = useState<EstimateItemModalForm>(
     EMPTY_ESTIMATE_ITEM_MODAL_FORM,
@@ -566,12 +548,26 @@ export function useCostEstimatorPage({
     toast.error("Save your draft before switching projects.");
   }
 
-  function handleOpenNewProjectSetup() {
+  function handleOpenAssignedProjectSetup(projectId: string) {
+    const assignedProject = assignedProjects.find(
+      (project) => project.id === projectId,
+    );
+    if (!assignedProject) {
+      toast.error("This project is no longer assigned to you for estimating.");
+      return;
+    }
+
     setSelectedEstimateId(null);
     setEstimateForm({
       ...EMPTY_ESTIMATE_FORM,
+      projectId: assignedProject.id,
+      projectName: assignedProject.name,
+      location: assignedProject.location,
+      ownerName: assignedProject.clientName || assignedProject.lead || "",
+      costEstimate: assignedProject.budgetCeiling,
       draftedDate: new Date().toISOString(),
     });
+    setSetupFormErrors({});
     setProjectSetupOpen(true);
     setItemModalOpen(false);
   }
@@ -590,7 +586,10 @@ export function useCostEstimatorPage({
 
     if (sortedEstimates[0]) {
       handleSelectEstimate(sortedEstimates[0].id);
+      return;
     }
+
+    setProjectSetupOpen(false);
   }
 
   function handleEstimateFieldChange(
@@ -966,7 +965,7 @@ export function useCostEstimatorPage({
 
   function handleMaterialRowFieldChange(
     materialRowId: string,
-    field: "searchInput" | "unitType" | "unitCostInput" | "quantityInput",
+    field: "searchInput" | "unitType" | "unitCostInput" | "quantityInput" | "pricingBasis" | "referenceSupplier" | "referenceQuotation",
     value: string,
   ) {
     if (
@@ -1368,6 +1367,16 @@ export function useCostEstimatorPage({
         return;
       }
 
+      const incompleteQuote = validMaterials.find(
+        (material) =>
+          material.pricingBasis === "supplier_quote" &&
+          (!material.referenceSupplier.trim() || !material.referenceQuotation.trim()),
+      );
+      if (incompleteQuote) {
+        toast.error("Supplier and quotation reference are required for supplier pricing.");
+        return;
+      }
+
       setItemModalErrors({ materialRows: {} });
 
       const existingItems =
@@ -1393,6 +1402,9 @@ export function useCostEstimatorPage({
           lineTotal: round2(quantityValue * unitCostValue),
           displayName: buildDisplayName(itemDisplayName),
           notes: itemModalForm.notes,
+          pricingBasis: material.pricingBasis,
+          referenceSupplier: material.referenceSupplier,
+          referenceQuotation: material.referenceQuotation,
           sortOrder:
             editingItemIndices && editingItemIndices.length > 0
               ? Math.min(...editingItemIndices) + index
@@ -1482,7 +1494,7 @@ export function useCostEstimatorPage({
     activeReportItems,
     rejectionAlert,
     handleSelectEstimate,
-    handleOpenNewProjectSetup,
+    handleOpenAssignedProjectSetup,
     handleCloseProjectSetup,
     handleEstimateFieldChange,
     handleSaveEstimate,

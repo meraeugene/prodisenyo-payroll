@@ -30,17 +30,15 @@ export default function EngineerDashboardProjects({
                   <h3 className="truncate text-base font-semibold text-slate-950">{project.name}</h3>
                   <p className="mt-1 flex items-center gap-1.5 truncate text-xs text-slate-500"><MapPin size={13} />{project.location}</p>
                 </div>
-                <span className="text-base font-semibold text-emerald-700">{project.progress}%</span>
+                <span className={`text-sm font-semibold ${project.status === "planning" ? "text-amber-700" : "text-emerald-700"}`}>{project.status === "planning" ? "Pending estimate" : `${project.progress}%`}</span>
               </div>
-              <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100" aria-label={`${project.progress}% complete`}>
-                <div className="h-full rounded-full bg-emerald-600 transition-[width]" style={{ width: `${project.progress}%` }} />
-              </div>
+              {project.status === "planning" ? <p className="mt-5 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">Complete and submit the project cost estimate before operations begin.</p> : <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100" aria-label={`${project.progress}% complete`}><div className="h-full rounded-full bg-emerald-600 transition-[width]" style={{ width: `${project.progress}%` }} /></div>}
               <div className="mt-5 grid grid-cols-2 gap-4 text-sm">
                 <div><p className="text-xs text-slate-500">Budget</p><p className="mt-1 font-semibold text-slate-900">{formatDashboardCurrency(project.budget)}</p></div>
                 <div><p className="text-xs text-slate-500">Spent to Date</p><p className="mt-1 font-semibold text-slate-900">{formatDashboardCurrency(project.spent)}</p></div>
               </div>
-              <Link href={`/projects/${project.id}`} className="mt-5 inline-flex h-10 w-full items-center justify-center rounded-lg border border-slate-200 text-sm font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2">
-                View details
+              <Link href={project.status === "planning" ? `/cost-estimator?projectId=${project.id}` : `/projects/${project.id}`} className="mt-5 inline-flex h-10 w-full items-center justify-center rounded-lg border border-slate-200 text-sm font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2">
+                {project.status === "planning" ? "Open cost estimate" : "View details"}
               </Link>
             </article>
           ))}

@@ -17,7 +17,7 @@ const PROJECT_DOCUMENT_BUCKET = "project-documents";
 async function requireProjectAccess(projectId: string, write = false) {
   const { user, profile } = await requireRole([APP_ROLES.CEO, APP_ROLES.ENGINEER]);
   const database = createSupabaseAdminClient() as any;
-  let query = database.from("projects").select("id,assigned_engineer_id,assigned_estimate_engineer_id").eq("id", projectId).neq("status", "archived");
+  let query = database.from("projects").select("id,assigned_engineer_id,assigned_estimate_engineer_id").eq("id", projectId).in("status", ["active", "on_hold", "completed"]);
   if (profile.role === APP_ROLES.ENGINEER) {
     query = write
       ? query.eq("assigned_engineer_id", user.id)
@@ -81,4 +81,3 @@ export async function deleteProjectDocumentAction(documentId: string) {
   revalidatePath(`/projects/${document.project_id}`);
   return document.id as string;
 }
-

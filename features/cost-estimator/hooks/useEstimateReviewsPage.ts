@@ -4,11 +4,11 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { toast } from "sonner";
 import {
-  approveProjectEstimateAction,
   deleteReviewedProjectEstimateAction,
   getEstimateReviewsDataAction,
   rejectProjectEstimateAction,
 } from "@/actions/costEstimator";
+import { approveProjectEstimateWithBaselineAction } from "@/actions/estimateProcurement";
 import type {
   ProjectEstimateItemRow,
   ReviewProjectEstimateRow,
@@ -18,6 +18,8 @@ import { buildEstimateItemsMap } from "@/features/cost-estimator/utils/costEstim
 interface UseEstimateReviewsPageOptions {
   estimates: ReviewProjectEstimateRow[];
   items: ProjectEstimateItemRow[];
+  onEstimateApproved?: (estimate: ReviewProjectEstimateRow) => void;
+  projectId?: string;
 }
 
 function sortReviewEstimates(estimates: ReviewProjectEstimateRow[]) {
@@ -38,6 +40,8 @@ function sortReviewEstimates(estimates: ReviewProjectEstimateRow[]) {
 export function useEstimateReviewsPage({
   estimates: initialEstimates,
   items: initialItems,
+  onEstimateApproved,
+  projectId,
 }: UseEstimateReviewsPageOptions) {
   const [activeEstimateId, setActiveEstimateId] = useState<string | null>(null);
   const [deleteEstimateId, setDeleteEstimateId] = useState<string | null>(null);
@@ -49,8 +53,8 @@ export function useEstimateReviewsPage({
   >(null);
   const [isPending, setIsPending] = useState(false);
   const { data, isLoading, isValidating, mutate } = useSWR(
-    "estimate-approvals",
-    getEstimateReviewsDataAction,
+    ["estimate-approvals", projectId || "all"],
+    () => getEstimateReviewsDataAction(projectId),
     {
       fallbackData: {
         estimates: initialEstimates,
@@ -133,8 +137,9 @@ export function useEstimateReviewsPage({
         setIsPending(true);
         setPendingActionId(estimateId);
         setPendingActionType("approve");
-        const result = await approveProjectEstimateAction(estimateId);
+        const result = await approveProjectEstimateWithBaselineAction(estimateId);
         applyEstimateUpdate(result.estimate);
+        onEstimateApproved?.(result.estimate);
         void mutate();
         toast.success("Estimate approved and linked to Budget Tracker.");
       } catch (error) {
@@ -198,5 +203,6 @@ export function useEstimateReviewsPage({
     handleConfirmDelete,
     handleApproveEstimate,
     handleConfirmReject,
+    refresh: mutate,
   };
 }

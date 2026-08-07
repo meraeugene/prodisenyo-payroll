@@ -245,7 +245,7 @@ begin
     nullif(trim(p_client), ''),
     nullif(trim(p_subject), ''),
     nullif(trim(p_lead), ''),
-    p_engineer,
+    null,
     coalesce(p_estimate_engineer, p_engineer),
     p_budget,
     p_start,

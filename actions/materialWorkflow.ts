@@ -21,7 +21,7 @@ export async function reviewMaterialRequestAction(input:{requestId:string;decisi
   if(input.decision==="approve"){
     const {data,error}=await db.rpc("approve_material_request_and_create_order",{p_request_id:input.requestId,p_actor:user.id,p_notes:input.notes?.trim()||null});
     if(error) throw new Error(`Failed to approve material request. ${error.message}`);
-    revalidatePath("/material-approvals"); revalidatePath("/purchasing-approvals"); revalidatePath("/projects");
+    revalidatePath("/material-approvals"); revalidatePath("/purchasing-approvals"); revalidatePath("/purchaser-dashboard"); revalidatePath("/dashboard"); revalidatePath("/projects");
     return {purchaseOrderId:data};
   }
   const reason=input.notes?.trim();
@@ -33,6 +33,6 @@ export async function reviewMaterialRequestAction(input:{requestId:string;decisi
   const {error}=await db.from("material_requests").update({status:"rejected",rejected_by:user.id,rejected_at:now,rejection_reason:reason,approved_by:null,approved_at:null}).eq("id",input.requestId);
   if(error) throw new Error(`Failed to reject material request. ${error.message}`);
   await db.from("workflow_notifications").insert({recipient_id:request.requested_by,project_id:request.project_id,kind:"material_rejected",title:"Material request returned",message:`${request.material_name} was returned: ${reason}`,entity_type:"material_request",entity_id:request.id});
-  revalidatePath("/material-approvals"); revalidatePath("/projects");
+  revalidatePath("/material-approvals"); revalidatePath("/dashboard"); revalidatePath("/projects");
   return {purchaseOrderId:null};
 }

@@ -28,6 +28,14 @@ export default async function Page() {
       .order("full_name"),
   ]);
   if (error) throw new Error(`Failed to load projects. ${error.message}`);
+  const visibleRows =
+    profile.role === APP_ROLES.ENGINEER
+      ? (data ?? []).filter((project: any) =>
+          project.status === "planning"
+            ? project.assigned_estimate_engineer_id === user.id
+            : project.assigned_engineer_id === user.id,
+        )
+      : data ?? [];
   const engineers = (engineerRows ?? []).map((row: any) => ({
     id: row.id,
     name: row.full_name || row.username,
@@ -36,7 +44,7 @@ export default async function Page() {
     <ProjectsPageClient
       role={profile.role as "ceo" | "engineer"}
       fullName={profile.full_name}
-      projects={(data ?? []).map(mapProjectRow)}
+      projects={visibleRows.map(mapProjectRow)}
       engineers={engineers}
     />
   );

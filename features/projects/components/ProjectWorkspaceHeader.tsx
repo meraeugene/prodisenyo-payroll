@@ -33,7 +33,7 @@ export default function ProjectWorkspaceHeader({
           </div>
           <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-500">
             <span className="inline-flex items-center gap-1.5">
-              <UserRound size={14} /> Engineer / PM: {project.engineer}
+              <UserRound size={14} /> {project.status === "planning" ? "Estimate Engineer" : "Engineer / PM"}: {project.status === "planning" ? project.estimateEngineer : project.engineer}
             </span>
             <span className="inline-flex items-center gap-1.5">
               <MapPin size={14} /> {project.location}

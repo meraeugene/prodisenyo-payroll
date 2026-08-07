@@ -53,12 +53,13 @@ export default function CeoProjectsOverview({
   }, [filter, projects, search]);
 
   const active = projects.filter((project) => project.status === "active").length;
+  const planning = projects.filter((project) => project.status === "planning").length;
   const completed = projects.filter((project) => project.status === "completed").length;
   const onHold = projects.filter((project) => project.status === "on_hold").length;
   const filters: Array<{ value: Filter; label: string }> = [
     { value: "all", label: "All Projects" },
     { value: "active", label: "Active" },
-    { value: "planning", label: "Planning" },
+    { value: "planning", label: "Pending Cost Estimate" },
     { value: "on_hold", label: "On Hold" },
     { value: "completed", label: "Completed" },
   ];
@@ -107,10 +108,11 @@ export default function CeoProjectsOverview({
         </label>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
           ["Total Projects", projects.length, FolderKanban, "All records"],
           ["Active Projects", active, BriefcaseBusiness, "In progress"],
+          ["Pending Estimates", planning, PauseCircle, "Not operational yet"],
           ["Completed", completed, CircleCheckBig, `${onHold} currently on hold`],
         ].map(([label, value, Icon, helper]) => {
           const MetricIcon = Icon as typeof FolderKanban;
@@ -152,16 +154,15 @@ export default function CeoProjectsOverview({
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500">Project Engineer</p>
+                  <p className="text-xs text-slate-500">{project.status === "planning" ? "Estimate Engineer" : "Project Engineer"}</p>
                   <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-slate-800">
                     <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"><UserRound size={14} /></span>
-                    <span className="truncate">{project.engineer}</span>
+                    <span className="truncate">{project.status === "planning" ? project.estimateEngineer : project.engineer}</span>
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500">Progress</p>
-                  <p className="mt-1 text-sm font-bold text-slate-950">{project.progress}%</p>
-                  <div className="mt-2 h-1.5 rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-700" style={{ width: `${project.progress}%` }} /></div>
+                  <p className="text-xs text-slate-500">{project.status === "planning" ? "Workflow" : "Progress"}</p>
+                  {project.status === "planning" ? <p className="mt-1 text-sm font-bold text-amber-700">Cost estimate first</p> : <><p className="mt-1 text-sm font-bold text-slate-950">{project.progress}%</p><div className="mt-2 h-1.5 rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-700" style={{ width: `${project.progress}%` }} /></div></>}
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">Budget</p>
@@ -170,7 +171,7 @@ export default function CeoProjectsOverview({
                 <div className="flex items-center justify-between gap-3 md:block md:text-right">
                   <span className={`inline-flex rounded-lg border px-3 py-1.5 text-xs font-bold ${STATUS_CLASSES[status.tone]}`}>{status.label}</span>
                   <button type="button" onClick={() => onOpenProject(project.id)} className="mt-0 inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 hover:bg-slate-50 md:mt-3">
-                    View Details <ArrowRight size={13} />
+                    {project.status === "planning" ? "Review Estimate" : "View Details"} <ArrowRight size={13} />
                   </button>
                 </div>
               </article>

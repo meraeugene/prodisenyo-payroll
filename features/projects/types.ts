@@ -18,6 +18,7 @@ export interface ProjectRecord {
   assignedEngineerId?: string | null;
   estimateEngineer?: string;
   assignedEstimateEngineerId?: string | null;
+  activeApprovedEstimateId?: string | null;
   imageUrl?: string | null;
   tasksCount: number;
   completedTasksCount: number;

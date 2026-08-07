@@ -14,7 +14,7 @@ create table if not exists public.projects (
   lead text,
   assigned_engineer_id uuid references public.profiles(id) on delete set null,
   assigned_estimate_engineer_id uuid references public.profiles(id) on delete set null,
-  status public.project_status not null default 'active',
+  status public.project_status not null default 'planning',
   budget_ceiling numeric(14,2) not null check (budget_ceiling > 0),
   currency_code text not null default 'PHP' check (char_length(currency_code) = 3),
   start_date date not null,
@@ -114,7 +114,7 @@ begin
     raise exception 'Estimate engineer is invalid';
   end if;
   insert into public.projects(name, location, client_name, subject, lead, assigned_engineer_id, assigned_estimate_engineer_id, budget_ceiling, start_date, end_date, description, image_url, created_by, updated_by)
-  values (trim(p_name), trim(p_location), nullif(trim(p_client), ''), nullif(trim(p_subject), ''), nullif(trim(p_lead), ''), p_engineer, coalesce(p_estimate_engineer, p_engineer), p_budget, p_start, p_end, nullif(trim(p_description), ''), nullif(trim(p_image_url), ''), p_actor, p_actor)
+  values (trim(p_name), trim(p_location), nullif(trim(p_client), ''), nullif(trim(p_subject), ''), nullif(trim(p_lead), ''), null, coalesce(p_estimate_engineer, p_engineer), p_budget, p_start, p_end, nullif(trim(p_description), ''), nullif(trim(p_image_url), ''), p_actor, p_actor)
   returning * into new_project;
   insert into public.budget_projects(project_id, name, currency_code, starting_budget, created_by, updated_by)
   values (new_project.id, new_project.name, new_project.currency_code, new_project.budget_ceiling, p_actor, p_actor);

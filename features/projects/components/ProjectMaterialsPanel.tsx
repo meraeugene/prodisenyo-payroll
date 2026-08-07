@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import type { ProjectMaterialRequest } from "@/features/material-approvals/types";
+import type { PlannedMaterialRow } from "@/features/material-requests/utils/plannedMaterials";
+import PlannedMaterialsSection from "@/features/projects/components/PlannedMaterialsSection";
 import {
   CheckCircle2,
   ClipboardList,
@@ -13,17 +16,6 @@ import {
   XCircle,
 } from "lucide-react";
 
-export type ProjectMaterialRequest = {
-  id: string;
-  material_name: string;
-  quantity: number;
-  unit: string;
-  needed_by: string;
-  priority: "low" | "medium" | "high" | "urgent";
-  notes: string | null;
-  status: "submitted" | "approved" | "rejected" | "purchasing" | "ordered" | "received" | "cancelled";
-  created_at: string;
-};
 
 const STATUS_LABELS: Record<ProjectMaterialRequest["status"], string> = {
   submitted: "Pending",
@@ -48,7 +40,15 @@ function statusClass(status: ProjectMaterialRequest["status"]) {
   return "bg-amber-50 text-amber-700";
 }
 
-export default function ProjectMaterialsPanel({ projectId, requests }: { projectId: string; requests: ProjectMaterialRequest[] }) {
+export default function ProjectMaterialsPanel({
+  projectId,
+  requests,
+  plannedMaterials,
+}: {
+  projectId: string;
+  requests: ProjectMaterialRequest[];
+  plannedMaterials: PlannedMaterialRow[];
+}) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"all" | ProjectMaterialRequest["status"]>("all");
   const normalizedSearch = search.trim().toLowerCase();

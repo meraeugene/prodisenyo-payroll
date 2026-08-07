@@ -12,14 +12,11 @@ export type PurchaseStatus =
   | "received"
   | "cancelled";
 
-export type DeliveryStatus =
-  | "pending"
-  | "scheduled"
-  | "in_transit"
-  | "delivered";
+export type DeliveryStatus = "pending" | "scheduled" | "in_transit" | "delivered";
 
 export type PurchasingRecord = {
   id: string;
+  projectId: string;
   projectName: string;
   materialRequestId: string | null;
   itemName: string;
@@ -28,6 +25,7 @@ export type PurchasingRecord = {
   supplierName: string;
   estimatedUnitCost: number;
   actualUnitCost: number;
+  quotationReference: string;
   status: PurchaseStatus;
   deliveryStatus: DeliveryStatus;
   receiptInvoiceReference: string;
@@ -39,6 +37,7 @@ export type UpdatePurchaseInput = {
   id: string;
   supplierName: string;
   actualUnitCost: number;
+  quotationReference: string;
   status: PurchaseStatus;
   deliveryStatus: DeliveryStatus;
   receiptInvoiceReference: string;
@@ -52,13 +51,14 @@ const DELIVERY_STATUSES = new Set<DeliveryStatus>([
   "pending", "scheduled", "in_transit", "delivered",
 ]);
 
-function clean(value: string) {
-  return value.trim();
+function clean(value: string | undefined) {
+  return (value ?? "").trim();
 }
 
 function mapRow(row: any): PurchasingRecord {
   return {
     id: row.id,
+    projectId: row.project_id,
     projectName: row.project?.name ?? "Unknown project",
     materialRequestId: row.material_request_id,
     itemName: row.item_name,
@@ -67,6 +67,7 @@ function mapRow(row: any): PurchasingRecord {
     supplierName: row.supplier_name ?? "",
     estimatedUnitCost: Number(row.estimated_unit_cost),
     actualUnitCost: Number(row.actual_unit_cost),
+    quotationReference: row.quotation_reference ?? "",
     status: row.status,
     deliveryStatus: row.delivery_status ?? "pending",
     receiptInvoiceReference: row.receipt_invoice_reference ?? "",
@@ -76,10 +77,7 @@ function mapRow(row: any): PurchasingRecord {
 }
 
 export async function getPurchasingRecordsAction(): Promise<PurchasingRecord[]> {
-  const { user, profile } = await requireRole([
-    APP_ROLES.CEO,
-    APP_ROLES.PURCHASER,
-  ]);
+  const { user, profile } = await requireRole([APP_ROLES.CEO, APP_ROLES.PURCHASER]);
   const database = createSupabaseAdminClient() as any;
   let query = database
     .from("purchase_orders")
@@ -87,11 +85,11 @@ export async function getPurchasingRecordsAction(): Promise<PurchasingRecord[]> 
     .order("updated_at", { ascending: false });
 
   if (profile.role === APP_ROLES.PURCHASER) {
-    query = query.or(`assigned_to.is.null,assigned_to.eq.${user.id}`);
+    query = query.or("assigned_to.is.null,assigned_to.eq." + user.id);
   }
 
   const { data, error } = await query;
-  if (error) throw new Error(`Failed to load purchasing records. ${error.message}`);
+  if (error) throw new Error("Failed to load purchasing records. " + error.message);
   return (data ?? []).map(mapRow);
 }
 
@@ -110,35 +108,54 @@ export async function updatePurchaseOrderAction(
   if (input.status !== "draft" && !clean(input.supplierName)) {
     throw new Error("Supplier is required once purchasing starts.");
   }
-  if (input.status === "received" && input.deliveryStatus !== "delivered") {
-    throw new Error("A received order must be marked delivered.");
+  if (input.status !== "draft" && !clean(input.quotationReference)) {
+    throw new Error("Quotation reference is required once purchasing starts.");
+  }
+  if (
+    input.status === "received" &&
+    (input.deliveryStatus !== "delivered" ||
+      actualUnitCost <= 0 ||
+      !clean(input.receiptInvoiceReference))
+  ) {
+    throw new Error(
+      "Received orders require delivered status, a positive price, and a receipt reference.",
+    );
   }
 
-  const now = new Date().toISOString();
   const database = createSupabaseAdminClient() as any;
+  const { error: workflowError } = await database.rpc(
+    "update_purchase_order_workflow",
+    {
+      p_order_id: input.id,
+      p_actor: user.id,
+      p_supplier_name: clean(input.supplierName),
+      p_actual_unit_cost: actualUnitCost,
+      p_quotation_reference: clean(input.quotationReference),
+      p_status: input.status,
+      p_delivery_status: input.deliveryStatus,
+      p_receipt_invoice_reference: clean(input.receiptInvoiceReference),
+      p_notes: clean(input.notes),
+    },
+  );
+
+  if (workflowError) {
+    throw new Error("Failed to update purchase order. " + workflowError.message);
+  }
+
   const { data, error } = await database
     .from("purchase_orders")
-    .update({
-      assigned_to: user.id,
-      supplier_name: clean(input.supplierName) || null,
-      actual_unit_cost: actualUnitCost,
-      status: input.status,
-      delivery_status: input.deliveryStatus,
-      receipt_invoice_reference: clean(input.receiptInvoiceReference) || null,
-      notes: clean(input.notes) || null,
-      ordered_at: input.status === "ordered" ? now : undefined,
-      received_at: input.status === "received" ? now : undefined,
-    })
-    .eq("id", input.id)
-    .or(`assigned_to.is.null,assigned_to.eq.${user.id}`)
     .select("*, project:projects(name)")
+    .eq("id", input.id)
     .single();
 
   if (error || !data) {
-    throw new Error(`Failed to update purchase order. ${error?.message ?? "Unknown error"}`);
+    throw new Error("Purchase order updated but could not be reloaded.");
   }
 
   revalidatePath("/purchasing-approvals");
   revalidatePath("/purchaser-dashboard");
+  revalidatePath("/dashboard");
+  revalidatePath("/projects");
+  revalidatePath("/projects/" + data.project_id);
   return mapRow(data);
 }

@@ -46,6 +46,9 @@ export interface ProjectEstimateDraftLine {
   lineTotal: number;
   displayName: string;
   notes: string;
+  pricingBasis: "catalog" | "supplier_quote";
+  referenceSupplier: string;
+  referenceQuotation: string;
   sortOrder: number;
 }
 
@@ -80,6 +83,9 @@ export interface EstimateItemModalMaterialForm {
   rawCostLabel: string;
   unitCostInput: string;
   quantityInput: string;
+  pricingBasis: "catalog" | "supplier_quote";
+  referenceSupplier: string;
+  referenceQuotation: string;
 }
 
 export const EMPTY_ESTIMATE_FORM: ProjectEstimateDraftForm = {

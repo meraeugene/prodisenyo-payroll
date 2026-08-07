@@ -1,9 +1,10 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { APP_ROLES, requireRole } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { mapProjectRow } from "@/features/projects/utils/projectMappers";
 import ProjectWorkspaceClient from "@/features/projects/components/ProjectWorkspaceClient";
 import { mapProjectDocumentRow } from "@/features/project-documents/utils/documentMappers";
+import PlanningProjectWorkspaceClient from "@/features/projects/components/PlanningProjectWorkspaceClient";
 
 export default async function Page({
   params,
@@ -42,6 +43,40 @@ export default async function Page({
         .in("estimate_id", estimateIds)
         .order("sort_order", { ascending: true })
     : { data: [] };
+
+  if (data.status === "planning") {
+    if (profile.role === APP_ROLES.ENGINEER) {
+      if (data.assigned_estimate_engineer_id !== user.id) notFound();
+      redirect(`/cost-estimator?projectId=${projectId}`);
+    }
+
+    const { data: engineerRows } = await db
+      .from("profiles")
+      .select("id,full_name,username")
+      .eq("role", APP_ROLES.ENGINEER)
+      .eq("is_active", true)
+      .order("full_name");
+
+    return (
+      <PlanningProjectWorkspaceClient
+        project={mapProjectRow(data)}
+        engineers={(engineerRows ?? []).map((engineer: any) => ({
+          id: engineer.id,
+          name: engineer.full_name || engineer.username,
+        }))}
+        estimates={estimates ?? []}
+        estimateItems={estimateItems ?? []}
+      />
+    );
+  }
+
+  if (
+    profile.role === APP_ROLES.ENGINEER &&
+    data.assigned_engineer_id !== user.id
+  ) {
+    notFound();
+  }
+
   const activities = (data.progress ?? []).sort(
     (a: any, b: any) => a.sort_order - b.sort_order,
   );
@@ -57,7 +92,7 @@ export default async function Page({
       .limit(8),
     db
       .from("material_requests")
-      .select("id,material_name,quantity,unit,needed_by,priority,notes,status,created_at,updated_at")
+      .select("id,estimate_item_id,material_name,quantity,unit,needed_by,priority,notes,status,created_at,updated_at")
       .eq("project_id", projectId)
       .order("created_at", { ascending: false })
       .limit(100),
@@ -75,7 +110,7 @@ export default async function Page({
       .limit(100),
     db
       .from("project_expenses")
-      .select("id,category,description,amount,expense_date,status")
+      .select("id,purchase_order_id,category,description,amount,expense_date,status")
       .eq("project_id", projectId)
       .order("expense_date", { ascending: false }),
     db

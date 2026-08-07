@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   Ellipsis,
   LayoutList,
-  FolderPlus,
   LoaderCircle,
   Save,
   Trash2,
@@ -25,7 +24,6 @@ export default function CostEstimatorHeader({
   onOpenProjects,
   onSelectEstimate,
   onSaveDraft,
-  onNewProject,
   onDeleteProject,
 }: {
   estimates: ProjectEstimateRow[];
@@ -38,7 +36,6 @@ export default function CostEstimatorHeader({
   onOpenProjects: () => void;
   onSelectEstimate: (estimateId: string) => void;
   onSaveDraft: () => void;
-  onNewProject: () => void;
   onDeleteProject: () => void;
 }) {
   const isReadOnlyEstimate =
@@ -156,15 +153,6 @@ export default function CostEstimatorHeader({
                   All projects
                 </button>
               ) : null}
-              <button
-                type="button"
-                onClick={onNewProject}
-                disabled={uiLocked}
-                className="flex h-10 w-full items-center gap-2 border-b border-apple-mist px-3 text-left text-sm font-medium text-apple-charcoal transition hover:bg-apple-mist/40 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <FolderPlus size={15} />
-                New project
-              </button>
               {canDeleteEstimate ? (
                 <button
                   type="button"
@@ -183,15 +171,6 @@ export default function CostEstimatorHeader({
             </div>
           </details>
 
-          <button
-            type="button"
-            onClick={onNewProject}
-            disabled={uiLocked}
-            className="hidden h-11 items-center gap-2 rounded-[10px] border border-apple-mist bg-white px-4 text-sm font-medium text-apple-charcoal transition hover:bg-apple-mist/40 disabled:cursor-not-allowed disabled:opacity-60 sm:inline-flex"
-          >
-            <FolderPlus size={16} />
-            New project
-          </button>
           {canDeleteEstimate ? (
             <button
               type="button"

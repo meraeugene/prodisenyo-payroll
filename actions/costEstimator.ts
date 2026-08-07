@@ -49,6 +49,9 @@ interface SaveProjectEstimateDraftInput {
     quantity?: number;
     displayName?: string;
     notes?: string;
+    pricingBasis?: "catalog" | "supplier_quote";
+    referenceSupplier?: string;
+    referenceQuotation?: string;
     sortOrder?: number;
   }>;
 }
@@ -67,14 +70,18 @@ interface EngineerEstimateNotificationRow {
   updated_at: string;
 }
 
-async function loadEstimateReviewsData(database: any) {
-  const { data: estimateData, error: estimateError } = await database
+async function loadEstimateReviewsData(database: any, projectId?: string) {
+  let query = database
     .from("project_estimates")
     .select(
       "*, requester_profile:profiles!project_estimates_requested_by_fkey(full_name, username)",
     )
-    .neq("status", "draft")
-    .order("updated_at", { ascending: false });
+    .neq("status", "draft");
+  if (projectId) query = query.eq("project_id", projectId);
+  const { data: estimateData, error: estimateError } = await query.order(
+    "updated_at",
+    { ascending: false },
+  );
 
   if (estimateError) {
     throw new Error(`Failed to load estimate reviews. ${estimateError.message}`);
@@ -115,6 +122,24 @@ async function loadEstimateReviewsData(database: any) {
 
 function normalizeText(value: string | undefined) {
   return (value ?? "").trim();
+}
+
+async function requirePlanningEstimateAssignment(
+  database: any,
+  projectId: string | null,
+  userId: string,
+) {
+  if (!projectId) throw new Error("Estimate must be linked to a pending project.");
+  const { data: project } = await database
+    .from("projects")
+    .select("id")
+    .eq("id", projectId)
+    .eq("assigned_estimate_engineer_id", userId)
+    .eq("status", "planning")
+    .maybeSingle();
+  if (!project) {
+    throw new Error("Cost estimation is available only while the assigned project is pending.");
+  }
 }
 
 function normalizeOptionalText(value: string | undefined) {
@@ -414,6 +439,9 @@ async function persistEstimateItems(params: {
         quantity,
         line_total: lineTotal,
         notes: normalizeOptionalText(item.notes),
+        pricing_basis: item.pricingBasis ?? "catalog",
+        reference_supplier: normalizeOptionalText(item.referenceSupplier),
+        reference_quotation: normalizeOptionalText(item.referenceQuotation),
         sort_order: Math.max(0, Math.floor(Number(item.sortOrder ?? index))),
       };
     })
@@ -556,7 +584,7 @@ export async function saveProjectEstimateDraftAction(
     .select("id,name,location")
     .or(`assigned_engineer_id.eq.${user.id},assigned_estimate_engineer_id.eq.${user.id}`)
     .eq(input.projectId ? "id" : "name", input.projectId || normalizeText(input.projectName))
-    .neq("status", "archived")
+    .eq("status", "planning")
     .limit(1)
     .maybeSingle();
   if (!linkedProject) throw new Error("Select a project assigned to you before saving an estimate.");
@@ -686,6 +714,7 @@ export async function submitProjectEstimateAction(estimateId: string) {
   if (estimate.requested_by !== user.id) {
     throw new Error("You can only submit your own estimates.");
   }
+  await requirePlanningEstimateAssignment(database, estimate.project_id, user.id);
   if (estimate.status !== "draft") {
     if (estimate.status === "submitted") {
       return {
@@ -756,6 +785,7 @@ export async function reopenRejectedEstimateAction(estimateId: string) {
   if (estimate.requested_by !== user.id) {
     throw new Error("You can only reopen your own estimates.");
   }
+  await requirePlanningEstimateAssignment(database, estimate.project_id, user.id);
   if (estimate.status !== "rejected") {
     throw new Error("Only rejected estimates can be reopened.");
   }
@@ -812,11 +842,11 @@ export async function getEngineerEstimateNotificationsAction() {
   };
 }
 
-export async function getEstimateReviewsDataAction() {
+export async function getEstimateReviewsDataAction(projectId?: string) {
   await requireRole(APP_ROLES.CEO);
   const database = createSupabaseAdminClient() as any;
 
-  return loadEstimateReviewsData(database);
+  return loadEstimateReviewsData(database, normalizeText(projectId));
 }
 
 export async function approveProjectEstimateAction(estimateId: string) {

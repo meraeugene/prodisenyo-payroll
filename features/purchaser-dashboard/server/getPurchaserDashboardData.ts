@@ -10,7 +10,7 @@ export async function getPurchaserDashboardData(
   const { data: orders, error } = await database
     .from("purchase_orders")
     .select(
-      "id,project_id,material_request_id,item_name,quantity,unit,supplier_name,estimated_unit_cost,actual_unit_cost,status,delivery_status,receipt_invoice_reference,created_at,updated_at,project:projects(name,image_url)",
+      "id,project_id,material_request_id,item_name,quantity,unit,supplier_name,estimated_unit_cost,actual_unit_cost,quotation_reference,status,delivery_status,receipt_invoice_reference,created_at,updated_at,project:projects(name,image_url)",
     )
     .or(`assigned_to.is.null,assigned_to.eq.${userId}`)
     .order("updated_at", { ascending: false });

@@ -15,6 +15,7 @@ import {
   approveProjectEstimateAction,
   rejectProjectEstimateAction,
 } from "@/actions/costEstimator";
+import { approveProjectEstimateWithBaselineAction } from "@/actions/estimateProcurement";
 import {
   getProjectWorkspaceDataAction,
   submitProjectProgressAction,
@@ -25,7 +26,9 @@ import EstimateReportModal from "@/features/cost-estimator/components/EstimateRe
 import EngineeringProgressWorksheet from "./EngineeringProgressWorksheet";
 import EngineerProjectOverview from "./EngineerProjectOverview";
 import ProjectProgressUpdatesPanel from "./ProjectProgressUpdatesPanel";
-import ProjectMaterialsPanel, { type ProjectMaterialRequest } from "./ProjectMaterialsPanel";
+import ProjectMaterialsPanel from "./ProjectMaterialsPanel";
+import type { ProjectMaterialRequest } from "@/features/material-approvals/types";
+import { buildPlannedMaterialRows } from "@/features/material-requests/utils/plannedMaterials";
 import ProjectDocumentsPanel from "@/features/project-documents/components/ProjectDocumentsPanel";
 import type { ProjectDocumentRecord } from "@/features/project-documents/types";
 import ProjectActivityLogPanel from "@/features/project-activity-log/components/ProjectActivityLogPanel";
@@ -170,6 +173,11 @@ export default function ProjectWorkspaceClient({
   const liveProjectExpenses = workspaceState.data?.projectExpenses ?? projectExpenses ?? [];
   const livePurchaseOrders = workspaceState.data?.purchaseOrders ?? purchaseOrders ?? [];
   const liveMaterialReceipts = workspaceState.data?.materialReceipts ?? materialReceipts ?? [];
+  const plannedMaterials = buildPlannedMaterialRows(
+    project.activeApprovedEstimateId,
+    liveEstimateItems,
+    liveMaterialRequests,
+  );
 
   const activityRows = liveActivities.map((activity) => mapActivity(project.name, activity));
   const activeEstimate =
@@ -242,7 +250,7 @@ export default function ProjectWorkspaceClient({
     void (async () => {
       try {
         setPendingEstimateAction({ id: estimateId, type: "approve" });
-        const result = await approveProjectEstimateAction(estimateId);
+        const result = await approveProjectEstimateWithBaselineAction(estimateId);
         updateLiveEstimate(result.estimate as Estimate);
         await workspaceState.mutate();
         setActiveEstimateId(null);
@@ -368,12 +376,20 @@ export default function ProjectWorkspaceClient({
 
       {!isTabPending && tab === "materials" ? (
         canReviewEstimates ? (
-          <>
-            <ProjectPreviewNotice label="Material approvals are preview data in this phase." />
-            <MaterialApprovalsPageClient projectName={project.name} canManage />
-          </>
+          <MaterialApprovalsPageClient
+            projectName={project.name}
+            requestedBy={project.engineer}
+            requests={liveMaterialRequests}
+            plannedMaterials={plannedMaterials}
+            canManage
+            onReviewed={() => workspaceState.mutate()}
+          />
         ) : (
-          <ProjectMaterialsPanel projectId={project.id} requests={liveMaterialRequests} />
+          <ProjectMaterialsPanel
+            projectId={project.id}
+            requests={liveMaterialRequests}
+            plannedMaterials={plannedMaterials}
+          />
         )
       ) : null}
       {!isTabPending && tab === "purchasing" ? (

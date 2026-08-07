@@ -64,7 +64,7 @@ export default function CostEstimatorItemModal({
   ) => void;
   onMaterialRowFieldChange: (
     materialRowId: string,
-    field: "searchInput" | "unitType" | "unitCostInput" | "quantityInput",
+    field: "searchInput" | "unitType" | "unitCostInput" | "quantityInput" | "pricingBasis" | "referenceSupplier" | "referenceQuotation",
     value: string,
   ) => void;
   onAddMaterial: () => void;
@@ -671,6 +671,63 @@ export default function CostEstimatorItemModal({
                             </p>
                           ) : null}
                         </div>
+                      </div>
+
+                      <div className="rounded-[16px] border border-slate-200 bg-slate-50 p-4">
+                        <label className="block text-sm font-semibold text-apple-charcoal">
+                          Pricing basis
+                          <select
+                            value={materialRow.pricingBasis}
+                            onChange={(event) =>
+                              onMaterialRowFieldChange(
+                                materialRow.id,
+                                "pricingBasis",
+                                event.target.value,
+                              )
+                            }
+                            className="mt-2 h-11 w-full rounded-xl border border-apple-mist bg-white px-3 text-sm outline-none focus:border-[#1f6a37]"
+                          >
+                            <option value="catalog">Catalog / reference rate</option>
+                            <option value="supplier_quote">Supplier quotation</option>
+                          </select>
+                        </label>
+                        {materialRow.pricingBasis === "supplier_quote" ? (
+                          <div className="mt-3 grid gap-3 md:grid-cols-2">
+                            <label className="text-sm font-semibold text-apple-charcoal">
+                              Reference supplier <span className="text-rose-500">*</span>
+                              <input
+                                value={materialRow.referenceSupplier}
+                                onChange={(event) =>
+                                  onMaterialRowFieldChange(
+                                    materialRow.id,
+                                    "referenceSupplier",
+                                    event.target.value,
+                                  )
+                                }
+                                className="mt-2 h-11 w-full rounded-xl border border-apple-mist bg-white px-3 text-sm outline-none focus:border-[#1f6a37]"
+                              />
+                            </label>
+                            <label className="text-sm font-semibold text-apple-charcoal">
+                              Quotation reference <span className="text-rose-500">*</span>
+                              <input
+                                value={materialRow.referenceQuotation}
+                                onChange={(event) =>
+                                  onMaterialRowFieldChange(
+                                    materialRow.id,
+                                    "referenceQuotation",
+                                    event.target.value,
+                                  )
+                                }
+                                placeholder="Quote number or document reference"
+                                className="mt-2 h-11 w-full rounded-xl border border-apple-mist bg-white px-3 text-sm outline-none focus:border-[#1f6a37]"
+                              />
+                            </label>
+                          </div>
+                        ) : (
+                          <p className="mt-2 text-xs text-slate-500">
+                            This rate is a planning reference. The purchaser records the final supplier quotation later.
+                          </p>
+                        )}
                       </div>
 
                       <div className="mt-1 flex items-center justify-between gap-3 rounded-[16px] border border-emerald-100 bg-emerald-50 px-4 py-3 xl:mt-auto">
