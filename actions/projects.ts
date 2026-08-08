@@ -6,6 +6,10 @@ import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import type { ProjectStatus } from "@/features/projects/types";
 import { normalizeProgressUpdateInput } from "@/features/projects/utils/progressUpdates";
 import { mapProjectDocumentRow } from "@/features/project-documents/utils/documentMappers";
+import {
+  attachPurchaseReceiptEvidence,
+  PURCHASE_RECEIPT_ENTITY_TYPE,
+} from "@/features/purchasing-approvals/utils/receiptEvidence";
 
 export interface ProjectInput {
   name: string; location: string; subject?: string; lead?: string; client?: string;
@@ -133,7 +137,7 @@ export async function getProjectWorkspaceDataAction(projectId: string) {
     throw new Error("The operational project workspace is not available to you.");
   }
 
-  const [{ data: activities }, { data: estimates }, { data: budgets }, { data: progressSubmissions }, { data: materialRequests }, { data: progressUpdates }, { data: documents }, { data: projectExpenses }, { data: purchaseOrders }, { data: materialReceipts }] =
+  const [{ data: activities }, { data: estimates }, { data: budgets }, { data: progressSubmissions }, { data: materialRequests }, { data: progressUpdates }, { data: documents }, { data: projectExpenses }, { data: purchaseOrders }, { data: materialReceipts }, { data: receiptEvidence }] =
     await Promise.all([
       database
         .from("project_progress_activities")
@@ -181,7 +185,7 @@ export async function getProjectWorkspaceDataAction(projectId: string) {
         .order("expense_date", { ascending: false }),
       database
         .from("purchase_orders")
-        .select("id,material_request_id,item_name,quantity,unit,estimated_unit_cost,actual_unit_cost,status,delivery_status,ordered_at,received_at,notes,created_at,updated_at")
+        .select("id,material_request_id,item_name,quantity,unit,estimated_unit_cost,actual_unit_cost,supplier_name,quotation_reference,receipt_invoice_reference,status,delivery_status,ordered_at,received_at,notes,created_at,updated_at")
         .eq("project_id", normalizedProjectId)
         .order("updated_at", { ascending: false }),
       database
@@ -189,6 +193,12 @@ export async function getProjectWorkspaceDataAction(projectId: string) {
         .select("id,purchase_order_id,item_name,quantity,unit,total_cost,accepted_at")
         .eq("project_id", normalizedProjectId)
         .order("accepted_at", { ascending: false }),
+      database
+        .from("workflow_evidence")
+        .select("id,entity_id,file_name,content_type,created_at")
+        .eq("project_id", normalizedProjectId)
+        .eq("entity_type", PURCHASE_RECEIPT_ENTITY_TYPE)
+        .order("created_at", { ascending: false }),
     ]);
   const estimateIds = (estimates ?? []).map((estimate: any) => estimate.id);
   const { data: estimateItems } = estimateIds.length
@@ -209,7 +219,10 @@ export async function getProjectWorkspaceDataAction(projectId: string) {
     progressUpdates: progressUpdates ?? [],
     documents: (documents ?? []).map(mapProjectDocumentRow),
     projectExpenses: projectExpenses ?? [],
-    purchaseOrders: purchaseOrders ?? [],
+    purchaseOrders: attachPurchaseReceiptEvidence(
+      purchaseOrders ?? [],
+      receiptEvidence ?? [],
+    ),
     materialReceipts: materialReceipts ?? [],
   };
 }

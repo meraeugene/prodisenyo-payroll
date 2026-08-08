@@ -20,6 +20,9 @@ export type ProjectPurchaseOrder = {
   unit: string;
   estimated_unit_cost: number;
   actual_unit_cost: number;
+  supplier_name: string | null;
+  quotation_reference: string | null;
+  receipt_invoice_reference: string | null;
   status: string;
   delivery_status: string | null;
   ordered_at: string | null;
@@ -27,6 +30,12 @@ export type ProjectPurchaseOrder = {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  receipt_evidence: {
+    id: string;
+    fileName: string;
+    contentType: string;
+    createdAt: string;
+  } | null;
 };
 
 export type ProjectMaterialReceipt = {

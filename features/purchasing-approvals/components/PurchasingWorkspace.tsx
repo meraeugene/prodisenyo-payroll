@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { BadgeDollarSign, LoaderCircle, Pencil, Search } from "lucide-react";
+import { BadgeDollarSign, Download, FileCheck2, LoaderCircle, Pencil, Search, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 import {
   getPurchasingRecordsAction,
+  getPurchaseReceiptDownloadUrlAction,
   updatePurchaseOrderAction,
   type DeliveryStatus,
   type PurchasingRecord,
@@ -31,6 +32,7 @@ export default function PurchasingWorkspace() {
   const [records, setRecords] = useState<PurchasingRecord[]>([]);
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<PurchasingRecord | null>(null);
+  const [selectedReceiptName, setSelectedReceiptName] = useState("");
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
 
@@ -56,21 +58,24 @@ export default function PurchasingWorkspace() {
     if (!editing) return;
     startTransition(async () => {
       try {
-        const updated = await updatePurchaseOrderAction({
-          id: editing.id,
-          quotationReference: String(formData.get('quotationReference') ?? ''),
-          supplierName: String(formData.get("supplierName") ?? ""),
-          actualUnitCost: Number(formData.get("actualUnitCost") ?? 0),
-          status: String(formData.get("status")) as PurchaseStatus,
-          deliveryStatus: String(formData.get("deliveryStatus")) as DeliveryStatus,
-          receiptInvoiceReference: String(formData.get("receiptInvoiceReference") ?? ""),
-          notes: String(formData.get("notes") ?? ""),
-        });
+        const updated = await updatePurchaseOrderAction(formData);
         setRecords((current) => current.map((record) => record.id === updated.id ? updated : record));
         setEditing(null);
+        setSelectedReceiptName("");
         toast.success("Purchase details updated.");
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Unable to update purchase.");
+      }
+    });
+  }
+
+  function openReceipt(evidenceId: string) {
+    startTransition(async () => {
+      try {
+        const url = await getPurchaseReceiptDownloadUrlAction(evidenceId);
+        window.open(url, "_blank", "noopener,noreferrer");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Unable to open receipt.");
       }
     });
   }
@@ -109,7 +114,14 @@ export default function PurchasingWorkspace() {
                   <p className="text-xs font-semibold uppercase text-apple-steel">{record.projectName}</p>
                   <h2 className="mt-1 font-bold text-apple-charcoal">{record.itemName}</h2>
                   <p className="mt-1 text-sm text-apple-smoke">{record.quantity} {record.unit} · {record.supplierName || "Supplier pending"}</p>
-                  <p className="mt-2 text-xs text-apple-steel">Quotation: {record.quotationReference || "Not recorded"} · Invoice/receipt: {record.receiptInvoiceReference || "Not recorded"} · Delivery: {record.deliveryStatus.replace("_", " ")}</p>
+                  <p className="mt-2 text-xs text-apple-steel">Quotation: {record.quotationReference || "Not recorded"} · Delivery: {record.deliveryStatus.replace("_", " ")}</p>
+                  {record.receiptFile ? (
+                    <button type="button" onClick={() => openReceipt(record.receiptFile!.id)} className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100">
+                      <FileCheck2 size={13} /> {record.receiptFile.fileName} <Download size={12} />
+                    </button>
+                  ) : (
+                    <p className="mt-2 text-xs text-apple-steel">Receipt / invoice: {record.receiptInvoiceReference || "Not uploaded"}</p>
+                  )}
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="text-right">
@@ -122,7 +134,7 @@ export default function PurchasingWorkspace() {
                       Final
                     </span>
                   ) : (
-                    <button onClick={() => setEditing(record)} aria-label="Edit purchase details"
+                    <button onClick={() => { setEditing(record); setSelectedReceiptName(""); }} aria-label="Edit purchase details"
                       className="flex h-9 w-9 items-center justify-center rounded-lg border border-apple-mist text-emerald-700 hover:bg-emerald-50">
                       <Pencil size={14} />
                     </button>
@@ -137,6 +149,7 @@ export default function PurchasingWorkspace() {
       {editing ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs">
           <form action={save} className="w-full max-w-lg space-y-4 rounded-2xl border border-apple-mist bg-white p-6 shadow-2xl">
+            <input type="hidden" name="id" value={editing.id} />
             <div><h2 className="text-lg font-bold text-apple-charcoal">Update purchase</h2><p className="text-xs text-apple-smoke">{editing.itemName}</p></div>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-xs font-semibold text-slate-700">Supplier<input name="supplierName" defaultValue={editing.supplierName} className="mt-1 h-10 w-full rounded-xl border border-apple-mist px-3 text-sm" /></label>
@@ -145,10 +158,17 @@ export default function PurchasingWorkspace() {
               <label className="text-xs font-semibold text-slate-700">Delivery status<select name="deliveryStatus" defaultValue={editing.deliveryStatus} className="mt-1 h-10 w-full rounded-xl border border-apple-mist px-3 text-sm">{DELIVERY_OPTIONS.map((value) => <option key={value}>{value}</option>)}</select></label>
             </div>
             <label className="block text-xs font-semibold text-slate-700">Supplier quotation reference<input name="quotationReference" defaultValue={editing.quotationReference} placeholder="Quotation number or file reference" className="mt-1 h-10 w-full rounded-xl border border-apple-mist px-3 text-sm" /></label>
-            <label className="block text-xs font-semibold text-slate-700">Receipt / invoice reference<input name="receiptInvoiceReference" defaultValue={editing.receiptInvoiceReference} className="mt-1 h-10 w-full rounded-xl border border-apple-mist px-3 text-sm" /></label>
+            <label className="block text-xs font-semibold text-slate-700">Receipt / invoice reference<input name="receiptInvoiceReference" defaultValue={editing.receiptInvoiceReference} placeholder="Invoice number (optional when uploading a file)" className="mt-1 h-10 w-full rounded-xl border border-apple-mist px-3 text-sm" /></label>
+            <label className="block cursor-pointer rounded-xl border-2 border-dashed border-emerald-200 bg-emerald-50/40 p-4 text-center transition hover:border-emerald-400 hover:bg-emerald-50">
+              <input name="receiptFile" type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" className="sr-only" onChange={(event) => setSelectedReceiptName(event.target.files?.[0]?.name ?? "")} />
+              <UploadCloud size={22} className="mx-auto text-emerald-700" />
+              <span className="mt-2 block text-sm font-semibold text-slate-800">Upload receipt or invoice</span>
+              <span className="mt-1 block text-xs text-slate-500">PDF, PNG or JPG, up to 10 MB</span>
+              {selectedReceiptName ? <span className="mt-2 block text-xs font-semibold text-emerald-700">Selected: {selectedReceiptName}</span> : editing.receiptFile ? <span className="mt-2 block text-xs font-semibold text-emerald-700">Current: {editing.receiptFile.fileName}</span> : null}
+            </label>
             <label className="block text-xs font-semibold text-slate-700">Notes<textarea name="notes" defaultValue={editing.notes} rows={3} className="mt-1 w-full rounded-xl border border-apple-mist p-3 text-sm" /></label>
             <div className="flex justify-end gap-2 border-t border-apple-mist pt-4">
-              <button type="button" onClick={() => setEditing(null)} className="h-10 rounded-xl border border-apple-mist px-4 text-sm">Cancel</button>
+              <button type="button" onClick={() => { setEditing(null); setSelectedReceiptName(""); }} className="h-10 rounded-xl border border-apple-mist px-4 text-sm">Cancel</button>
               <button disabled={isPending} className={cn("flex h-10 items-center gap-2 rounded-xl bg-[#1f6a37] px-5 text-sm font-semibold text-white", isPending && "opacity-60")}>{isPending ? <LoaderCircle size={14} className="animate-spin" /> : null}Save</button>
             </div>
           </form>

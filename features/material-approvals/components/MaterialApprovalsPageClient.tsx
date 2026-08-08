@@ -24,6 +24,8 @@ import {
   type MaterialApprovalBucket,
 } from "@/features/material-approvals/utils/materialApproval";
 import { cn } from "@/lib/utils";
+import MaterialProcurementDetails from "@/features/purchasing-approvals/components/MaterialProcurementDetails";
+import type { ProjectPurchaseOrder } from "@/features/project-cost-tracking/types";
 
 function formatDate(value: string) {
   const date = new Date(value);
@@ -61,6 +63,7 @@ export default function MaterialApprovalsPageClient({
   requestedBy,
   requests = [],
   plannedMaterials = [],
+  purchaseOrders = [],
   canManage = false,
   onReviewed,
 }: {
@@ -68,6 +71,7 @@ export default function MaterialApprovalsPageClient({
   requestedBy: string;
   requests: ProjectMaterialRequest[];
   plannedMaterials?: PlannedMaterialRow[];
+  purchaseOrders?: ProjectPurchaseOrder[];
   canManage?: boolean;
   onReviewed?: () => Promise<unknown> | unknown;
 }) {
@@ -77,6 +81,15 @@ export default function MaterialApprovalsPageClient({
   const [actionType, setActionType] = useState<"approve" | "reject">("approve");
   const [commentText, setCommentText] = useState("");
   const [isPending, startTransition] = useTransition();
+  const purchaseOrderByRequestId = useMemo(
+    () =>
+      new Map(
+        purchaseOrders
+          .filter((order) => order.material_request_id)
+          .map((order) => [order.material_request_id as string, order]),
+      ),
+    [purchaseOrders],
+  );
 
   const filteredRequests = useMemo(() => {
     const search = searchTerm.trim().toLowerCase();
@@ -220,6 +233,11 @@ export default function MaterialApprovalsPageClient({
                   <p className="rounded-xl border border-slate-100 bg-slate-50 p-2.5 text-xs italic text-slate-500">
                     &ldquo;{request.notes}&rdquo;
                   </p>
+                ) : null}
+                {purchaseOrderByRequestId.get(request.id) ? (
+                  <MaterialProcurementDetails
+                    order={purchaseOrderByRequestId.get(request.id)!}
+                  />
                 ) : null}
               </div>
             </div>

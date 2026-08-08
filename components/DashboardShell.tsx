@@ -45,7 +45,7 @@ const PRIMARY_NAV_ITEMS = [
 ];
 
 const PAYROLL_MANAGER_GENERAL_ITEMS = [
-  { href: "/home", label: "Home", icon: House },
+  { href: "/payroll-dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/upload-attendance", label: "Upload Attendance", icon: Upload },
 ] as const;
 

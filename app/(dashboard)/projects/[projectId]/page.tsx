@@ -5,6 +5,10 @@ import { mapProjectRow } from "@/features/projects/utils/projectMappers";
 import ProjectWorkspaceClient from "@/features/projects/components/ProjectWorkspaceClient";
 import { mapProjectDocumentRow } from "@/features/project-documents/utils/documentMappers";
 import PlanningProjectWorkspaceClient from "@/features/projects/components/PlanningProjectWorkspaceClient";
+import {
+  attachPurchaseReceiptEvidence,
+  PURCHASE_RECEIPT_ENTITY_TYPE,
+} from "@/features/purchasing-approvals/utils/receiptEvidence";
 
 export default async function Page({
   params,
@@ -83,7 +87,7 @@ export default async function Page({
   const budgetItems = (data.budget ?? []).flatMap(
     (item: any) => item.budget_items ?? [],
   );
-  const [{ data: progressSubmissions }, { data: materialRequests }, { data: progressUpdates }, { data: documents }, { data: projectExpenses }, { data: purchaseOrders }, { data: materialReceipts }] = await Promise.all([
+  const [{ data: progressSubmissions }, { data: materialRequests }, { data: progressUpdates }, { data: documents }, { data: projectExpenses }, { data: purchaseOrders }, { data: materialReceipts }, { data: receiptEvidence }] = await Promise.all([
     db
       .from("project_progress_submissions")
       .select("id,activity_count,submitted_at")
@@ -115,7 +119,7 @@ export default async function Page({
       .order("expense_date", { ascending: false }),
     db
       .from("purchase_orders")
-      .select("id,material_request_id,item_name,quantity,unit,estimated_unit_cost,actual_unit_cost,status,delivery_status,ordered_at,received_at,notes,created_at,updated_at")
+      .select("id,material_request_id,item_name,quantity,unit,estimated_unit_cost,actual_unit_cost,supplier_name,quotation_reference,receipt_invoice_reference,status,delivery_status,ordered_at,received_at,notes,created_at,updated_at")
       .eq("project_id", projectId)
       .order("updated_at", { ascending: false }),
     db
@@ -123,6 +127,12 @@ export default async function Page({
       .select("id,purchase_order_id,item_name,quantity,unit,total_cost,accepted_at")
       .eq("project_id", projectId)
       .order("accepted_at", { ascending: false }),
+    db
+      .from("workflow_evidence")
+      .select("id,entity_id,file_name,content_type,created_at")
+      .eq("project_id", projectId)
+      .eq("entity_type", PURCHASE_RECEIPT_ENTITY_TYPE)
+      .order("created_at", { ascending: false }),
   ]);
   const canUpdateProgress =
     profile.role === APP_ROLES.ENGINEER &&
@@ -148,7 +158,10 @@ export default async function Page({
       progressUpdates={progressUpdates ?? []}
       documents={(documents ?? []).map(mapProjectDocumentRow)}
       projectExpenses={projectExpenses ?? []}
-      purchaseOrders={purchaseOrders ?? []}
+      purchaseOrders={attachPurchaseReceiptEvidence(
+        purchaseOrders ?? [],
+        receiptEvidence ?? [],
+      )}
       materialReceipts={materialReceipts ?? []}
     />
   );

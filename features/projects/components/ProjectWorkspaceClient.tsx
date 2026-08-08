@@ -381,6 +381,7 @@ export default function ProjectWorkspaceClient({
             requestedBy={project.engineer}
             requests={liveMaterialRequests}
             plannedMaterials={plannedMaterials}
+            purchaseOrders={livePurchaseOrders}
             canManage
             onReviewed={() => workspaceState.mutate()}
           />
@@ -389,6 +390,7 @@ export default function ProjectWorkspaceClient({
             projectId={project.id}
             requests={liveMaterialRequests}
             plannedMaterials={plannedMaterials}
+            purchaseOrders={livePurchaseOrders}
           />
         )
       ) : null}

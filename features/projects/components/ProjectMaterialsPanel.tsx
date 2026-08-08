@@ -5,6 +5,8 @@ import { useMemo, useState } from "react";
 import type { ProjectMaterialRequest } from "@/features/material-approvals/types";
 import type { PlannedMaterialRow } from "@/features/material-requests/utils/plannedMaterials";
 import PlannedMaterialsSection from "@/features/projects/components/PlannedMaterialsSection";
+import MaterialProcurementDetails from "@/features/purchasing-approvals/components/MaterialProcurementDetails";
+import type { ProjectPurchaseOrder } from "@/features/project-cost-tracking/types";
 import {
   CheckCircle2,
   ClipboardList,
@@ -44,14 +46,25 @@ export default function ProjectMaterialsPanel({
   projectId,
   requests,
   plannedMaterials,
+  purchaseOrders,
 }: {
   projectId: string;
   requests: ProjectMaterialRequest[];
   plannedMaterials: PlannedMaterialRow[];
+  purchaseOrders: ProjectPurchaseOrder[];
 }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"all" | ProjectMaterialRequest["status"]>("all");
   const normalizedSearch = search.trim().toLowerCase();
+  const purchaseOrderByRequestId = useMemo(
+    () =>
+      new Map(
+        purchaseOrders
+          .filter((order) => order.material_request_id)
+          .map((order) => [order.material_request_id as string, order]),
+      ),
+    [purchaseOrders],
+  );
 
   const filtered = useMemo(() => requests.filter((request) => {
     const matchesSearch = !normalizedSearch || request.material_name.toLowerCase().includes(normalizedSearch) || request.unit.toLowerCase().includes(normalizedSearch);
@@ -90,7 +103,23 @@ export default function ProjectMaterialsPanel({
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50/70 text-xs font-semibold text-slate-500"><tr><th className="px-5 py-3">Material</th><th className="px-4 py-3">Quantity</th><th className="px-4 py-3">Needed By</th><th className="px-4 py-3">Priority</th><th className="px-4 py-3">Status</th><th className="px-5 py-3">Requested</th></tr></thead>
               <tbody className="divide-y divide-slate-100">
-                {filtered.map((request) => <tr key={request.id} className="transition hover:bg-slate-50/70"><td className="px-5 py-4"><p className="font-semibold text-slate-900">{request.material_name}</p>{request.notes ? <p className="mt-1 max-w-xs truncate text-xs text-slate-500">{request.notes}</p> : null}</td><td className="px-4 py-4 font-medium text-slate-700">{Number(request.quantity).toLocaleString("en-PH")} {request.unit}</td><td className="px-4 py-4 text-slate-600">{formatDate(request.needed_by)}</td><td className="px-4 py-4"><span className="capitalize text-slate-700">{request.priority}</span></td><td className="px-4 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(request.status)}`}>{STATUS_LABELS[request.status]}</span></td><td className="px-5 py-4 text-slate-600">{formatDate(request.created_at)}</td></tr>)}
+                {filtered.map((request) => {
+                  const purchaseOrder = purchaseOrderByRequestId.get(request.id);
+                  return (
+                    <tr key={request.id} className="transition hover:bg-slate-50/70">
+                      <td className="px-5 py-4">
+                        <p className="font-semibold text-slate-900">{request.material_name}</p>
+                        {request.notes ? <p className="mt-1 max-w-xs truncate text-xs text-slate-500">{request.notes}</p> : null}
+                        {purchaseOrder ? <MaterialProcurementDetails order={purchaseOrder} /> : null}
+                      </td>
+                      <td className="px-4 py-4 font-medium text-slate-700">{Number(request.quantity).toLocaleString("en-PH")} {request.unit}</td>
+                      <td className="px-4 py-4 text-slate-600">{formatDate(request.needed_by)}</td>
+                      <td className="px-4 py-4"><span className="capitalize text-slate-700">{request.priority}</span></td>
+                      <td className="px-4 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(request.status)}`}>{STATUS_LABELS[request.status]}</span></td>
+                      <td className="px-5 py-4 text-slate-600">{formatDate(request.created_at)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
