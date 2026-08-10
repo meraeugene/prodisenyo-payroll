@@ -1,53 +1,69 @@
-# Payroll Manager Dashboard Design QA
+# Login Redesign - Design QA
 
-- Source visual truth: `C:\Users\User\Downloads\payrol-admin-dashboard.png`
-- Implementation screenshot: `C:\Users\User\Desktop\prodisenyo-probuild\payroll-dashboard-implementation.png`
-- Comparison image: `C:\Users\User\Desktop\prodisenyo-probuild\payroll-dashboard-comparison-small.jpg`
-- Responsive capture: `C:\Users\User\Desktop\prodisenyo-probuild\payroll-dashboard-mobile.png`
-- Viewport: 1536 x 1024 CSS px, device scale factor 1
-- Source pixels: 1536 x 1024
-- Implementation pixels: 1536 x 1024
-- Density normalization: equal 1x pixel dimensions; the side-by-side review copy was downsampled equally for inspection
-- State: payroll manager dashboard populated with a non-sensitive realistic visual fixture; production page uses persisted live data
+## Comparison target
 
-## Full-view comparison evidence
+- Source visual truth: `design-references/probuild-login.png`
+- Source pixels: 1672 x 941
+- Browser-rendered implementation: `login-implementation-desktop-passed.png`
+- Implementation pixels: 1672 x 941
+- CSS viewport: 1672 x 941
+- Device scale factor: 1
+- Density normalization: none required; source and implementation are equal pixel dimensions
+- Route/state: `/auth/login`, signed-out, default empty form, password hidden
+- Responsive evidence: `login-implementation-mobile-final.png` at 500 x 900 CSS pixels, device scale factor 1
 
-The source and implementation were placed in one side-by-side comparison at the same desktop dimensions. Both use a left navigation shell, compact page header, five summary cards, a dominant attendance table, a payroll composition panel, and lower approval/activity panels. The implementation deliberately retains the repository's existing shell width and omits unsupported attendance-issue, expense, payslip, contract-type, and admin-management sections.
+## Evidence
 
-The rendered hierarchy, white/slate surface balance, emerald actions, semantic status colors, card radii, table density, and desktop column proportions align with the supplied reference. The implementation remains vertically scrollable because returned CEO correction notes are included as a supported extra panel.
-
-## Focused region comparison evidence
-
-The summary cards, attendance table, payroll overview chart, approval table, returned-submission card, and recent-activity list were inspected in the combined image. Labels, values, badges, icons, table alignment, button contrast, and empty-state affordances remain legible at the target viewport. A 390 x 844 capture verified that the page header, actions, and metric cards stack without horizontal page overflow; data tables use their intended internal horizontal scroll container.
-
-## Findings
-
-- No actionable P0, P1, or P2 visual differences remain.
-- Intentional difference: the existing Prodisenyo shell is retained instead of copying the reference navigation.
-- Intentional difference: unsupported workflows and fabricated counts are omitted.
+- Full-view comparison: `login-design-comparison-passed.jpg` (source left, implementation right)
+- Focused sign-in-card comparison: `login-card-comparison-passed.jpg` (source left, implementation right)
+- Focused comparison was required because field labels, input sizing, button placement, and support-row spacing were not readable enough in the full-view comparison.
 
 ## Required fidelity surfaces
 
-- Fonts and typography: existing system/SF-style sans stack, weight hierarchy, wrapping, tracking, and table labels are consistent with the application and visually comparable to the reference.
-- Spacing and layout rhythm: header, card grid, two-column operational row, three-column lower row, radii, borders, and shadows match the reference's compact dashboard rhythm.
-- Colors and visual tokens: existing slate, white, emerald, sky, amber, violet, and rose tokens provide equivalent semantic emphasis with accessible contrast.
-- Image quality and asset fidelity: the reference contains no required content imagery for this dashboard. Icons use the repository's established Lucide library; the payroll chart uses Recharts.
-- Copy and content: all visible labels describe persisted attendance and payroll workflows. Unsupported reference copy was not reproduced.
+- Fonts and typography: passed. The existing system font stack closely matches the reference's neutral sans-serif proportions. Display hierarchy, weights, line height, and wrapping are aligned at the target viewport.
+- Spacing and layout rhythm: passed. The 51.8/48.2 split, 578px card width, card height, desktop alignment, field rhythm, button position, divider, support row, and copyright placement match the reference hierarchy. Mobile content stacks without horizontal overflow at the validated responsive viewport.
+- Colors and visual tokens: passed. Off-white backgrounds, navy text, muted steel copy, teal accents, borders, and low-elevation shadows match the supplied direction while using the application's established palette.
+- Image quality and asset fidelity: passed. The construction background is a project-local raster asset generated for the measured hero slot, and the implementation uses the application's real ProBuild brand mark rather than a code-drawn substitute.
+- Copy and content: passed with intentional product constraints. The live app authenticates by username, so the field remains `Username`. Unsupported remember-me and password-recovery controls are not presented as working features; the equivalent spacing is occupied by truthful authorized-account guidance.
 
-## Primary interactions tested
+## Interaction and runtime checks
 
-- Browser-rendered page captured successfully in Chrome at desktop and mobile dimensions.
-- Required links are rendered for attendance upload, attendance review, payroll generation, attendance analytics, payroll analytics, and overtime requests; server route protection and production build were verified separately.
-- Chrome produced no visible runtime error overlay, and the Next development log contained no dashboard runtime error.
-- Loading, zero-data, partial-item, awaiting-approval, approved, draft, ready, and returned states are represented by implemented components and automated selector tests.
+- Username and password inputs are required and retain the existing server action.
+- Password visibility changed from `password` to `text`; the control changed from `Show password` / `aria-pressed=false` to `Hide password` / `aria-pressed=true`.
+- Submit control rendered with the expected `Sign In` label and retains the pending state.
+- Local route returned HTTP 200.
+- Browser-rendered desktop and responsive screenshots were captured successfully.
+- Error-level browser console messages observed during the final check: 0.
 
 ## Comparison history
 
-1. Initial capture returned a QA fixture 404 because the temporary route used a Next.js private-folder prefix. This was a P0 capture blocker, not a production route defect.
-2. The fixture route was renamed, the page was recaptured at 1536 x 1024, and the combined comparison showed the completed dashboard with no remaining P0/P1/P2 differences.
+### Iteration 1
+
+- [P2] Hero copy sat about 30px above the reference position.
+- [P2] Construction imagery had materially stronger contrast than the reference.
+- [P2] Omitting unsupported remember-me and recovery controls shortened the lower form rhythm.
+
+Fixes made:
+
+- Moved the hero copy block down from 9.5vh to 12.5vh.
+- Increased the white image veil from 30% to 40%.
+- Added supported authorized-company-account guidance so the form preserves the source rhythm without inventing authentication behavior.
+- Shifted the desktop panel group down 20px and shortened the administrator guidance to the reference label.
+
+Post-fix evidence:
+
+- `login-design-comparison-passed.jpg`
+- `login-card-comparison-passed.jpg`
+- No remaining actionable P0, P1, or P2 mismatch is visible.
+
+## Intentional differences
+
+- The reference's email label is replaced by the application's real username credential.
+- Remember-me and forgot-password actions are omitted because no persisted workflow or route exists for them.
+- The existing ProBuild PB mark is used instead of replacing the product identity with the mockup's different building logo.
 
 ## Follow-up polish
 
-- P3: a future design pass may add a payroll-specific notification badge once the product defines a persisted notification interaction for this role.
+- [P3] The generated construction photograph is slightly more building-forward than the source crop, but it matches the reference art direction and preserves equivalent negative space.
 
 final result: passed
