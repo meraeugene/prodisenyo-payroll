@@ -7,12 +7,16 @@ type NotificationCounts = {
   overtime: number;
   payrollReports: number;
   estimateReviews: number;
+  materialApprovals: number;
+  purchasing: number;
 };
 
 const EMPTY_COUNTS: NotificationCounts = {
   overtime: 0,
   payrollReports: 0,
   estimateReviews: 0,
+  materialApprovals: 0,
+  purchasing: 0,
 };
 
 let activeRequest: Promise<NotificationCounts | null> | null = null;
@@ -20,7 +24,7 @@ let activeRequest: Promise<NotificationCounts | null> | null = null;
 function loadNotificationCounts() {
   if (activeRequest) return activeRequest;
 
-  const supabase = createSupabaseBrowserClient();
+  const supabase = createSupabaseBrowserClient() as any;
   activeRequest = Promise.all([
     supabase
       .from("payroll_adjustments")
@@ -39,13 +43,21 @@ function loadNotificationCounts() {
       .from("project_estimates")
       .select("id", { count: "exact", head: true })
       .eq("status", "submitted"),
+    supabase
+      .from("material_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending"),
+    supabase
+      .from("material_requests")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["assigned", "partially_delivered"]),
   ])
-    .then(([payrollOvertime, requestOvertime, payrollReports, estimates]) => {
+    .then(([payrollOvertime, requestOvertime, payrollReports, estimates, materials, purchasing]: any[]) => {
       if (
         payrollOvertime.error ||
         requestOvertime.error ||
         payrollReports.error ||
-        estimates.error
+        estimates.error || materials.error || purchasing.error
       ) {
         return null;
       }
@@ -54,6 +66,8 @@ function loadNotificationCounts() {
         overtime: (payrollOvertime.count ?? 0) + (requestOvertime.count ?? 0),
         payrollReports: payrollReports.count ?? 0,
         estimateReviews: estimates.count ?? 0,
+        materialApprovals: materials.count ?? 0,
+        purchasing: purchasing.count ?? 0,
       };
     })
     .finally(() => {

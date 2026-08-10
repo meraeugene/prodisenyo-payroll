@@ -1,0 +1,3 @@
+"use client";
+import { TbAlertTriangle } from "react-icons/tb";
+export default function EngineerError({ reset }: { error: Error; reset: () => void }) { return <div className="grid min-h-[70vh] place-items-center p-6"><div className="max-w-md text-center"><TbAlertTriangle className="mx-auto text-[#d27a00]" size={34} /><h1 className="mt-4 text-xl font-semibold">The Engineer workspace could not be loaded</h1><p className="mt-2 text-sm text-[#707982]">Check that the Engineer operations migration has been applied, then try again.</p><button onClick={reset} className="mt-5 h-10 rounded-[6px] bg-[#087332] px-5 text-xs font-semibold text-white">Try again</button></div></div>; }

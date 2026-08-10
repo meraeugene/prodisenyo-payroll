@@ -1,0 +1,47 @@
+{
+  "primaryState": {
+    "path": "/dashboard",
+    "title": "Operations Overview",
+    "createProject": true,
+    "projectRows": 8,
+    "filterOptions": [
+      "All Projects",
+      "On Track",
+      "At Risk",
+      "Overdue",
+      "Blocked",
+      "Completed"
+    ],
+    "queueLinks": [
+      "/material-approvals",
+      "/purchasing"
+    ],
+    "horizontalOverflow": false
+  },
+  "interactions": {
+    "drawerOpened": true,
+    "drawerVisible": true,
+    "drawerClosed": true,
+    "projectModalOpened": true,
+    "projectModalVisible": true
+  },
+  "responsiveOverflow": {
+    "390": false,
+    "768": false,
+    "1280": false,
+    "1440": false
+  },
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 404 () (https://kymwhntzubhyjdxuqkyx.supabase.co/rest/v1/material_requests?select=id&status=eq.pending)",
+    "Failed to load resource: the server responded with a status of 404 () (https://kymwhntzubhyjdxuqkyx.supabase.co/rest/v1/material_requests?select=id&status=in.%28assigned%2Cpartially_delivered%29)",
+    "Failed to load resource: the server responded with a status of 404 () (https://kymwhntzubhyjdxuqkyx.supabase.co/rest/v1/material_requests?select=id&status=eq.pending)",
+    "Failed to load resource: the server responded with a status of 404 () (https://kymwhntzubhyjdxuqkyx.supabase.co/rest/v1/material_requests?select=id&status=in.%28assigned%2Cpartially_delivered%29)"
+  ],
+  "screenshots": [
+    "C:\\Users\\User\\prodisenyo-probuild\\design-qa-assets\\operations-dashboard-1488x1058.png",
+    "C:\\Users\\User\\prodisenyo-probuild\\design-qa-assets\\operations-dashboard-1440x1024.png",
+    "C:\\Users\\User\\prodisenyo-probuild\\design-qa-assets\\operations-dashboard-1280x900.png",
+    "C:\\Users\\User\\prodisenyo-probuild\\design-qa-assets\\operations-dashboard-768x1024.png",
+    "C:\\Users\\User\\prodisenyo-probuild\\design-qa-assets\\operations-dashboard-390x844.png"
+  ]
+}

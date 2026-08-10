@@ -54,6 +54,9 @@ function isRoleAllowedNextPath(role: AppRole, pathname: string) {
       "/add-user",
       "/reset-data",
       "/settings",
+      "/operations",
+      "/material-approvals",
+      "/purchasing",
     ]);
   }
 
@@ -67,7 +70,12 @@ function isRoleAllowedNextPath(role: AppRole, pathname: string) {
       "/payroll-analytics",
       "/request-overtime",
       "/settings",
+      "/operations",
     ]);
+  }
+
+  if (role === APP_ROLES.PURCHASER) {
+    return hasAllowedPrefix(pathname, ["/home", "/purchasing", "/settings"]);
   }
 
   if (role === APP_ROLES.ENGINEER) {
