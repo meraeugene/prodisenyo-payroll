@@ -34,6 +34,14 @@ export default function EstimateReportModal({
     (sum, item) => sum + (item.line_total ?? 0),
     0,
   );
+  const boqItemCount = new Set(
+    items.map(
+      (item) =>
+        (item.boq_section || "General Works").toLowerCase() +
+        "::" +
+        (item.boq_item_number || String(item.sort_order + 1)).toLowerCase(),
+    ),
+  ).size;
   const remainingBudget = estimate.estimate_total - overallTotal;
   const budgetSummary =
     remainingBudget > 0
@@ -196,7 +204,7 @@ export default function EstimateReportModal({
                     Line Items
                   </p>
                   <h3 className="mt-2 text-lg font-semibold tracking-[-0.03em] text-apple-charcoal">
-                    {items.length} item{items.length === 1 ? "" : "s"}
+                    {boqItemCount} BOQ item{boqItemCount === 1 ? "" : "s"}
                   </h3>
                 </div>
                 <p className="text-2xl font-semibold tracking-[-0.03em] text-apple-charcoal">
@@ -208,6 +216,12 @@ export default function EstimateReportModal({
                 <table className="w-full min-w-[560px] text-sm lg:min-w-0">
                   <thead>
                     <tr className="bg-[rgb(var(--apple-snow))]">
+                      <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.15em] text-apple-steel">
+                        Item No.
+                      </th>
+                      <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.15em] text-apple-steel">
+                        Section
+                      </th>
                       <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.15em] text-apple-steel">
                         Item
                       </th>
@@ -230,6 +244,12 @@ export default function EstimateReportModal({
                       <>
                         {items.map((item) => (
                           <tr key={item.id}>
+                            <td className="px-3 py-3 align-top font-semibold text-apple-charcoal">
+                              {item.boq_item_number || item.sort_order + 1}
+                            </td>
+                            <td className="px-3 py-3 align-top text-apple-smoke">
+                              {item.boq_section || "General Works"}
+                            </td>
                             <td className="px-3 py-3 align-top">
                               <p className="font-semibold text-apple-charcoal">
                                 {item.item_name_snapshot}
@@ -265,7 +285,7 @@ export default function EstimateReportModal({
                         ))}
                         <tr className="bg-[linear-gradient(135deg,#112e1a,#1f4f2c,#245f34)]">
                           <td
-                            colSpan={4}
+                            colSpan={6}
                             className="px-3 py-3 text-right text-sm font-semibold uppercase tracking-[0.12em] text-white"
                           >
                             Item Cost Total
@@ -278,7 +298,7 @@ export default function EstimateReportModal({
                     ) : (
                       <tr>
                         <td
-                          colSpan={5}
+                          colSpan={7}
                           className="px-3 py-5 text-center text-sm text-apple-steel"
                         >
                           No estimate items were saved.

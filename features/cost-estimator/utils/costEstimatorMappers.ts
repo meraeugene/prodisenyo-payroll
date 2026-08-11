@@ -64,6 +64,8 @@ export function buildEstimateDraftForm(
       unitCost: item.unit_cost_snapshot ?? 0,
       quantity: item.quantity ?? 0,
       lineTotal: item.line_total ?? 0,
+      section: item.boq_section ?? "General Works",
+      itemNumber: item.boq_item_number ?? String(index + 1),
       displayName: item.item_name_snapshot ?? "",
       notes: item.notes ?? "",
       pricingBasis: item.pricing_basis ?? "catalog",
@@ -83,6 +85,8 @@ export function buildEstimateItemModalForm(
 
   return {
     id: item.id,
+    section: item.section,
+    itemNumber: item.itemNumber,
     displayName: item.displayName,
     notes: item.notes,
     materials: [
@@ -116,6 +120,8 @@ export function buildEstimateItemModalFormFromItems(
 
   return {
     id: baseItem.id,
+    section: baseItem.section,
+    itemNumber: baseItem.itemNumber,
     displayName: baseItem.displayName,
     notes: baseItem.notes,
     materials: items.map((item) => ({

@@ -16,11 +16,11 @@ export default function LoginHero() {
       <div className="relative z-10 flex min-h-screen flex-col px-[8%] pb-20 pt-[7.5vh]">
         <div className="flex w-fit flex-col items-center">
           <Image
-            src="/probuild-building-mark.png"
-            alt="Prodisenyo logo"
-            width={92}
+            src="/prodisenyo-building-mark.png"
+            alt="Prodisenyo building mark"
+            width={112}
             height={92}
-            className="h-[92px] w-[92px] rounded-[18px] shadow-[0_8px_24px_rgba(6,79,77,0.12)]"
+            className="h-[92px] w-[112px] object-contain"
           />
           <p className="mt-3 text-[24px] font-semibold tracking-[0.01em] text-[#086864]">
             Prodisenyo ProBuild

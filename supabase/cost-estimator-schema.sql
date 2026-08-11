@@ -68,6 +68,8 @@ create table if not exists public.project_estimate_items (
   id uuid primary key default gen_random_uuid(),
   estimate_id uuid not null references public.project_estimates(id) on delete cascade,
   catalog_item_id uuid references public.cost_catalog_items(id) on delete set null,
+  boq_section text not null default 'General Works',
+  boq_item_number text not null default '',
   item_name_snapshot text not null,
   material_name_snapshot text not null default '',
   category_snapshot public.budget_item_category not null,
@@ -82,7 +84,9 @@ create table if not exists public.project_estimate_items (
 );
 
 alter table public.project_estimate_items
-  add column if not exists material_name_snapshot text not null default '';
+  add column if not exists material_name_snapshot text not null default '',
+  add column if not exists boq_section text not null default 'General Works',
+  add column if not exists boq_item_number text not null default '';
 
 create index if not exists cost_catalog_items_active_idx
   on public.cost_catalog_items(is_active, category, name);

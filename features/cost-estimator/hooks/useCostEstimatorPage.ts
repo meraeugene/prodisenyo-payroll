@@ -56,6 +56,8 @@ type SetupFormErrors = Partial<
 >;
 
 type ItemModalErrors = {
+  section?: string;
+  itemNumber?: string;
   displayName?: string;
   materialRows: Record<
     string,
@@ -69,6 +71,18 @@ function round2(value: number) {
 
 function buildDisplayName(baseName: string) {
   return baseName;
+}
+
+function inferProjectTypeFromSubject(subject: string | null) {
+  const normalized = subject?.trim().toLowerCase().replaceAll("_", " ") ?? "";
+
+  if (normalized.includes("renovation")) return "renovation" as const;
+  if (normalized.includes("extension")) return "extension" as const;
+  if (normalized.includes("new build") || normalized.includes("new construction")) {
+    return "new_build" as const;
+  }
+
+  return "other" as const;
 }
 
 function setCostEstimatorModalScrollEnabled(enabled: boolean) {
@@ -356,8 +370,13 @@ export function useCostEstimatorPage({
           unitCost: round2(item.unitCost),
           quantity: round2(item.quantity),
           lineTotal: round2(item.lineTotal),
+          section: item.section.trim(),
+          itemNumber: item.itemNumber.trim(),
           displayName: item.displayName.trim(),
           notes: item.notes.trim(),
+          pricingBasis: item.pricingBasis,
+          referenceSupplier: item.referenceSupplier.trim(),
+          referenceQuotation: item.referenceQuotation.trim(),
           sortOrder: item.sortOrder,
         }))
         .sort((left, right) => left.sortOrder - right.sortOrder),
@@ -548,7 +567,10 @@ export function useCostEstimatorPage({
     toast.error("Save your draft before switching projects.");
   }
 
-  function handleOpenAssignedProjectSetup(projectId: string) {
+  function handleOpenAssignedProjectSetup(
+    projectId: string,
+    onSuccess?: () => void,
+  ) {
     const assignedProject = assignedProjects.find(
       (project) => project.id === projectId,
     );
@@ -557,19 +579,53 @@ export function useCostEstimatorPage({
       return;
     }
 
-    setSelectedEstimateId(null);
-    setEstimateForm({
+    const initialForm: ProjectEstimateDraftForm = {
       ...EMPTY_ESTIMATE_FORM,
       projectId: assignedProject.id,
       projectName: assignedProject.name,
+      projectType: inferProjectTypeFromSubject(assignedProject.subject),
       location: assignedProject.location,
       ownerName: assignedProject.clientName || assignedProject.lead || "",
-      costEstimate: assignedProject.budgetCeiling,
+      costEstimate: 0,
       draftedDate: new Date().toISOString(),
-    });
+    };
+
+    setSelectedEstimateId(null);
+    setEstimateForm(initialForm);
     setSetupFormErrors({});
-    setProjectSetupOpen(true);
+    setProjectSetupOpen(false);
     setItemModalOpen(false);
+
+    setPendingEstimateIntent("save");
+    setSaveState("saving");
+    setSaveMessage("Creating draft...");
+    startEstimateTransition(async () => {
+      try {
+        const saved = await saveProjectEstimateDraftAction({
+          projectId: initialForm.projectId,
+          projectName: initialForm.projectName,
+          projectType: initialForm.projectType,
+          location: initialForm.location,
+          ownerName: initialForm.ownerName,
+          costEstimate: 0,
+          notes: "",
+          items: [],
+        });
+        applyEstimateUpdate(saved.estimate, saved.items);
+        setSaveState("saved");
+        setSaveMessage("Draft saved");
+        toast.success("Project estimate created.");
+        onSuccess?.();
+      } catch (error) {
+        setSaveState("error");
+        setSaveMessage("Unable to create draft");
+        toast.error(
+          error instanceof Error ? error.message : "Failed to create estimate.",
+        );
+      } finally {
+        setPendingEstimateIntent(null);
+      }
+    });
   }
 
   function handleCloseProjectSetup() {
@@ -638,7 +694,13 @@ export function useCostEstimatorPage({
   }
 
   async function persistDraft(shouldSubmit: boolean) {
-    const nextForm = ensureEstimateLineTotals(estimateForm);
+    const normalizedForm = ensureEstimateLineTotals(estimateForm);
+    const nextForm = {
+      ...normalizedForm,
+      costEstimate: round2(
+        normalizedForm.items.reduce((sum, item) => sum + item.lineTotal, 0),
+      ),
+    };
     const saved = await saveProjectEstimateDraftAction({
       id: nextForm.id,
       projectId: nextForm.projectId,
@@ -655,8 +717,13 @@ export function useCostEstimatorPage({
         unitType: item.unitType,
         unitCost: item.unitCost,
         quantity: item.quantity,
+        section: item.section,
+        itemNumber: item.itemNumber,
         displayName: item.displayName,
         notes: item.notes,
+        pricingBasis: item.pricingBasis,
+        referenceSupplier: item.referenceSupplier,
+        referenceQuotation: item.referenceQuotation,
         sortOrder: item.sortOrder,
       })),
     });
@@ -812,9 +879,21 @@ export function useCostEstimatorPage({
     setItemModalReadOnly(false);
     setEditingMaterialSnapshots({});
     const initialMaterial = buildInitialModalMaterial(materialOptions);
+    const existingGroups = new Set(
+      estimateForm.items.map(
+        (item) =>
+          item.section.trim().toLowerCase() +
+          "::" +
+          item.itemNumber.trim().toLowerCase(),
+      ),
+    );
 
     setItemModalForm({
       ...EMPTY_ESTIMATE_ITEM_MODAL_FORM,
+      section:
+        estimateForm.items[estimateForm.items.length - 1]?.section ||
+        "General Works",
+      itemNumber: String(existingGroups.size + 1),
       displayName: "",
       materials: [initialMaterial],
     });
@@ -950,10 +1029,14 @@ export function useCostEstimatorPage({
     field: Exclude<keyof EstimateItemModalForm, "materials" | "id">,
     value: string,
   ) {
-    if (field === "displayName") {
+    if (
+      field === "section" ||
+      field === "itemNumber" ||
+      field === "displayName"
+    ) {
       setItemModalErrors((current) => ({
         ...current,
-        displayName: undefined,
+        [field]: undefined,
       }));
     }
 
@@ -1313,6 +1396,8 @@ export function useCostEstimatorPage({
       const nextErrors: ItemModalErrors = {
         materialRows: {},
       };
+      const trimmedSection = itemModalForm.section.trim();
+      const trimmedItemNumber = itemModalForm.itemNumber.trim();
       const trimmedDisplayName = itemModalForm.displayName.trim();
       const validMaterials = itemModalForm.materials.filter((material) => {
         const hasName =
@@ -1344,11 +1429,35 @@ export function useCostEstimatorPage({
         return hasName && hasUnit && quantityValue > 0;
       });
 
+      if (!trimmedSection) {
+        nextErrors.section = "Section or work category is required.";
+      }
+
+      if (!trimmedItemNumber) {
+        nextErrors.itemNumber = "Item number is required.";
+      }
+
       if (!trimmedDisplayName) {
         nextErrors.displayName = "Description is required.";
       }
 
-      if (validMaterials.length === 0) {
+      const duplicateItemNumber = estimateForm.items.some(
+        (item, index) =>
+          !editingItemIndices?.includes(index) &&
+          item.itemNumber.trim().toLowerCase() ===
+            trimmedItemNumber.toLowerCase(),
+      );
+      if (duplicateItemNumber) {
+        nextErrors.itemNumber =
+          "This item number is already used in the estimate.";
+      }
+
+      if (
+        validMaterials.length === 0 ||
+        nextErrors.section ||
+        nextErrors.itemNumber ||
+        nextErrors.displayName
+      ) {
         setItemModalErrors(nextErrors);
         return;
       }
@@ -1400,6 +1509,8 @@ export function useCostEstimatorPage({
           unitCost: unitCostValue,
           quantity: quantityValue,
           lineTotal: round2(quantityValue * unitCostValue),
+          section: trimmedSection,
+          itemNumber: trimmedItemNumber,
           displayName: buildDisplayName(itemDisplayName),
           notes: itemModalForm.notes,
           pricingBasis: material.pricingBasis,

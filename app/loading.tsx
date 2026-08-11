@@ -1,4 +1,4 @@
-import { Building2 } from "lucide-react";
+import Image from "next/image";
 
 export default function Loading() {
   return (
@@ -12,9 +12,13 @@ export default function Loading() {
 
           {/* Main Icon Card */}
           <div className="z-10 flex h-20 w-20 items-center justify-center rounded-2xl bg-white border border-slate-100 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] transition-transform duration-700">
-            <Building2
-              className="h-10 w-10 text-emerald-600 animate-in fade-in zoom-in duration-700"
-              strokeWidth={1.5}
+            <Image
+              src="/prodisenyo-building-mark.png"
+              alt="Prodisenyo building mark"
+              width={64}
+              height={64}
+              className="h-16 w-16 object-contain animate-in fade-in zoom-in duration-700"
+              priority
             />
           </div>
         </div>

@@ -44,6 +44,8 @@ export interface ProjectEstimateDraftLine {
   unitCost: number;
   quantity: number;
   lineTotal: number;
+  section: string;
+  itemNumber: string;
   displayName: string;
   notes: string;
   pricingBasis: "catalog" | "supplier_quote";
@@ -67,6 +69,8 @@ export interface ProjectEstimateDraftForm {
 
 export interface EstimateItemModalForm {
   id?: string;
+  section: string;
+  itemNumber: string;
   displayName: string;
   notes: string;
   materials: EstimateItemModalMaterialForm[];
@@ -86,6 +90,56 @@ export interface EstimateItemModalMaterialForm {
   pricingBasis: "catalog" | "supplier_quote";
   referenceSupplier: string;
   referenceQuotation: string;
+}
+
+export interface CostEstimatorItemModalProps {
+  open: boolean;
+  form: EstimateItemModalForm;
+  errors: {
+    section?: string;
+    itemNumber?: string;
+    displayName?: string;
+    materialRows: Record<
+      string,
+      Partial<Record<"searchInput" | "unitType" | "quantityInput", string>>
+    >;
+  };
+  editingMaterialSnapshots: Record<string, EstimateItemModalMaterialForm>;
+  pendingMaterialRowId: string | null;
+  materials: MaterialOptionGroup[];
+  computedTotal: number;
+  baseEstimateTotal: number;
+  budgetCeiling: number | null;
+  itemNumberLabel: string;
+  editing: boolean;
+  readOnly?: boolean;
+  pending: boolean;
+  onClose: () => void;
+  onSelectMaterial: (materialRowId: string, materialId: string) => void;
+  onSelectUnitType: (materialRowId: string, catalogItemId: string) => void;
+  onFieldChange: (
+    field: Exclude<keyof EstimateItemModalForm, "materials" | "id">,
+    value: string,
+  ) => void;
+  onMaterialRowFieldChange: (
+    materialRowId: string,
+    field:
+      | "searchInput"
+      | "unitType"
+      | "unitCostInput"
+      | "quantityInput"
+      | "pricingBasis"
+      | "referenceSupplier"
+      | "referenceQuotation",
+    value: string,
+  ) => void;
+  onAddMaterial: () => void;
+  onSaveMaterial: (materialRowId: string) => void;
+  onEditMaterial: (materialRowId: string) => void;
+  onCancelMaterial: (materialRowId: string) => void;
+  onRemoveMaterial: (materialRowId: string) => void;
+  onSave: () => void;
+  onDelete: () => void;
 }
 
 export const EMPTY_ESTIMATE_FORM: ProjectEstimateDraftForm = {
@@ -111,6 +165,8 @@ export interface AssignedEstimateProject {
 }
 
 export const EMPTY_ESTIMATE_ITEM_MODAL_FORM: EstimateItemModalForm = {
+  section: "",
+  itemNumber: "",
   displayName: "",
   notes: "",
   materials: [],

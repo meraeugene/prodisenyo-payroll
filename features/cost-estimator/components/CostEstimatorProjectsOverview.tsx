@@ -1,27 +1,18 @@
 "use client";
 
-import { Calculator, FolderOpen } from "lucide-react";
-import DashboardPageHero from "@/components/DashboardPageHero";
-import EstimateStatusBadge from "@/features/cost-estimator/components/EstimateStatusBadge";
 import {
-  formatBudgetMoney,
-  formatProjectTypeLabel,
-} from "@/features/cost-estimator/utils/costEstimatorFormatters";
+  BriefcaseBusiness,
+  CircleCheck,
+  FileText,
+  Send,
+} from "lucide-react";
+import CostEstimatorOverviewMetric from "@/features/cost-estimator/components/CostEstimatorOverviewMetric";
+import CostEstimatorOverviewProjectCard from "@/features/cost-estimator/components/CostEstimatorOverviewProjectCard";
 import type {
   AssignedEstimateProject,
   ProjectEstimateItemRow,
   ProjectEstimateRow,
 } from "@/features/cost-estimator/types";
-
-function formatUpdatedAt(value: string) {
-  return new Intl.DateTimeFormat("en-PH", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
 
 export default function CostEstimatorProjectsOverview({
   estimates,
@@ -38,6 +29,9 @@ export default function CostEstimatorProjectsOverview({
   onOpenProject: (estimateId: string) => void;
   onStartEstimate: (projectId: string) => void;
 }) {
+  const assignedProjectsById = new Map(
+    assignedProjects.map((project) => [project.id, project]),
+  );
   const estimatedProjectIds = new Set(
     estimates.map((estimate) => estimate.project_id).filter(Boolean),
   );
@@ -45,160 +39,75 @@ export default function CostEstimatorProjectsOverview({
     (project) => !estimatedProjectIds.has(project.id),
   );
   const queueCount = estimates.length + projectsWithoutEstimates.length;
+  const draftCount =
+    projectsWithoutEstimates.length +
+    estimates.filter((estimate) => estimate.status === "draft").length;
+  const submittedCount = estimates.filter(
+    (estimate) => estimate.status === "submitted",
+  ).length;
+  const approvedCount = estimates.filter(
+    (estimate) => estimate.status === "approved",
+  ).length;
 
   return (
-    <div className="space-y-4 p-0 sm:p-6">
-      <DashboardPageHero
-        eyebrow="Cost Estimation Workflow"
-        title="Overall Projects"
-        description="Open an existing estimate or start one for a project assigned to you by the CEO."
-      />
+    <div className="space-y-5 p-0 sm:p-6">
+      <section className="rounded-none bg-[linear-gradient(135deg,#064e2b,#075f35_55%,#087443)] px-6 py-9 text-white shadow-[0_16px_34px_rgba(6,78,43,0.14)] sm:rounded-[14px] sm:px-10 sm:py-10">
+        <h1 className="text-[34px] font-semibold tracking-[-0.035em] sm:text-[40px]">
+          Cost Estimator
+        </h1>
+        <p className="mt-2 text-base text-white/90 sm:text-[18px]">
+          Prepare and manage Bill of Quantities for projects assigned to you.
+        </p>
+      </section>
 
-      <section className="rounded-none border border-apple-mist bg-white p-5 shadow-[0_10px_30px_rgba(24,83,43,0.06)] sm:rounded-[18px]">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-apple-steel">
-              Project Queue
-            </p>
-            <h2 className="mt-2 text-xl font-semibold text-apple-charcoal">
-              Your Estimate Queue
-            </h2>
-          </div>
-          <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-            {queueCount} project{queueCount === 1 ? "" : "s"}
-          </span>
-        </div>
+      <section aria-label="Estimate summary" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <CostEstimatorOverviewMetric icon={BriefcaseBusiness} value={queueCount} label="Projects" tone="emerald" />
+        <CostEstimatorOverviewMetric icon={FileText} value={draftCount} label="Draft" tone="amber" />
+        <CostEstimatorOverviewMetric icon={Send} value={submittedCount} label="Submitted" tone="sky" />
+        <CostEstimatorOverviewMetric icon={CircleCheck} value={approvedCount} label="Approved" tone="green" />
+      </section>
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {projectsWithoutEstimates.map((project) => (
-            <article
-              key={project.id}
-              className="rounded-[14px] border border-emerald-200 bg-emerald-50/40 p-4"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-apple-steel">
-                    {project.subject || "Assigned project"}
-                  </p>
-                  <h3 className="mt-2 text-lg font-semibold text-apple-charcoal">
-                    {project.name}
-                  </h3>
-                </div>
-                <span className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-sky-700">
-                  New
-                </span>
-              </div>
+      <section aria-labelledby="assigned-projects-heading" className="space-y-4 px-3 sm:px-2">
+        <h2 id="assigned-projects-heading" className="text-[24px] font-semibold tracking-[-0.025em] text-slate-950">
+          Assigned Projects
+        </h2>
 
-              <div className="mt-4 rounded-[10px] border border-dashed border-emerald-200 bg-white/80 p-3">
-                <p className="text-sm font-semibold text-apple-charcoal">
-                  No cost estimate exists yet
-                </p>
-                <p className="mt-1 text-xs leading-5 text-apple-steel">
-                  This project was assigned by the CEO and is waiting for its
-                  first cost estimate.
-                </p>
-              </div>
+        {queueCount > 0 ? (
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {projectsWithoutEstimates.map((project) => (
+              <CostEstimatorOverviewProjectCard
+                key={project.id}
+                project={project}
+                estimate={null}
+                items={[]}
+                pending={pending}
+                onOpen={() => onStartEstimate(project.id)}
+              />
+            ))}
 
-              <div className="mt-4 space-y-2 text-sm text-apple-smoke">
-                <p>
-                  Location: <span className="font-semibold text-apple-charcoal">{project.location || "Not recorded"}</span>
-                </p>
-                <p>
-                  Budget ceiling: <span className="font-semibold text-green-700">{formatBudgetMoney(project.budgetCeiling)}</span>
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => onStartEstimate(project.id)}
-                disabled={pending}
-                className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-[#1f6a37] px-4 text-sm font-semibold text-white transition hover:bg-[#18552d] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Calculator size={15} />
-                Start cost estimate
-              </button>
-            </article>
-          ))}
-
-          {estimates.map((estimate) => {
-            const estimateItems = itemsByEstimateId[estimate.id] ?? [];
-            const totalQuantity = estimateItems.reduce(
-              (sum, item) => sum + (item.quantity ?? 0),
-              0,
-            );
-            const totalItemCost = estimateItems.reduce(
-              (sum, item) => sum + (item.line_total ?? 0),
-              0,
-            );
-
-            return (
-              <article
+            {estimates.map((estimate) => (
+              <CostEstimatorOverviewProjectCard
                 key={estimate.id}
-                className="rounded-[14px] border border-apple-mist bg-[rgb(var(--apple-snow))] p-4"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-apple-steel">
-                      {formatProjectTypeLabel(estimate.project_type)}
-                    </p>
-                    <h3 className="mt-2 text-lg font-semibold text-apple-charcoal">
-                      {estimate.project_name}
-                    </h3>
-                  </div>
-                  <EstimateStatusBadge status={estimate.status} />
-                </div>
-
-                <div className="mt-4 space-y-2 text-sm text-apple-smoke">
-                  <p>
-                    Total estimate:{" "}
-                    <span className="font-semibold text-green-700">
-                      {formatBudgetMoney(estimate.estimate_total)}
-                    </span>
-                  </p>
-
-                  <p>
-                    Total quantity:{" "}
-                    <span className="font-semibold text-sky-700">
-                      {totalQuantity.toLocaleString("en-PH")}
-                    </span>
-                  </p>
-                  <p>
-                    Total item cost:{" "}
-                    <span className="font-semibold text-rose-700">
-                      {formatBudgetMoney(totalItemCost)}
-                    </span>
-                  </p>
-
-                  <p>
-                    Updated:{" "}
-                    <span className="font-semibold text-apple-charcoal">
-                      {formatUpdatedAt(estimate.updated_at)}
-                    </span>
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => onOpenProject(estimate.id)}
-                  disabled={pending}
-                  className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-[#1f6a37] px-4 text-sm font-semibold text-white transition hover:bg-[#18552d] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <FolderOpen size={15} />
-                  Open project
-                </button>
-              </article>
-            );
-          })}
-        </div>
-
-        {queueCount === 0 ? (
-          <div className="rounded-[14px] border border-dashed border-apple-mist bg-[rgb(var(--apple-snow))] px-5 py-12 text-center">
-            <p className="font-semibold text-apple-charcoal">No estimating assignments yet</p>
-            <p className="mt-2 text-sm text-apple-steel">
+                project={
+                  estimate.project_id
+                    ? assignedProjectsById.get(estimate.project_id) ?? null
+                    : null
+                }
+                estimate={estimate}
+                items={itemsByEstimateId[estimate.id] ?? []}
+                pending={pending}
+                onOpen={() => onOpenProject(estimate.id)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-[14px] border border-dashed border-emerald-200 bg-white px-5 py-14 text-center">
+            <p className="font-semibold text-slate-900">No estimating assignments yet</p>
+            <p className="mt-2 text-sm text-slate-500">
               Projects assigned by the CEO for cost estimation will appear here.
             </p>
           </div>
-        ) : null}
+        )}
       </section>
     </div>
   );

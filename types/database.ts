@@ -824,6 +824,8 @@ export interface Database {
           id: string;
           estimate_id: string;
           catalog_item_id: string | null;
+          boq_section: string;
+          boq_item_number: string;
           item_name_snapshot: string;
           material_name_snapshot: string;
           category_snapshot: BudgetItemCategory;
@@ -843,6 +845,8 @@ export interface Database {
           id?: string;
           estimate_id: string;
           catalog_item_id?: string | null;
+          boq_section?: string;
+          boq_item_number?: string;
           item_name_snapshot: string;
           material_name_snapshot: string;
           category_snapshot: BudgetItemCategory;
@@ -861,6 +865,8 @@ export interface Database {
         Update: {
           estimate_id?: string;
           catalog_item_id?: string | null;
+          boq_section?: string;
+          boq_item_number?: string;
           item_name_snapshot?: string;
           material_name_snapshot?: string;
           category_snapshot?: BudgetItemCategory;

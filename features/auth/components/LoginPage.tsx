@@ -15,11 +15,11 @@ export default function LoginPage({ nextPath }: LoginPageProps) {
       <section className="relative flex min-h-screen flex-col items-center justify-center px-5 py-8 sm:px-8 lg:translate-y-5 lg:px-[7%] lg:py-10">
         <div className="mb-8 flex items-center gap-3 lg:hidden">
           <Image
-            src="/probuild-building-mark.png"
-            alt="Prodisenyo logo"
-            width={52}
+            src="/prodisenyo-building-mark.png"
+            alt="Prodisenyo building mark"
+            width={64}
             height={52}
-            className="h-[52px] w-[52px] rounded-xl"
+            className="h-[52px] w-16 object-contain"
           />
           <div>
             <p className="text-lg font-semibold tracking-[-0.02em] text-[#076966]">

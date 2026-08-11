@@ -47,6 +47,8 @@ interface SaveProjectEstimateDraftInput {
     unitType?: string;
     unitCost?: number;
     quantity?: number;
+    section?: string;
+    itemNumber?: string;
     displayName?: string;
     notes?: string;
     pricingBasis?: "catalog" | "supplier_quote";
@@ -412,6 +414,11 @@ async function persistEstimateItems(params: {
     catalogRows.map((row) => [row.id, row]),
   );
 
+  const boqParentByItemNumber = new Map<
+    string,
+    { section: string; description: string }
+  >();
+
   const payload: ProjectEstimateItemInsert[] = params.items
     .map((item, index) => {
       const catalogItemId = normalizeText(item.catalogItemId);
@@ -425,12 +432,41 @@ async function persistEstimateItems(params: {
       const unitCost = normalizeMoney(item.unitCost ?? catalogItem?.unit_cost);
       const lineTotal = normalizeMoney(unitCost * quantity);
       const materialName = normalizeText(item.materialName) || catalogItem?.name || "Material";
+      const section = normalizeText(item.section) || "General Works";
+      const itemNumber = normalizeText(item.itemNumber) || String(index + 1);
       const displayName = normalizeText(item.displayName) || materialName;
       const unitType = normalizeText(item.unitType) || catalogItem?.unit_label || "";
+
+      if (section.length > 120) {
+        throw new Error("BOQ section/category must be 120 characters or fewer.");
+      }
+
+      if (itemNumber.length > 40) {
+        throw new Error("BOQ item number must be 40 characters or fewer.");
+      }
+
+      const normalizedItemNumber = itemNumber.toLocaleLowerCase();
+      const existingParent = boqParentByItemNumber.get(normalizedItemNumber);
+      if (
+        existingParent &&
+        (existingParent.section.toLocaleLowerCase() !== section.toLocaleLowerCase() ||
+          existingParent.description.toLocaleLowerCase() !== displayName.toLocaleLowerCase())
+      ) {
+        throw new Error(
+          `BOQ item ${itemNumber} must use one shared section and description for all of its cost lines.`,
+        );
+      }
+
+      boqParentByItemNumber.set(normalizedItemNumber, {
+        section,
+        description: displayName,
+      });
 
       return {
         estimate_id: params.estimateId,
         catalog_item_id: catalogItem?.id ?? null,
+        boq_section: section,
+        boq_item_number: itemNumber,
         item_name_snapshot: displayName,
         material_name_snapshot: materialName,
         category_snapshot: catalogItem?.category ?? "materials",

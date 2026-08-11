@@ -75,7 +75,13 @@ export default function CeoEstimateEditDialog({
             return (
               <article key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4">
                 <div className="flex flex-col justify-between gap-2 md:flex-row md:items-start">
-                  <div><h3 className="font-bold text-slate-900">{item.material_name_snapshot || item.item_name_snapshot}</h3><p className="mt-1 text-xs text-slate-500">{item.item_name_snapshot} · {item.unit_label_snapshot}</p></div>
+                  <div>
+                    <p className="text-xs font-semibold text-emerald-700">
+                      {item.boq_section || "General Works"} / {item.boq_item_number || item.sort_order + 1}
+                    </p>
+                    <h3 className="mt-1 font-bold text-slate-900">{item.item_name_snapshot}</h3>
+                    <p className="mt-1 text-xs text-slate-500">{item.material_name_snapshot || item.item_name_snapshot} / {item.unit_label_snapshot}</p>
+                  </div>
                   <p className="font-bold text-emerald-800">₱{(value.quantity * value.unitCost).toLocaleString("en-PH", { maximumFractionDigits: 2 })}</p>
                 </div>
                 <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">

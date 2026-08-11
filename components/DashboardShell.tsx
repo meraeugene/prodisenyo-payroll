@@ -1,12 +1,12 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
-  Building2,
   BadgeDollarSign,
   Calculator,
   ChevronsLeft,
@@ -302,9 +302,7 @@ export default function DashboardShell({
             style={{ height: headerHeight }}
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-apple-mist text-apple-charcoal">
-                <Building2 className="h-4 w-4" strokeWidth={1.5} />
-              </div>
+              <BrandLogoMark />
 
               {!collapsed ? (
                 <p className="font-semibold tracking-[-0.04em] text-apple-charcoal">
@@ -600,9 +598,7 @@ export default function DashboardShell({
             style={{ height: headerHeight }}
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-apple-mist text-apple-charcoal">
-                <Building2 className="h-4 w-4" strokeWidth={1.5} />
-              </div>
+              <BrandLogoMark />
               <p className="font-semibold tracking-[-0.04em] text-apple-charcoal">
                 Prodisenyo ProBuild
               </p>
@@ -621,5 +617,20 @@ export default function DashboardShell({
         </div>
       </div>
     </div>
+  );
+}
+
+function BrandLogoMark() {
+  return (
+    <span className="relative block h-9 w-9 shrink-0">
+      <Image
+        src="/prodisenyo-building-mark.png"
+        alt="Prodisenyo building mark"
+        fill
+        sizes="36px"
+        className="object-contain"
+        priority
+      />
+    </span>
   );
 }
