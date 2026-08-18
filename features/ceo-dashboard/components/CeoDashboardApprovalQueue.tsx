@@ -15,7 +15,10 @@ export default function CeoDashboardApprovalQueue({
   items: CeoApprovalSummary[];
 }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+    <section
+      id="approval-queue"
+      className="scroll-mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.04)]"
+    >
       <div className="border-b border-slate-100 px-5 py-4">
         <h2 className="font-bold text-slate-950">Approval Queue</h2>
       </div>
@@ -36,7 +39,7 @@ export default function CeoDashboardApprovalQueue({
             </span>
             <Link
               href={item.href}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-emerald-700 px-3 text-xs font-bold text-emerald-800 transition hover:bg-emerald-50"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-emerald-700 px-3 text-xs font-bold text-emerald-800 transition hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
             >
               Review <ArrowRight size={12} />
             </Link>

@@ -44,7 +44,6 @@ function isRoleAllowedNextPath(role: AppRole, pathname: string) {
       "/payroll-reports",
       "/projects",
       "/material-approvals",
-      "/purchasing-approvals",
       "/settings",
     ]);
   }
@@ -75,6 +74,14 @@ function isRoleAllowedNextPath(role: AppRole, pathname: string) {
       "/projects",
       "/cost-estimator",
       "/request-overtime",
+      "/settings",
+    ]);
+  }
+
+  if (role === APP_ROLES.PURCHASER) {
+    return hasAllowedPrefix(pathname, [
+      "/purchaser-dashboard",
+      "/purchasing-approvals",
       "/settings",
     ]);
   }

@@ -53,7 +53,6 @@ const FEATURE_ICONS: Record<string, LucideIcon> = {
   "/overview": LayoutDashboard,
   "/projects?section=material-approvals": ClipboardCheck,
   "/material-approvals": ClipboardCheck,
-  "/projects?section=purchasing-approvals": BadgeDollarSign,
   "/purchasing-approvals": BadgeDollarSign,
 };
 
@@ -90,11 +89,6 @@ const ROLE_FEATURES: Record<AppRole, FeatureCard[]> = {
       href: "/projects?section=material-approvals",
       title: "Material Approvals",
       description: "Approve or reject material requests submitted by site engineers.",
-    },
-    {
-      href: "/projects?section=purchasing-approvals",
-      title: "Purchasing Approvals",
-      description: "Review and approve purchase orders and vendor payments.",
     },
     {
       href: "/budget-tracker",

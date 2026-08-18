@@ -20,7 +20,7 @@ export default function ProjectWorkspaceLoading() {
       </header>
 
       <nav className="flex gap-2 overflow-x-auto border-b border-slate-200 pb-3">
-        {["Progress", "Estimates", "Materials", "Purchasing", "Budget"].map((item, index) => (
+        {["Overview", "Estimates", "Materials", "Documents", "Cost Tracking"].map((item, index) => (
           <div
             key={item}
             className={`h-10 animate-pulse rounded-lg ${

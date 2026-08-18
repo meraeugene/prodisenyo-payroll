@@ -21,6 +21,7 @@ const {
   buildCeoApprovalQueue,
   buildCeoAttentionItems,
   buildCeoRecentActivity,
+  getCeoReviewApprovalsHref,
   getCeoDashboardTotals,
 } = loadTypeScriptModule("../features/ceo-dashboard/utils/ceoDashboard.ts");
 
@@ -63,6 +64,22 @@ test("approval queue uses actual material, estimate, payroll, and overtime count
     overtimeApprovalCount: 4,
   }));
   assert.deepEqual(queue.map((item) => item.count), [2, 1, 3, 4]);
+});
+
+test("review approvals opens the only pending workflow or the aggregate queue", () => {
+  const estimateOnly = buildCeoApprovalQueue(dashboardData({
+    estimates: [{ status: "submitted" }],
+  }));
+  assert.equal(getCeoReviewApprovalsHref(estimateOnly), "/estimate-approvals");
+
+  const multipleWorkflows = buildCeoApprovalQueue(dashboardData({
+    materialRequests: [{ status: "submitted" }],
+    payrollApprovalCount: 1,
+  }));
+  assert.equal(getCeoReviewApprovalsHref(multipleWorkflows), "#approval-queue");
+
+  const noPendingApprovals = buildCeoApprovalQueue(dashboardData());
+  assert.equal(getCeoReviewApprovalsHref(noPendingApprovals), "#approval-queue");
 });
 
 test("flags only persisted overdue and over-budget project conditions", () => {

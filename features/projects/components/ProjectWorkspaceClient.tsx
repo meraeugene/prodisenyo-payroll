@@ -21,7 +21,6 @@ import {
   submitProjectProgressAction,
 } from "@/actions/projects";
 import MaterialApprovalsPageClient from "@/features/material-approvals/components/MaterialApprovalsPageClient";
-import PurchasingApprovalsPageClient from "@/features/purchasing-approvals/components/PurchasingApprovalsPageClient";
 import EstimateReportModal from "@/features/cost-estimator/components/EstimateReportModal";
 import EngineeringProgressWorksheet from "./EngineeringProgressWorksheet";
 import EngineerProjectOverview from "./EngineerProjectOverview";
@@ -43,7 +42,6 @@ import CeoProjectOverview from "./CeoProjectOverview";
 import ProjectEstimateReviewSection from "./ProjectEstimateReviewSection";
 import ProjectWorkspaceHeader from "./ProjectWorkspaceHeader";
 import ProjectWorkspaceTabs from "./ProjectWorkspaceTabs";
-import ProjectPreviewNotice from "./ProjectPreviewNotice";
 import ProjectReturnEstimateDialog from "./ProjectReturnEstimateDialog";
 import ProjectWorkspaceTabSkeleton from "./ProjectWorkspaceTabSkeleton";
 import type { ImportedProgressActivity } from "../utils/engineeringProgressImport";
@@ -52,6 +50,12 @@ import type {
   ProjectEstimateItemRow,
   ReviewProjectEstimateRow,
 } from "@/features/cost-estimator/types";
+import {
+  CEO_PROJECT_WORKSPACE_TABS,
+  ENGINEER_PROJECT_WORKSPACE_TABS,
+  resolveProjectWorkspaceTab,
+  type ProjectWorkspaceTab,
+} from "../utils/workspaceTabs";
 import type { ProjectRecord } from "../types";
 
 type Activity = {
@@ -86,10 +90,6 @@ type WorkspaceData = {
   purchaseOrders?: ProjectPurchaseOrder[];
   materialReceipts?: ProjectMaterialReceipt[];
 };
-
-const CEO_TABS = ["overview", "estimates", "materials", "purchasing", "documents", "activity-log", "cost-tracking"] as const;
-const ENGINEER_TABS = ["overview", "activities", "progress-updates", "materials", "documents", "activity-log", "cost-tracking"] as const;
-type WorkspaceTab = (typeof CEO_TABS)[number] | (typeof ENGINEER_TABS)[number];
 
 function mapActivity(projectName: string, activity: Activity): EngineeringProgressActivityRecord {
   return {
@@ -140,10 +140,12 @@ export default function ProjectWorkspaceClient({
 }) {
   const router = useRouter();
   const params = useSearchParams();
-  const tabs: readonly WorkspaceTab[] = canReviewEstimates ? CEO_TABS : ENGINEER_TABS;
+  const tabs: readonly ProjectWorkspaceTab[] = canReviewEstimates
+    ? CEO_PROJECT_WORKSPACE_TABS
+    : ENGINEER_PROJECT_WORKSPACE_TABS;
   const selected = params.get("tab");
-  const tab = tabs.includes(selected as WorkspaceTab) ? (selected as WorkspaceTab) : "overview";
-  const [pendingTab, setPendingTab] = useState<WorkspaceTab | null>(null);
+  const tab = resolveProjectWorkspaceTab(selected, tabs);
+  const [pendingTab, setPendingTab] = useState<ProjectWorkspaceTab | null>(null);
   const [isTabPending, startTabTransition] = useTransition();
   const [isSubmittingProgress, setIsSubmittingProgress] = useState(false);
   const [pendingEstimateAction, setPendingEstimateAction] = useState<{
@@ -193,10 +195,19 @@ export default function ProjectWorkspaceClient({
   }, [canCreateEstimate, canReviewEstimates, project.id, router, tab]);
 
   useEffect(() => {
+    if (selected !== "purchasing") return;
+    const nextParams = new URLSearchParams(params.toString());
+    nextParams.set("tab", "materials");
+    router.replace(`/projects/${project.id}?${nextParams.toString()}`, {
+      scroll: false,
+    });
+  }, [params, project.id, router, selected]);
+
+  useEffect(() => {
     if (!isTabPending) setPendingTab(null);
   }, [isTabPending]);
 
-  function switchTab(nextTab: WorkspaceTab) {
+  function switchTab(nextTab: ProjectWorkspaceTab) {
     if (nextTab === tab || isTabPending) return;
 
     const href =
@@ -393,12 +404,6 @@ export default function ProjectWorkspaceClient({
             purchaseOrders={livePurchaseOrders}
           />
         )
-      ) : null}
-      {!isTabPending && tab === "purchasing" ? (
-        <>
-          <ProjectPreviewNotice label="Purchasing approvals are preview data in this phase." />
-          <PurchasingApprovalsPageClient projectName={project.name} />
-        </>
       ) : null}
       {!isTabPending && tab === "documents" ? (
         <ProjectDocumentsPanel

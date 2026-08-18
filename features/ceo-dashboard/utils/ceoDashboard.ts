@@ -71,6 +71,12 @@ export function buildCeoApprovalQueue(data: CeoDashboardData): CeoApprovalSummar
   ];
 }
 
+export function getCeoReviewApprovalsHref(items: CeoApprovalSummary[]) {
+  const pendingItems = items.filter((item) => item.count > 0);
+
+  return pendingItems.length === 1 ? pendingItems[0].href : "#approval-queue";
+}
+
 export function buildCeoAttentionItems(
   projects: CeoDashboardProject[],
   now = new Date(),

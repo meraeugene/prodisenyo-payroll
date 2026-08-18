@@ -80,7 +80,7 @@ export default function PlanningProjectWorkspaceClient({
           <div>
             <h2 className="font-bold text-amber-950">Operational project workspace is locked</h2>
             <p className="mt-1 text-sm leading-6 text-amber-800">
-              This record is still pending cost estimation. Progress, materials, documents, purchasing, and cost tracking unlock only after estimate approval and explicit project activation.
+              This record is still pending cost estimation. Progress, materials, documents, and cost tracking unlock only after estimate approval and explicit project activation.
             </p>
           </div>
         </div>

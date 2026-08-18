@@ -65,7 +65,6 @@ const CEO_ALLOWED_PREFIXES = [
   "/settings",
   "/projects",
   "/material-approvals",
-  "/purchasing-approvals",
 ] as const;
 
 const ADMIN_ALLOWED_PREFIXES = [
@@ -82,7 +81,6 @@ const CEO_ONLY_PREFIXES = [
   "/payroll-approvals",
   "/payroll-reports",
   "/material-approvals",
-  "/purchasing-approvals",
   "/budget-tracker",
 ] as const;
 const CEO_REDIRECT_PATH = "/dashboard";

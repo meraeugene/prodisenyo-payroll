@@ -4,7 +4,6 @@ type WorkspaceTab =
   | "progress-updates"
   | "estimates"
   | "materials"
-  | "purchasing"
   | "documents"
   | "activity-log"
   | "cost-tracking";

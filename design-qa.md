@@ -1,49 +1,62 @@
-# Sidebar Brand Mark - Design QA
+# Public Landing Page - Design QA
 
 ## Comparison target
 
-- Source visual truth: `design-references/brand-logo-source.jpg` and the user's supplied sidebar screenshot showing the rejected circular crop.
-- Implementation route: authenticated dashboard shell on any protected route.
-- Intended state: expanded desktop sidebar with a 36 x 36 px standalone building emblem beside the Prodisenyo ProBuild wordmark.
-- Source pixels: brand source 1254 x 1254; supplied sidebar screenshot 241 x 64.
-- Target CSS viewport and density: desktop dashboard, device scale factor 1.
+- Source visual truth: `design-references/landing-page-reference.png`
+- Source pixels: 941 x 1672
+- Implementation route: `/`
+- Intended state: public, signed-out desktop landing page with navigation, product preview, modules, workflow, roles, product tour, platform advantages, CTA, and footer
+- Target desktop viewport: 1440 x 1800 CSS pixels, device scale factor 1
+- Responsive target: 390 x 844 CSS pixels, device scale factor 1
 
 ## Evidence
 
-- The source brand artwork is stored in the repository.
-- The replacement asset is `public/prodisenyo-building-mark.png`, an RGBA image with transparent corners and a centered building-mark alpha bounding box.
-- The old circular background, border ring, 2.05x crop, embedded company text, and `object-cover` treatment were removed.
-- A browser-rendered implementation screenshot could not be captured because the required in-app browser process exits during startup with `windows sandbox failed: helper_unknown_error: apply deny-read ACLs`.
+- The supplied reference is stored in the repository.
+- Real product screenshots are stored under `public/landing/` and used for the hero, product tour, and feature spotlight.
+- The local route returns HTTP 200 and server-rendered content contains the hero, product tour, and `/auth/login` destination.
+- The mobile navigation and product-tour tabs are implemented as functional client controls.
+- A browser-rendered implementation screenshot could not be captured because the required in-app browser runtime exits during startup with `windows sandbox failed: helper_unknown_error: apply deny-read ACLs`.
 - Implementation screenshot path: unavailable.
-- Console inspection: blocked because the browser-rendered page could not be opened.
+- Browser console inspection: blocked because the browser surface could not start.
 
 ## Findings
 
-- [Blocked] Rendered logo comparison is unavailable.
-  - Location: dashboard sidebar brand header.
-  - Evidence: source artwork and generated transparent asset are available, but the protected dashboard could not be captured through the required browser surface.
-  - Impact: exact perceived sharpness, optical size, and baseline alignment at 36 px cannot be signed off visually.
-  - Fix: reconnect the in-app browser, capture the expanded sidebar at device scale factor 1, and compare the focused brand-header region against the supplied screenshot.
+- [Blocked] Full visual comparison is unavailable.
+  - Location: full public landing page at `/`.
+  - Evidence: the source reference is available, but no browser-rendered implementation capture can be produced through the required browser surface.
+  - Impact: exact desktop and mobile spacing, screenshot crop, typography scale, sticky-header behavior, and section rhythm cannot receive visual sign-off.
+  - Fix: reconnect the in-app browser, capture the page at the desktop and responsive target viewports, combine the source and implementation captures, and correct any remaining P0, P1, or P2 mismatch.
 
 ## Required fidelity surfaces
 
-- Fonts and typography: unchanged; the existing Prodisenyo ProBuild wordmark remains in the same component.
-- Spacing and layout rhythm: logo slot remains 36 x 36 px; rendered comparison is blocked.
-- Colors and visual tokens: replacement emblem uses the supplied teal brand direction; rendered comparison is blocked.
-- Image quality and asset fidelity: real raster brand asset used, with transparent background and no CSS/SVG approximation; final small-size sharpness requires browser capture.
-- Copy and content: unchanged.
+- Fonts and typography: the existing system font stack, strong ERP-style hierarchy, and balanced display copy are implemented; rendered comparison is blocked.
+- Spacing and layout rhythm: the reference's wide centered container, card grid, workflow sequence, alternating product sections, CTA, and footer are implemented; rendered comparison is blocked.
+- Colors and visual tokens: ProBuild teal, white, soft green, slate text, restrained borders, and low-elevation shadows follow the supplied visual direction; rendered comparison is blocked.
+- Image quality and asset fidelity: the implementation uses six supplied ProBuild product screenshots rather than placeholders or CSS-drawn dashboard artwork; crop and small-text readability require browser capture.
+- Copy and content: content is limited to persisted ProBuild workflows and real roles. Unsupported pricing, customer testimonials, demo booking, public contact details, and fabricated claims are intentionally omitted.
+
+## Interaction and runtime checks
+
+- Root route response: HTTP 200.
+- Sign In and Open ProBuild CTAs: implemented with `/auth/login`.
+- Public navigation: anchor links to modules, workflow, roles, and product tour.
+- Product tour: tab selection updates copy, bullets, and product screenshot.
+- Mobile navigation: accessible open/close state and Sign In destination.
+- TypeScript: passed.
+- ESLint: passed.
+- Automated tests: 60 passed.
+- Production build: passed.
 
 ## Comparison history
 
-- Initial source state: full square logo was zoomed 2.05x inside a circular 36 px mask, making the tiny embedded text and building mark muddy.
-- Implemented fix: isolated the building emblem, removed embedded text and background, converted it to transparent PNG, removed the circle/ring/crop, and changed all consumers to `object-contain`.
-- Post-fix visual evidence: blocked by the in-app browser startup failure.
+- Initial implementation pass created the complete landing hierarchy from the selected reference and existing ProBuild product screens.
+- Unsupported marketing elements were replaced with truthful workflow benefits and direct Sign In access.
+- Post-build visual comparison is blocked because the in-app browser cannot start.
 
-## Verification
+## Verification status
 
-- Focused ESLint check: passed.
-- Production build: passed.
-- Full-view comparison: blocked.
-- Focused logo-region comparison: blocked.
+- Full-view desktop comparison: blocked.
+- Focused hero and product-tour comparison: blocked.
+- Responsive comparison: blocked.
 
 final result: blocked

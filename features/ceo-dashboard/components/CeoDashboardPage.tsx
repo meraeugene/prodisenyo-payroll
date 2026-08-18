@@ -13,6 +13,7 @@ import {
   buildCeoApprovalQueue,
   buildCeoAttentionItems,
   buildCeoRecentActivity,
+  getCeoReviewApprovalsHref,
   getCeoDashboardTotals,
 } from "@/features/ceo-dashboard/utils/ceoDashboard";
 
@@ -25,6 +26,8 @@ export default function CeoDashboardPage({
 }) {
   const displayName = fullName?.trim() || "CEO";
   const totals = getCeoDashboardTotals(data);
+  const approvalQueue = buildCeoApprovalQueue(data);
+  const reviewApprovalsHref = getCeoReviewApprovalsHref(approvalQueue);
   const attentionItems = buildCeoAttentionItems(data.projects);
   const recentActivity = buildCeoRecentActivity(data);
 
@@ -39,8 +42,8 @@ export default function CeoDashboardPage({
         </div>
         <div className="flex items-center gap-3">
           <Link
-            href="/material-approvals"
-            className="inline-flex h-10 items-center gap-2 rounded-xl border border-emerald-700 bg-white px-4 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50"
+            href={reviewApprovalsHref}
+            className="inline-flex h-10 items-center gap-2 rounded-xl border border-emerald-700 bg-white px-4 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2"
           >
             <ClipboardCheck size={16} />
             Review approvals
@@ -59,7 +62,7 @@ export default function CeoDashboardPage({
 
       <div className="mt-5 grid gap-5 2xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,.72fr)_minmax(320px,.78fr)]">
         <CeoDashboardProjectsPanel projects={data.projects} />
-        <CeoDashboardApprovalQueue items={buildCeoApprovalQueue(data)} />
+        <CeoDashboardApprovalQueue items={approvalQueue} />
         <CeoRecentProgressPanel updates={data.progressUpdates} />
       </div>
 

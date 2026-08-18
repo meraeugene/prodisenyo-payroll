@@ -81,16 +81,13 @@ function mapRow(
 }
 
 export async function getPurchasingRecordsAction(): Promise<PurchasingRecord[]> {
-  const { user, profile } = await requireRole([APP_ROLES.CEO, APP_ROLES.PURCHASER]);
+  const { user } = await requireRole(APP_ROLES.PURCHASER);
   const database = createSupabaseAdminClient() as any;
-  let query = database
+  const query = database
     .from("purchase_orders")
     .select("*, project:projects(name)")
-    .order("updated_at", { ascending: false });
-
-  if (profile.role === APP_ROLES.PURCHASER) {
-    query = query.or("assigned_to.is.null,assigned_to.eq." + user.id);
-  }
+    .order("updated_at", { ascending: false })
+    .or("assigned_to.is.null,assigned_to.eq." + user.id);
 
   const { data, error } = await query;
   if (error) throw new Error("Failed to load purchasing records. " + error.message);
