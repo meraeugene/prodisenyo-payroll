@@ -60,3 +60,35 @@
 - Responsive comparison: blocked.
 
 final result: blocked
+
+---
+
+# Payroll Calculation Details - Design QA
+
+## Comparison target
+
+- Selected visual: `.design-reference-payroll-calculation.png`
+- Target viewport: 1440 x 900 CSS pixels
+- Implementation surface: Payroll Manager calculation details modal
+
+## Implemented fidelity
+
+- Compact employee, site, role, and payroll-period header
+- Logs, Summary, and Adjustments navigation
+- Five-row default attendance table with editable regular and overtime hours
+- Condensed two-column calculation summary and adjusted total pay emphasis
+- Biometric overtime confirmation controls
+- Compact adjustment actions with focused entry dialog
+- Adjustment ledger, collapsible branch-rate breakdown, and sticky save actions
+- Responsive stacking and horizontal table scrolling
+
+## Verification
+
+- TypeScript: passed
+- Targeted ESLint: passed
+- Automated tests: 64 passed
+- Production build: passed
+- Browser capture: blocked because the required in-app browser runtime exits during startup with `windows sandbox failed: helper_unknown_error: apply deny-read ACLs`
+- Pixel comparison: blocked until a browser-rendered screenshot can be captured
+
+final result: blocked

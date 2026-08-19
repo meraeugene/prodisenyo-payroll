@@ -66,13 +66,18 @@ import {
   parseNonNegativeValue,
   round2,
 } from "@/features/payroll/utils/payrollEditModalHelpers";
+import {
+  PayrollAdjustmentDialog,
+  type PayrollAdjustmentFieldKey,
+} from "@/features/payroll/components/payroll-edit/PayrollAdjustmentDialog";
+import { PayrollCalculationWorkspace } from "@/features/payroll/components/payroll-edit/PayrollCalculationWorkspace";
 
 interface PayrollEditModalProps {
   payroll: UsePayrollStateResult;
   currentUserRole: AppRole | null;
 }
 
-const ALL_REPORT_LOGS_PAGE_SIZE = 7;
+const ALL_REPORT_LOGS_PAGE_SIZE = 5;
 
 export default function PayrollEditModal({
   payroll,
@@ -123,6 +128,8 @@ export default function PayrollEditModal({
   const [confirmBiometricOvertimeStatus, setConfirmBiometricOvertimeStatus] =
     useState<"approved" | "rejected" | null>(null);
   const [allReportLogsPage, setAllReportLogsPage] = useState(1);
+  const [showAllLogs, setShowAllLogs] = useState(false);
+  const [showBranchRates, setShowBranchRates] = useState(false);
   const isPayrollManager = currentUserRole === "payroll_manager";
 
   useEffect(() => {
@@ -181,6 +188,8 @@ export default function PayrollEditModal({
     );
     setConfirmBiometricOvertimeStatus(null);
     setAllReportLogsPage(1);
+    setShowAllLogs(false);
+    setShowBranchRates(false);
   }, [editingPayrollRow?.id, payroll.editingPayrollAdjustments]);
 
   useEffect(() => {
@@ -735,6 +744,163 @@ export default function PayrollEditModal({
 
   function removePaidLeave(id: string) {
     setPaidLeaveEntries((prev) => prev.filter((entry) => entry.id !== id));
+  }
+
+  function updateAdjustmentField(
+    field: PayrollAdjustmentFieldKey,
+    value: string,
+  ) {
+    const numericValue = field.toLowerCase().includes("notes")
+      ? value
+      : normalizeNumericInput(value);
+    const setters: Record<
+      PayrollAdjustmentFieldKey,
+      (nextValue: string) => void
+    > = {
+      cashAdvance: setCashAdvanceInput,
+      cashAdvanceNotes: setCashAdvanceNotes,
+      overtimeHours: setOvertimeHoursInput,
+      overtimePay: setOvertimePayInput,
+      overtimeNotes: setOvertimeNotes,
+      paidLeaveDays: setPaidLeaveDaysInput,
+      paidLeaveNotes: setPaidLeaveNotes,
+      allowance: setAllowanceAmountInput,
+      allowanceNotes: setAllowanceNotes,
+      sssGsis: setSssGsisInput,
+      philHealth: setPhilHealthInput,
+      pagIbig: setPagIbigInput,
+      withholdingTax: setWithholdingTaxInput,
+      otherDeductions: setOtherDeductionsInput,
+    };
+    setters[field](numericValue);
+    if (field === "overtimeHours" || field === "overtimePay") {
+      setOvertimeValidationMessage(null);
+    }
+  }
+
+  function submitActiveAdjustment() {
+    switch (activeAdjustmentForm) {
+      case "cashAdvance":
+        addCashAdvance();
+        break;
+      case "overtime":
+        addOvertime();
+        break;
+      case "paidLeave":
+        addPaidLeave();
+        break;
+      case "allowance":
+        addAllowance();
+        break;
+      case "reductions":
+        saveReductions();
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (allReportLogsPage >= 1) {
+    return (
+      <PayrollCalculationWorkspace
+        employeeName={editingPayrollRow.worker}
+        roleName={
+          ROLE_CODE_TO_NAME[editingPayrollRow.role as RoleCode] ??
+          "Unknown Role"
+        }
+        siteLabel={loggedSitesLabel}
+        periodLabel={primarySitePeriodLabel}
+        logs={payroll.editingPayrollLogs}
+        visibleLogs={
+          showAllLogs ? payroll.editingPayrollLogs : visibleAllReportLogs
+        }
+        page={allReportLogsPage}
+        totalPages={allReportLogsTotalPages}
+        showAllLogs={showAllLogs}
+        paidHolidayDates={payableHolidayDateSet}
+        attendanceDays={payroll.editingPayrollSummary.attendanceDays}
+        daysWorked={daysWorked}
+        actualWorkedHours={actualWorkedHours}
+        regularWorkedHours={regularWorkedHours}
+        overtimeHours={payableOvertimeHours}
+        baseWorkedPay={baseWorkedPay}
+        overtimePay={payableOvertimePay}
+        grossPay={grossPay}
+        adjustedTotalPay={adjustedTotalPay}
+        adjustmentTotal={round2(adjustedTotalPay - grossPay)}
+        hasBiometricOvertime={hasBiometricOvertime}
+        biometricOvertimeHours={biometricOvertimeHours}
+        biometricOvertimeStatus={biometricOvertimeStatus}
+        confirmBiometricOvertimeStatus={confirmBiometricOvertimeStatus}
+        cashAdvanceEntries={cashAdvanceEntries}
+        overtimeEntries={overtimeEntries}
+        paidLeaveEntries={paidLeaveEntries}
+        allowanceEntries={allowanceEntries}
+        deductionEntries={deductionEntries}
+        branchRates={sitePayBreakdownWithAllocation}
+        showBranchRates={showBranchRates}
+        isPayrollManager={isPayrollManager}
+        isSaving={isSavingChanges}
+        adjustmentDialog={
+          activeAdjustmentForm ? (
+            <PayrollAdjustmentDialog
+              activeForm={activeAdjustmentForm}
+              values={{
+                cashAdvance: cashAdvanceInput,
+                cashAdvanceNotes,
+                overtimeHours: overtimeHoursInput,
+                overtimePay: overtimePayInput,
+                overtimeNotes,
+                paidLeaveDays: paidLeaveDaysInput,
+                paidLeaveNotes,
+                allowance: allowanceAmountInput,
+                allowanceNotes,
+                sssGsis: sssGsisInput,
+                philHealth: philHealthInput,
+                pagIbig: pagIbigInput,
+                withholdingTax: withholdingTaxInput,
+                otherDeductions: otherDeductionsInput,
+              }}
+              overtimeValidationMessage={overtimeValidationMessage}
+              onChange={updateAdjustmentField}
+              onClose={() => {
+                setOvertimeValidationMessage(null);
+                setActiveAdjustmentForm(null);
+              }}
+              onSubmit={submitActiveAdjustment}
+              onClearReductions={clearReductions}
+            />
+          ) : null
+        }
+        getRegularHours={getEditableRegularHours}
+        getOvertimeHours={getEditableOvertimeHours}
+        onUpdateHour={payroll.updateLogHour}
+        onPageChange={setAllReportLogsPage}
+        onToggleAllLogs={() => setShowAllLogs((current) => !current)}
+        onToggleBranchRates={() =>
+          setShowBranchRates((current) => !current)
+        }
+        onOpenAdjustment={setActiveAdjustmentForm}
+        onRemoveCashAdvance={removeCashAdvance}
+        onRemoveOvertime={removeOvertime}
+        onRemovePaidLeave={removePaidLeave}
+        onRemoveAllowance={removeAllowance}
+        onBiometricDecision={setConfirmBiometricOvertimeStatus}
+        onCancelBiometricDecision={() =>
+          setConfirmBiometricOvertimeStatus(null)
+        }
+        onConfirmBiometricDecision={() => {
+          if (confirmBiometricOvertimeStatus) {
+            setBiometricOvertimeStatus(confirmBiometricOvertimeStatus);
+          }
+          setConfirmBiometricOvertimeStatus(null);
+        }}
+        onClose={payroll.closePayrollEditModal}
+        onSave={() => {
+          void handleSaveChanges();
+        }}
+      />
+    );
   }
 
   return (
