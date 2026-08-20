@@ -71,6 +71,8 @@ import {
   type PayrollAdjustmentFieldKey,
 } from "@/features/payroll/components/payroll-edit/PayrollAdjustmentDialog";
 import { PayrollCalculationWorkspace } from "@/features/payroll/components/payroll-edit/PayrollCalculationWorkspace";
+import { AttendanceResolutionDialog } from "@/features/payroll/components/payroll-edit/AttendanceResolutionDialog";
+import { useCutoffAttendanceReview } from "@/features/payroll/hooks/useCutoffAttendanceReview";
 
 interface PayrollEditModalProps {
   payroll: UsePayrollStateResult;
@@ -215,6 +217,21 @@ export default function PayrollEditModal({
     );
   }, [payroll.paidHolidays, payroll.payrollDateRange]);
 
+  const attendanceReview = useCutoffAttendanceReview({
+    identity: editingPayrollRow?.id ?? null,
+    periodStart: payroll.payrollDateRange?.start,
+    periodEnd: payroll.payrollDateRange?.end,
+    logs: payroll.editingPayrollLogs,
+    paidHolidayDates: payableHolidayDateSet,
+    initialDecisions:
+      payroll.editingPayrollAdjustments.attendanceDecisions ?? {},
+    dailyRateCentavos: Math.round(
+      ((editingPayrollRow?.customRate ?? editingPayrollRow?.defaultRate ?? 0) *
+        FULL_WORKDAY_HOURS) *
+        100,
+    ),
+  });
+
   if (!editingPayrollRow || !payrollEditDraft) return null;
 
   function getEditableRegularHours(log: DailyLogRow): number {
@@ -317,10 +334,22 @@ export default function PayrollEditModal({
       0,
     ),
   );
-  const regularWorkedHours = currentLogsForPay.reduce(
+  const biometricRegularWorkedHours = currentLogsForPay.reduce(
     (sum, log) => sum + log.regularHours,
     0,
   );
+  const hasAttendanceDecisions =
+    Object.keys(attendanceReview.decisions).length > 0;
+  const regularWorkedHours = hasAttendanceDecisions
+    ? attendanceReview.days.reduce(
+        (sum, day) =>
+          day.classification === "REGULAR_HOLIDAY" ||
+          day.classification === "SPECIAL_NON_WORKING_HOLIDAY"
+            ? sum
+            : sum + day.approvedRegularSeconds / 3600,
+        0,
+      )
+    : biometricRegularWorkedHours;
   const sitePayBreakdown = loggedSites.map((site) => {
     const siteLogs = currentLogsForPay.filter(
       (log) => extractSiteName(log.site) === site,
@@ -723,6 +752,8 @@ export default function PayrollEditModal({
           biometricOvertimeStatus === "approved"
             ? biometricOvertimeHours
             : null,
+        attendanceDecisions: attendanceReview.decisions,
+        attendanceDays: attendanceReview.days,
       });
 
       if (result.entries.length > 0) {
@@ -871,6 +902,15 @@ export default function PayrollEditModal({
               onClearReductions={clearReductions}
             />
           ) : null
+        }
+        cutoffAttendanceDays={attendanceReview.days}
+        onResolveAttendance={attendanceReview.openResolution}
+        attendanceResolutionDialog={
+          <AttendanceResolutionDialog
+            day={attendanceReview.resolvingDay}
+            onClose={attendanceReview.closeResolution}
+            onSave={attendanceReview.saveDecision}
+          />
         }
         getRegularHours={getEditableRegularHours}
         getOvertimeHours={getEditableOvertimeHours}

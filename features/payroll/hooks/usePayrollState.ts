@@ -73,6 +73,8 @@ const EMPTY_ADJUSTMENTS: PayrollAdjustmentSet = {
   allowanceEntries: [],
   deductionEntries: [],
   biometricOvertimeStatus: null,
+  attendanceDecisions: {},
+  attendanceDays: [],
 };
 
 function sanitizeEditableHours(
@@ -903,6 +905,8 @@ export function usePayrollState({
       deductionEntries: override?.deductionEntries ?? [],
       biometricOvertimeStatus: override?.biometricOvertimeStatus ?? null,
       biometricOvertimeHours: override?.biometricOvertimeHours ?? null,
+      attendanceDecisions: override?.attendanceDecisions ?? {},
+      attendanceDays: override?.attendanceDays ?? [],
     };
   }, [editingPayrollRowId, payrollOverrides]);
 
@@ -1569,6 +1573,12 @@ export function usePayrollState({
         deductionsTotal: nextDeductionsTotal,
         biometricOvertimeStatus: nextBiometricStatus,
         biometricOvertimeHours: nextBiometricHours,
+        attendanceDecisions:
+          adjustments?.attendanceDecisions ??
+          existingOverride?.attendanceDecisions ??
+          {},
+        attendanceDays:
+          adjustments?.attendanceDays ?? existingOverride?.attendanceDays ?? [],
       },
     }));
 

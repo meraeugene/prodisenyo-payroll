@@ -1,94 +1,21 @@
-# Public Landing Page - Design QA
+# Calculation Details Design QA
 
-## Comparison target
+- Reference: `C:/Users/User/Downloads/63ba444d-9a63-417d-8d66-5ee7757c3e3e.png`
+- Target: existing Calculation Details modal in the local payroll application
+- Viewport/state: desktop modal with an existing payroll record
 
-- Source visual truth: `design-references/landing-page-reference.png`
-- Source pixels: 941 x 1672
-- Implementation route: `/`
-- Intended state: public, signed-out desktop landing page with navigation, product preview, modules, workflow, roles, product tour, platform advantages, CTA, and footer
-- Target desktop viewport: 1440 x 1800 CSS pixels, device scale factor 1
-- Responsive target: 390 x 844 CSS pixels, device scale factor 1
+## Build checks
 
-## Evidence
+- ESLint: passed
+- Existing automated tests: 64 passed
+- Next.js production build and TypeScript: passed
 
-- The supplied reference is stored in the repository.
-- Real product screenshots are stored under `public/landing/` and used for the hero, product tour, and feature spotlight.
-- The local route returns HTTP 200 and server-rendered content contains the hero, product tour, and `/auth/login` destination.
-- The mobile navigation and product-tour tabs are implemented as functional client controls.
-- A browser-rendered implementation screenshot could not be captured because the required in-app browser runtime exits during startup with `windows sandbox failed: helper_unknown_error: apply deny-read ACLs`.
-- Implementation screenshot path: unavailable.
-- Browser console inspection: blocked because the browser surface could not start.
+## Visual comparison
 
-## Findings
+The local application is responding at `http://127.0.0.1:3000`, but the required in-app browser connection could not start because its browser-control runtime was blocked by the Windows sandbox. A same-viewport prototype screenshot therefore could not be captured or compared with the reference image.
 
-- [Blocked] Full visual comparison is unavailable.
-  - Location: full public landing page at `/`.
-  - Evidence: the source reference is available, but no browser-rendered implementation capture can be produced through the required browser surface.
-  - Impact: exact desktop and mobile spacing, screenshot crop, typography scale, sticky-header behavior, and section rhythm cannot receive visual sign-off.
-  - Fix: reconnect the in-app browser, capture the page at the desktop and responsive target viewports, combine the source and implementation captures, and correct any remaining P0, P1, or P2 mismatch.
-
-## Required fidelity surfaces
-
-- Fonts and typography: the existing system font stack, strong ERP-style hierarchy, and balanced display copy are implemented; rendered comparison is blocked.
-- Spacing and layout rhythm: the reference's wide centered container, card grid, workflow sequence, alternating product sections, CTA, and footer are implemented; rendered comparison is blocked.
-- Colors and visual tokens: ProBuild teal, white, soft green, slate text, restrained borders, and low-elevation shadows follow the supplied visual direction; rendered comparison is blocked.
-- Image quality and asset fidelity: the implementation uses six supplied ProBuild product screenshots rather than placeholders or CSS-drawn dashboard artwork; crop and small-text readability require browser capture.
-- Copy and content: content is limited to persisted ProBuild workflows and real roles. Unsupported pricing, customer testimonials, demo booking, public contact details, and fabricated claims are intentionally omitted.
-
-## Interaction and runtime checks
-
-- Root route response: HTTP 200.
-- Sign In and Open ProBuild CTAs: implemented with `/auth/login`.
-- Public navigation: anchor links to modules, workflow, roles, and product tour.
-- Product tour: tab selection updates copy, bullets, and product screenshot.
-- Mobile navigation: accessible open/close state and Sign In destination.
-- TypeScript: passed.
-- ESLint: passed.
-- Automated tests: 60 passed.
-- Production build: passed.
-
-## Comparison history
-
-- Initial implementation pass created the complete landing hierarchy from the selected reference and existing ProBuild product screens.
-- Unsupported marketing elements were replaced with truthful workflow benefits and direct Sign In access.
-- Post-build visual comparison is blocked because the in-app browser cannot start.
-
-## Verification status
-
-- Full-view desktop comparison: blocked.
-- Focused hero and product-tour comparison: blocked.
-- Responsive comparison: blocked.
+## Final result
 
 final result: blocked
 
----
-
-# Payroll Calculation Details - Design QA
-
-## Comparison target
-
-- Selected visual: `.design-reference-payroll-calculation.png`
-- Target viewport: 1440 x 900 CSS pixels
-- Implementation surface: Payroll Manager calculation details modal
-
-## Implemented fidelity
-
-- Compact employee, site, role, and payroll-period header
-- Logs, Summary, and Adjustments navigation
-- Five-row default attendance table with editable regular and overtime hours
-- Condensed two-column calculation summary and adjusted total pay emphasis
-- Biometric overtime confirmation controls
-- Compact adjustment actions with focused entry dialog
-- Adjustment ledger, collapsible branch-rate breakdown, and sticky save actions
-- Responsive stacking and horizontal table scrolling
-
-## Verification
-
-- TypeScript: passed
-- Targeted ESLint: passed
-- Automated tests: 64 passed
-- Production build: passed
-- Browser capture: blocked because the required in-app browser runtime exits during startup with `windows sandbox failed: helper_unknown_error: apply deny-read ACLs`
-- Pixel comparison: blocked until a browser-rendered screenshot can be captured
-
-final result: blocked
+Visual QA must be rerun after browser access is available. No visual pass is claimed from build or static-code checks alone.

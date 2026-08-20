@@ -53,6 +53,8 @@ export interface PayrollAdjustmentSet {
   biometricOvertimeStatus: "approved" | "rejected" | null;
   /** When approved, total biometric OT hours (matches edit modal / all-site logs). */
   biometricOvertimeHours?: number | null;
+  attendanceDecisions?: PayrollAttendanceDecisionMap;
+  attendanceDays?: PayrollAttendanceDaySnapshot[];
 }
 
 export interface PayrollRowOverride {
@@ -74,6 +76,8 @@ export interface PayrollRowOverride {
   deductionsTotal?: number;
   biometricOvertimeStatus?: "approved" | "rejected" | null;
   biometricOvertimeHours?: number | null;
+  attendanceDecisions?: PayrollAttendanceDecisionMap;
+  attendanceDays?: PayrollAttendanceDaySnapshot[];
 }
 
 export interface PayrollEditSummary {
@@ -107,5 +111,72 @@ export type LogHourOverrideMap = Record<string, LogHourOverride>;
 export interface PayrollEditContext {
   editingPayrollLogs: DailyLogRow[];
   logHourOverrides: LogHourOverrideMap;
+}
+
+export const ATTENDANCE_CLASSIFICATIONS = [
+  "WORKED",
+  "NO_BIOMETRIC",
+  "ABSENT",
+  "REST_DAY",
+  "REGULAR_HOLIDAY",
+  "SPECIAL_NON_WORKING_HOLIDAY",
+  "PAID_LEAVE",
+  "UNPAID_LEAVE",
+  "OFFICIAL_BUSINESS",
+  "MANUAL_ATTENDANCE",
+  "FORGOT_TO_LOG",
+  "COMPANY_PAID_DAY",
+] as const;
+
+export type AttendanceClassification =
+  (typeof ATTENDANCE_CLASSIFICATIONS)[number];
+
+export type AttendanceDecisionSource =
+  | "biometric"
+  | "schedule"
+  | "holiday"
+  | "leave"
+  | "manual"
+  | "system";
+
+export interface PayrollAttendanceDecision {
+  date: string;
+  classification: AttendanceClassification;
+  approvedRegularSeconds: number;
+  approvedOvertimeSeconds: number;
+  overtimeStatus: "pending" | "approved" | "rejected";
+  reason: string;
+  notes?: string;
+  source: AttendanceDecisionSource;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+}
+
+export type PayrollAttendanceDecisionMap = Record<
+  string,
+  PayrollAttendanceDecision
+>;
+
+export interface PayrollAttendanceDaySnapshot {
+  date: string;
+  dayOfWeek: number;
+  isScheduledWorkday: boolean | null;
+  biometricTimeIn: string | null;
+  biometricTimeOut: string | null;
+  biometricWorkedSeconds: number;
+  breakSeconds: number;
+  calculatedRegularSeconds: number;
+  detectedOvertimeSeconds: number;
+  classification: AttendanceClassification;
+  approvedRegularSeconds: number;
+  approvedOvertimeSeconds: number;
+  payableSeconds: number;
+  overtimeStatus: "pending" | "approved" | "rejected";
+  source: AttendanceDecisionSource;
+  isManualOverride: boolean;
+  overrideReason: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  needsReview: boolean;
 }
 

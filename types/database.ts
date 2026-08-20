@@ -15,6 +15,19 @@ export type AppRole =
   | "employee";
 export type PayrollRunStatus = "draft" | "submitted" | "approved" | "rejected";
 export type AdjustmentStatus = "pending" | "approved" | "rejected";
+export type AttendanceClassification =
+  | "WORKED"
+  | "NO_BIOMETRIC"
+  | "ABSENT"
+  | "REST_DAY"
+  | "REGULAR_HOLIDAY"
+  | "SPECIAL_NON_WORKING_HOLIDAY"
+  | "PAID_LEAVE"
+  | "UNPAID_LEAVE"
+  | "OFFICIAL_BUSINESS"
+  | "MANUAL_ATTENDANCE"
+  | "FORGOT_TO_LOG"
+  | "COMPANY_PAID_DAY";
 export type EstimateStatus = "draft" | "submitted" | "approved" | "rejected";
 export type AdjustmentType =
   | "overtime"
@@ -273,6 +286,10 @@ export interface Database {
           approved_at: string | null;
           rejected_at: string | null;
           rejection_reason: string | null;
+          locked_at: string | null;
+          reopened_at: string | null;
+          reopened_by: string | null;
+          reopen_reason: string | null;
           gross_total: number;
           net_total: number;
           created_at: string;
@@ -294,6 +311,10 @@ export interface Database {
           approved_at?: string | null;
           rejected_at?: string | null;
           rejection_reason?: string | null;
+          locked_at?: string | null;
+          reopened_at?: string | null;
+          reopened_by?: string | null;
+          reopen_reason?: string | null;
           gross_total?: number;
           net_total?: number;
           created_at?: string;
@@ -313,6 +334,10 @@ export interface Database {
           approved_at?: string | null;
           rejected_at?: string | null;
           rejection_reason?: string | null;
+          locked_at?: string | null;
+          reopened_at?: string | null;
+          reopened_by?: string | null;
+          reopen_reason?: string | null;
           gross_total?: number;
           net_total?: number;
           updated_at?: string;
@@ -881,6 +906,88 @@ export interface Database {
           reference_supplier?: string | null;
           reference_quotation?: string | null;
         };
+      };
+      employee_work_schedules: {
+        Row: {
+          id: string; employee_id: string | null; employee_name_key: string | null;
+          site_id: string | null; day_of_week: number; is_workday: boolean;
+          standard_seconds: number; break_seconds: number; effective_from: string | null;
+          effective_to: string | null; created_by: string; updated_by: string | null;
+          created_at: string; updated_at: string;
+        };
+        Insert: {
+          id?: string; employee_id?: string | null; employee_name_key?: string | null;
+          site_id?: string | null; day_of_week: number; is_workday?: boolean;
+          standard_seconds?: number; break_seconds?: number; effective_from?: string | null;
+          effective_to?: string | null; created_by: string; updated_by?: string | null;
+          created_at?: string; updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["employee_work_schedules"]["Insert"]>;
+      };
+      payroll_holidays: {
+        Row: {
+          id: string; holiday_date: string; name: string;
+          holiday_type: "regular" | "special_non_working" | "local" | "company";
+          site_id: string | null; payable_seconds: number; multiplier_basis_points: number;
+          created_by: string; updated_by: string | null; created_at: string; updated_at: string;
+        };
+        Insert: {
+          id?: string; holiday_date: string; name: string;
+          holiday_type: "regular" | "special_non_working" | "local" | "company";
+          site_id?: string | null; payable_seconds?: number; multiplier_basis_points?: number;
+          created_by: string; updated_by?: string | null; created_at?: string; updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["payroll_holidays"]["Insert"]>;
+      };
+      employee_leave_records: {
+        Row: {
+          id: string; employee_id: string | null; employee_name_key: string | null;
+          leave_date: string; leave_type: "paid" | "sick" | "unpaid";
+          status: AdjustmentStatus; payable_seconds: number; reason: string | null;
+          requested_by: string; approved_by: string | null; approved_at: string | null;
+          created_at: string; updated_at: string;
+        };
+        Insert: {
+          id?: string; employee_id?: string | null; employee_name_key?: string | null;
+          leave_date: string; leave_type: "paid" | "sick" | "unpaid";
+          status?: AdjustmentStatus; payable_seconds?: number; reason?: string | null;
+          requested_by: string; approved_by?: string | null; approved_at?: string | null;
+          created_at?: string; updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["employee_leave_records"]["Insert"]>;
+      };
+      payroll_attendance_days: {
+        Row: {
+          id: string; payroll_run_id: string | null; payroll_run_item_id: string | null;
+          attendance_import_id: string | null; employee_id: string | null;
+          employee_name: string; employee_name_key: string; role_code: string; site_name: string;
+          attendance_date: string; schedule_type: "workday" | "rest_day" | "missing";
+          biometric_time_in: string | null; biometric_time_out: string | null;
+          biometric_worked_seconds: number; break_seconds: number;
+          calculated_regular_seconds: number; detected_overtime_seconds: number;
+          classification: AttendanceClassification; approved_regular_seconds: number;
+          approved_overtime_seconds: number; overtime_status: AdjustmentStatus;
+          source: "biometric" | "schedule" | "holiday" | "leave" | "manual" | "system";
+          is_manual_override: boolean; override_reason: string | null; notes: string | null;
+          reviewed_by: string | null; reviewed_at: string | null;
+          created_at: string; updated_at: string;
+        };
+        Insert: {
+          id?: string; payroll_run_id?: string | null; payroll_run_item_id?: string | null;
+          attendance_import_id?: string | null; employee_id?: string | null;
+          employee_name: string; employee_name_key: string; role_code: string; site_name: string;
+          attendance_date: string; schedule_type?: "workday" | "rest_day" | "missing";
+          biometric_time_in?: string | null; biometric_time_out?: string | null;
+          biometric_worked_seconds?: number; break_seconds?: number;
+          calculated_regular_seconds?: number; detected_overtime_seconds?: number;
+          classification: AttendanceClassification; approved_regular_seconds?: number;
+          approved_overtime_seconds?: number; overtime_status?: AdjustmentStatus;
+          source: "biometric" | "schedule" | "holiday" | "leave" | "manual" | "system";
+          is_manual_override?: boolean; override_reason?: string | null; notes?: string | null;
+          reviewed_by?: string | null; reviewed_at?: string | null;
+          created_at?: string; updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["payroll_attendance_days"]["Insert"]>;
       };
       audit_logs: {
         Row: {

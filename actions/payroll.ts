@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import type { PayrollRunStatus } from "@/types/database";
 import type { Database } from "@/types/database";
 import type { AttendanceRecordInput, PayrollRow } from "@/lib/payrollEngine";
@@ -1219,7 +1220,7 @@ export async function savePayrollRunAction(input: SavePayrollRunInput) {
   if (!runId) {
     const existingRunQuery = database
       .from("payroll_runs")
-      .select("id, created_at")
+      .select("id, created_at, status")
       .eq("period_label", input.attendancePeriod)
       .eq("site_name", normalizeSiteName(input.siteName))
       .neq("status", "rejected")
@@ -1249,10 +1250,18 @@ export async function savePayrollRunAction(input: SavePayrollRunInput) {
       (existingRuns ?? []) as Array<{
         id: string;
         created_at: string;
+        status: PayrollRunStatus;
       }>
     ).find(Boolean);
 
     if (matchedExistingRun) {
+      if (matchedExistingRun.status === "approved") {
+        throw createPayrollSaveError(
+          "PAYROLL_RUN_LOCKED",
+          "Approved payroll is locked. Reopen it with a recorded reason before editing.",
+          { payrollRunId: matchedExistingRun.id },
+        );
+      }
       runId = matchedExistingRun.id;
     }
   }
@@ -1459,6 +1468,74 @@ export async function savePayrollRunAction(input: SavePayrollRunInput) {
       item.id,
     ]),
   );
+
+  const attendanceDayPayload = normalizedRowSnapshots.flatMap((snapshot) => {
+    const rowKey = [
+      snapshot.row.role,
+      snapshot.row.worker,
+      snapshot.row.site,
+    ]
+      .join(String.fromCharCode(124, 124, 124))
+      .toLowerCase();
+    const payrollRunItemId = itemIdByKey.get(rowKey) ?? null;
+    if (!payrollRunItemId) return [];
+
+    return (snapshot.override?.attendanceDays ?? []).map((day) => ({
+      payroll_run_id: runId,
+      payroll_run_item_id: payrollRunItemId,
+      attendance_import_id: input.attendanceImportId,
+      employee_id: null,
+      employee_name: snapshot.row.worker,
+      employee_name_key: normalizeEmployeeNameKey(snapshot.row.worker),
+      role_code: snapshot.row.role,
+      site_name: snapshot.row.site,
+      attendance_date: day.date,
+      schedule_type:
+        day.isScheduledWorkday === null
+          ? "missing"
+          : day.isScheduledWorkday
+            ? "workday"
+            : "rest_day",
+      biometric_time_in: day.biometricTimeIn,
+      biometric_time_out: day.biometricTimeOut,
+      biometric_worked_seconds: day.biometricWorkedSeconds,
+      break_seconds: day.breakSeconds,
+      calculated_regular_seconds: day.calculatedRegularSeconds,
+      detected_overtime_seconds: day.detectedOvertimeSeconds,
+      classification: day.classification,
+      approved_regular_seconds: day.approvedRegularSeconds,
+      approved_overtime_seconds: day.approvedOvertimeSeconds,
+      overtime_status: day.overtimeStatus,
+      source: day.source,
+      is_manual_override: day.isManualOverride,
+      override_reason: day.overrideReason,
+      reviewed_by: day.isManualOverride ? user.id : null,
+      reviewed_at: day.reviewedAt,
+    }));
+  });
+
+  if (attendanceDayPayload.length > 0) {
+    const { error: attendanceDaysError } = await database
+      .from("payroll_attendance_days")
+      .insert(attendanceDayPayload);
+
+    const attendanceReviewTableUnavailable =
+      attendanceDaysError &&
+      ["42P01", "PGRST205"].includes(attendanceDaysError.code ?? "");
+
+    if (attendanceDaysError && !attendanceReviewTableUnavailable) {
+      throw createPayrollSaveError(
+        "PAYROLL_SAVE_ATTENDANCE_DAYS_FAILED",
+        "Failed to save reviewed cutoff attendance.",
+        {
+          runId,
+          rowCount: attendanceDayPayload.length,
+          message: attendanceDaysError.message,
+          code: attendanceDaysError.code,
+        },
+      );
+    }
+  }
 
   const dailyTotalsPayload: Array<Record<string, unknown>> = [];
 
@@ -2040,6 +2117,7 @@ export async function approveOvertimeRequestFormAction(requestId: string) {
       status: "approved",
       approved_by: user.id,
       approved_at: approvedAt,
+      locked_at: approvedAt,
       rejected_at: null,
       rejection_reason: null,
     })
@@ -2247,6 +2325,58 @@ export async function approvePayrollReportAction(payrollRunId: string) {
   };
 }
 
+export async function reopenPayrollReportAction(input: {
+  payrollRunId: string;
+  reason: string;
+}) {
+  const { user } = await requireRole(["ceo", "payroll_manager"]);
+  const database = createSupabaseAdminClient() as any;
+  const runId = input.payrollRunId.trim();
+  const reason = input.reason.trim();
+
+  if (!runId) throw new Error("Payroll report ID is required.");
+  if (reason.length < 5) {
+    throw new Error("A reopening reason of at least 5 characters is required.");
+  }
+
+  const reopenedAt = new Date().toISOString();
+  const { data: payrollRun, error: reopenError } = await database
+    .from("payroll_runs")
+    .update({
+      status: "draft" satisfies PayrollRunStatus,
+      locked_at: null,
+      reopened_at: reopenedAt,
+      reopened_by: user.id,
+      reopen_reason: reason,
+    })
+    .eq("id", runId)
+    .eq("status", "approved")
+    .select("id, site_name, period_label")
+    .maybeSingle();
+
+  if (reopenError || !payrollRun) {
+    throw new Error("Only an approved payroll report can be reopened.");
+  }
+
+  await database.from("audit_logs").insert({
+    actor_id: user.id,
+    action: "payroll_report_reopened",
+    entity_type: "payroll_run",
+    entity_id: runId,
+    payload: {
+      reason,
+      reopened_at: reopenedAt,
+      site_name: payrollRun.site_name,
+      period_label: payrollRun.period_label,
+    },
+  });
+
+  revalidatePath("/payroll-reports");
+  revalidatePath("/payroll-approvals");
+
+  return { payrollRunId: runId, status: "draft" as const, reopenedAt };
+}
+
 export async function getPayrollReportsDataAction() {
   await requireRole("ceo");
   const database = createSupabaseAdminClient() as any;
@@ -2296,6 +2426,7 @@ export async function rejectPayrollReportAction(
       status: "rejected" satisfies PayrollRunStatus,
       approved_by: null,
       approved_at: null,
+      locked_at: null,
       rejected_at: rejectedAt,
       rejection_reason: rejectionReason,
     })
